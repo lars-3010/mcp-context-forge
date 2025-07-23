@@ -261,8 +261,8 @@ async def validation_exception_handler(_request: Request, exc: ValidationError):
 
     Args:
         _request: The FastAPI request object that triggered the validation error.
-                  (Unused but required by FastAPI's exception handler interface)
-        exc: The Pydantic ValidationError exception containing validation
+                 (Unused but required by FastAPI's exception handler interface)
+        exc:The Pydantic ValidationError exception containing validation
              failure details.
 
     Returns:
@@ -1802,7 +1802,11 @@ async def register_gateway(
     """
     logger.debug(f"User '{user}' requested to register gateway: {gateway}")
     try:
-        return await gateway_service.register_gateway(db, gateway)
+        # return await gateway_service.register_gateway(db, gateway)
+        result = await gateway_service.register_gateway(db, gateway)
+        print(result)
+        return result
+
     except Exception as ex:
         if isinstance(ex, GatewayConnectionError):
             return JSONResponse(content={"message": "Unable to connect to gateway"}, status_code=502)

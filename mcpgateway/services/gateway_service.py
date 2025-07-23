@@ -384,9 +384,20 @@ class GatewayService:
             self._active_gateways.add(db_gateway.url)
 
             # Notify subscribers
-            await self._notify_gateway_added(db_gateway)
+            # await self._notify_gateway_added(db_gateway)
 
-            return GatewayRead.model_validate(gateway)
+            await self._notify_gateway_added(db_gateway)
+            logger.info(f"Created Gateway ID: {db_gateway.id}")
+            gateway_read = GatewayRead(
+                # id=str(db_gateway.id),
+                id=str(db_gateway.id),
+                name=db_gateway.name,
+                url=db_gateway.url,
+                description=db_gateway.description,
+            )
+            return gateway_read
+            # return GatewayRead.model_validate(gateway)
+
         except* GatewayConnectionError as ge:
             if TYPE_CHECKING:
                 ge: ExceptionGroup[GatewayConnectionError]

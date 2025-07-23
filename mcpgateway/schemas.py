@@ -1572,6 +1572,7 @@ class PromptInvocation(BaseModelWithConfigDict):
 
 # --- Transport Type ---
 class TransportType(str, Enum):
+    """Enum representing different types of transport protocols."""
     SSE = "SSE"
     HTTP = "HTTP"
     STDIO = "STDIO"
@@ -1690,6 +1691,7 @@ class GatewayCreate(BaseModel):
     @field_validator("transport")
     @classmethod
     def validate_transport(cls, v: str) -> str:
+        """Validate that the transport type is one of the defined TransportType values."""
         if v not in [t.value for t in TransportType]:
             raise ValueError(f"Invalid transport type: {v}. Must be one of: {', '.join([t.value for t in TransportType])}")
         return v

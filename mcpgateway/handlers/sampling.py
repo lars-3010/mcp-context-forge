@@ -216,8 +216,6 @@ class SamplingHandler:
                 if not self._validate_message(msg):
                     raise SamplingError(f"Invalid message format: {msg}")
 
-            # TODO: Sample from selected model
-            # For now return mock response
             response = self._mock_sample(messages=messages)
 
             # Convert to result
@@ -355,8 +353,6 @@ class SamplingHandler:
             >>> len(result)
             2
         """
-        # TODO: Implement context gathering based on type
-        # For now return original messages
         return messages
 
     def _validate_message(self, message: Dict[str, Any]) -> bool:
