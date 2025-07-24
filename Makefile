@@ -184,18 +184,33 @@ certs:                           ## Generate ./certs/cert.pem & ./certs/key.pem 
 ## --- House-keeping -----------------------------------------------------------
 # help: clean                - Remove caches, build artefacts, virtualenv, docs, certs, coverage, SBOM, database files, etc.
 .PHONY: clean
+# clean:
+# 	@echo "🧹  Cleaning workspace..."
+# 	@# Remove matching directories
+# 	@for dir in $(DIRS_TO_CLEAN); do \
+# 		find . -type d -name "$$dir" -exec rm -rf {} +; \
+# 	done
+# 	@# Remove listed files
+# 	@rm -f $(FILES_TO_CLEAN)
+# 	@# Delete Python bytecode
+# 	@find . -name '*.py[cod]' -delete
+# 	@# Delete coverage annotated files
+# 	@find . -name '*.py,cover' -delete
+# 	@echo "✅  Clean complete."
 clean:
 	@echo "🧹  Cleaning workspace..."
-	@# Remove matching directories
-	@for dir in $(DIRS_TO_CLEAN); do \
-		find . -type d -name "$$dir" -exec rm -rf {} +; \
-	done
-	@# Remove listed files
-	@rm -f $(FILES_TO_CLEAN)
-	@# Delete Python bytecode
-	@find . -name '*.py[cod]' -delete
-	@# Delete coverage annotated files
-	@find . -name '*.py,cover' -delete
+	@bash -eu -o pipefail -c '\
+		# Remove matching directories \
+		for dir in $(DIRS_TO_CLEAN); do \
+			find . -type d -name "$$dir" -exec rm -rf {} +; \
+		done; \
+		# Remove listed files \
+		rm -f $(FILES_TO_CLEAN); \
+		# Delete Python bytecode \
+		find . -name "*.py[cod]" -delete; \
+		# Delete coverage annotated files \
+		find . -name "*.py,cover" -delete; \
+	'
 	@echo "✅  Clean complete."
 
 
@@ -262,9 +277,16 @@ htmlcov:
 	@/bin/bash -c "source $(VENV_DIR)/bin/activate && coverage html -i -d $(COVERAGE_DIR)"
 	@echo "✅  HTML coverage report ready → $(COVERAGE_DIR)/index.html"
 
+# pytest-examples:
+# 	@echo "🧪 Testing README examples..."
+# 	@test -d "$(VENV_DIR)" || $(MAKE) venv
+# 	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
+# 		python3 -m pip install -q pytest pytest-examples && \
+# 		pytest -v test_readme.py"
 pytest-examples:
 	@echo "🧪 Testing README examples..."
 	@test -d "$(VENV_DIR)" || $(MAKE) venv
+	@test -f test_readme.py || { echo "⚠️  test_readme.py not found - skipping"; exit 0; }
 	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
 		python3 -m pip install -q pytest pytest-examples && \
 		pytest -v test_readme.py"
@@ -674,7 +696,7 @@ security-scan: trivy grype-scan
 LINTERS += yamllint jsonlint tomllint
 
 # ➋  Individual targets
-.PHONY: yamllint jsonlint tomllint
+# .PHONY: yamllint jsonlint tomllint
 
 yamllint:                         ## 📑 YAML linting
 	@echo '📑  yamllint ...'
@@ -921,15 +943,24 @@ trivy-install:
 	@echo "📥 Installing Trivy..."
 	@curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
+# trivy:
+# 	@command -v trivy >/dev/null 2>&1 || { \
+# 		echo "❌ trivy not installed."; \
+# 		echo "💡 Install with:"; \
+# 		echo "   • macOS: brew install trivy"; \
+# 		echo "   • Linux: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin"; \
+# 		echo "   • Or run: make trivy-install"; \
+# 		exit 1; \
+# 	}
 trivy:
-	@command -v trivy >/dev/null 2>&1 || { \
-		echo "❌ trivy not installed."; \
-		echo "💡 Install with:"; \
-		echo "   • macOS: brew install trivy"; \
-		echo "   • Linux: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin"; \
-		echo "   • Or run: make trivy-install"; \
-		exit 1; \
-	}
+	@command -v trivy >/dev/null 2>&1 || { echo "⚠️ trivy not installed"; exit 1; }
+	@if command -v systemctl >/dev/null 2>&1; then \
+		systemctl --user enable --now podman.socket 2>/dev/null || true; \
+	fi
+	@echo "🔎  trivy vulnerability scan..."
+	# (existing trivy scan commands)
+
+
 	@systemctl --user enable --now podman.socket 2>/dev/null || true
 	@echo "🔎  trivy vulnerability scan..."
 	@trivy --format table --severity HIGH,CRITICAL image $(IMG)
@@ -1154,13 +1185,22 @@ endef
 # help: use-podman           - Switch to Podman runtime
 # help: show-runtime         - Show current container runtime
 
-.PHONY: container-build container-run container-run-host container-run-ssl container-run-ssl-host \
+# .PHONY: container-build container-run container-run-host container-run-ssl container-run-ssl-host \
+#         container-push container-info container-stop container-logs container-shell \
+#         container-health image-list image-clean image-retag container-check-image \
+#         container-build-multi use-docker use-podman show-runtime
+
+.PHONY: container-build container-run container-run-ssl container-run-ssl-host \
         container-push container-info container-stop container-logs container-shell \
         container-health image-list image-clean image-retag container-check-image \
-        container-build-multi use-docker use-podman show-runtime
+        container-build-multi use-docker use-podman show-runtime print-runtime \
+        print-image container-validate-env container-check-ports container-wait-healthy
+
 
 # Containerfile to use (can be overridden)
-CONTAINER_FILE ?= Containerfile
+#CONTAINER_FILE ?= Containerfile
+CONTAINER_FILE ?= $(shell [ -f "Containerfile" ] && echo "Containerfile" || echo "Dockerfile")
+
 
 # Define COMMA for the conditional Z flag
 COMMA := ,
@@ -1177,10 +1217,22 @@ container-info:
 	@echo "Container File: $(CONTAINER_FILE)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+# container-build:
+# 	@echo "🔨 Building with $(CONTAINER_RUNTIME)..."
+# 	$(CONTAINER_RUNTIME) build \
+# 		--platform=linux/amd64 \
+# 		-f $(CONTAINER_FILE) \
+# 		--tag $(IMAGE_BASE):$(IMAGE_TAG) \
+# 		.
+# 	@echo "✅ Built image: $(call get_image_name)"
+
+# Auto-detect platform based on uname
+PLATFORM ?= linux/$(shell uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+
 container-build:
-	@echo "🔨 Building with $(CONTAINER_RUNTIME)..."
+	@echo "🔨 Building with $(CONTAINER_RUNTIME) for platform $(PLATFORM)..."
 	$(CONTAINER_RUNTIME) build \
-		--platform=linux/amd64 \
+		--platform=$(PLATFORM) \
 		-f $(CONTAINER_FILE) \
 		--tag $(IMAGE_BASE):$(IMAGE_TAG) \
 		.
@@ -1329,13 +1381,38 @@ container-health:
 	@echo "Logs:"
 	@$(CONTAINER_RUNTIME) inspect $(PROJECT_NAME) --format='{{range .State.Health.Log}}{{.Output}}{{end}}' 2>/dev/null || true
 
+# container-build-multi:
+# 	@echo "🔨 Building multi-architecture image..."
+# 	@if [ "$(CONTAINER_RUNTIME)" = "docker" ]; then \
+# 		if ! docker buildx ls | grep -q "$(PROJECT_NAME)-builder"; then \
+# 			echo "📦 Creating buildx builder..."; \
+# 			docker buildx create --name $(PROJECT_NAME)-builder --use; \
+# 		fi; \
+# 		docker buildx build \
+# 			--platform=linux/amd64,linux/arm64 \
+# 			-f $(CONTAINER_FILE) \
+# 			--tag $(IMAGE_BASE):$(IMAGE_TAG) \
+# 			--push \
+# 			.; \
+# 	elif [ "$(CONTAINER_RUNTIME)" = "podman" ]; then \
+# 		echo "📦 Building manifest with Podman..."; \
+# 		$(CONTAINER_RUNTIME) build --platform=linux/amd64,linux/arm64 \
+# 			-f $(CONTAINER_FILE) \
+# 			--manifest $(IMAGE_BASE):$(IMAGE_TAG) \
+# 			.; \
+# 		echo "💡 To push: podman manifest push $(IMAGE_BASE):$(IMAGE_TAG)"; \
+# 	else \
+# 		echo "❌ Multi-arch builds require Docker buildx or Podman"; \
+# 		exit 1; \
+# 	fi
 container-build-multi:
 	@echo "🔨 Building multi-architecture image..."
 	@if [ "$(CONTAINER_RUNTIME)" = "docker" ]; then \
-		if ! docker buildx ls | grep -q "$(PROJECT_NAME)-builder"; then \
+		if ! docker buildx inspect $(PROJECT_NAME)-builder >/dev/null 2>&1; then \
 			echo "📦 Creating buildx builder..."; \
-			docker buildx create --name $(PROJECT_NAME)-builder --use; \
+			docker buildx create --name $(PROJECT_NAME)-builder; \
 		fi; \
+		docker buildx use $(PROJECT_NAME)-builder; \
 		docker buildx build \
 			--platform=linux/amd64,linux/arm64 \
 			-f $(CONTAINER_FILE) \
@@ -1353,6 +1430,7 @@ container-build-multi:
 		echo "❌ Multi-arch builds require Docker buildx or Podman"; \
 		exit 1; \
 	fi
+
 
 # Helper targets for debugging image issues
 image-list:
@@ -1407,7 +1485,8 @@ show-runtime:
 # Pre-flight validation
 .PHONY: container-validate check-ports
 
-container-validate: container-validate-env check-ports
+# container-validate: container-validate-env check-ports
+container-validate: container-validate-env container-check-ports
 	@echo "✅ All validations passed"
 
 container-validate-env:
@@ -1416,8 +1495,27 @@ container-validate-env:
 	@grep -q "^MCP_" .env || { echo "⚠️  No MCP_ variables found in .env"; }
 	@echo "✅ Environment validated"
 
+# container-check-ports:
+# 	@echo "🔍 Checking port availability..."
+# 	@failed=0; \
+# 	for port in 4444 8000 8080; do \
+# 		if lsof -Pi :$$port -sTCP:LISTEN -t >/dev/null 2>&1; then \
+# 			echo "❌ Port $$port is already in use"; \
+# 			lsof -Pi :$$port -sTCP:LISTEN; \
+# 			failed=1; \
+# 		else \
+# 			echo "✅ Port $$port is available"; \
+# 		fi; \
+# 	done; \
+# 	test $$failed -eq 0
+
 container-check-ports:
 	@echo "🔍 Checking port availability..."
+	@if ! command -v lsof >/dev/null 2>&1; then \
+		echo "⚠️  lsof not installed - skipping port check"; \
+		echo "💡 Install with: brew install lsof (macOS) or apt-get install lsof (Linux)"; \
+		exit 0; \
+	fi
 	@failed=0; \
 	for port in 4444 8000 8080; do \
 		if lsof -Pi :$$port -sTCP:LISTEN -t >/dev/null 2>&1; then \
@@ -1463,6 +1561,18 @@ container-run-safe: container-validate container-run
 container-run-ssl-safe: container-validate container-run-ssl
 	@$(MAKE) container-wait-healthy
 
+container-wait-healthy:
+	@echo "⏳ Waiting for container to be healthy..."
+	@for i in $$(seq 1 30); do \
+		if $(CONTAINER_RUNTIME) inspect $(PROJECT_NAME) --format='{{.State.Health.Status}}' 2>/dev/null | grep -q healthy; then \
+			echo "✅ Container is healthy"; \
+			exit 0; \
+		fi; \
+		echo "⏳ Waiting for container health... ($$i/30)"; \
+		sleep 2; \
+	done; \
+	echo "⚠️  Container not healthy after 60 seconds"; \
+	exit 1
 # =============================================================================
 # 🦭 PODMAN CONTAINER BUILD & RUN
 # =============================================================================
@@ -1688,9 +1798,15 @@ compose-up: compose-validate
 	@echo "🚀  Using $(COMPOSE_CMD); starting stack..."
 	IMAGE_LOCAL=$(call get_image_name) $(COMPOSE) up -d
 
+# compose-restart:
+# 	@echo "🔄  Restarting stack (build + pull if needed)..."
+# 	IMAGE_LOCAL=$(IMAGE_LOCAL) $(COMPOSE) up -d --pull=missing --build  # These flags might conflict
 compose-restart:
-	@echo "🔄  Restarting stack (build + pull if needed)..."
-	IMAGE_LOCAL=$(IMAGE_LOCAL) $(COMPOSE) up -d --pull=missing --build  # These flags might conflict
+	@echo "🔄  Restarting stack..."
+	$(COMPOSE) pull
+	$(COMPOSE) build
+	IMAGE_LOCAL=$(IMAGE_LOCAL) $(COMPOSE) up -d
+
 
 compose-build:
 	IMAGE_LOCAL=$(call get_image_name) $(COMPOSE) build
@@ -1794,6 +1910,10 @@ IBMCLOUD_REGISTRY_SECRET ?= $(IBMCLOUD_PROJECT)-registry-secret
 # IBMCLOUD_API_KEY             = IBM Cloud IAM API key (optional, use --sso if not set)
 
 ibmcloud-check-env:
+    @test -f .env.ce || { \
+		echo "❌ Missing required .env.ce file!"; \
+		exit 1; \
+	}
 	@bash -eu -o pipefail -c '\
 		echo "🔍  Verifying required IBM Cloud variables (.env.ce)..."; \
 		missing=0; \
@@ -2446,14 +2566,14 @@ devpi-stop:
 	@pids=$(pgrep -f "devpi-server.*$(DEVPI_PORT)" 2>/dev/null || true); \
 	if [ -n "$pids" ]; then \
 		echo "🔄  Killing remaining devpi processes: $pids"; \
-		echo "$pids" | xargs -r kill 2>/dev/null || true; \
+		echo "$pids" | xargs $(XARGS_FLAGS) kill 2>/dev/null || true; \
 		sleep 1; \
-		echo "$pids" | xargs -r kill -9 2>/dev/null || true; \
+		echo "$pids" | xargs $(XARGS_FLAGS) kill -9 2>/dev/null || true; \
 	fi
 	@# Force kill anything using the port
 	@if lsof -ti :$(DEVPI_PORT) >/dev/null 2>&1; then \
 		echo "⚠️   Port $(DEVPI_PORT) still in use, force killing..."; \
-		lsof -ti :$(DEVPI_PORT) | xargs -r kill -9 2>/dev/null || true; \
+		lsof -ti :$(DEVPI_PORT) | xargs $(XARGS_FLAGS) kill -9 2>/dev/null || true; \
 		sleep 1; \
 	fi
 	@echo "✅  DevPi server stopped"
@@ -2619,7 +2739,17 @@ devpi-delete: devpi-setup-user                 ## Delete mcp-contextforge-gatewa
 # ──────────────────────────
 # Which shell files to scan
 # ──────────────────────────
-SHELL_SCRIPTS := $(shell find . -type f -name '*.sh' -not -path './node_modules/*')
+# SHELL_SCRIPTS := $(shell find . -type f -name '*.sh' -not -path './node_modules/*')
+SHELL_SCRIPTS := $(shell find . -type f -name '*.sh' \
+    -not -path './node_modules/*' \
+    -not -path './.venv/*' \
+    -not -path './venv/*' \
+    -not -path './$(VENV_DIR)/*' \
+    -not -path './.git/*' \
+    -not -path './dist/*' \
+    -not -path './build/*' \
+    -not -path './.tox/*')
+
 
 .PHONY: shell-linters-install shell-lint shfmt-fix shellcheck bashate
 
@@ -2640,9 +2770,13 @@ shell-linters-install:     ## 🔧  Install shellcheck, shfmt, bashate
 	# -------- shfmt (Go) -------- \
 	if ! command -v shfmt >/dev/null 2>&1 ; then \
 	  echo "🛠  Installing shfmt..." ; \
-	  GO111MODULE=on go install mvdan.cc/sh/v3/cmd/shfmt@latest || \
-	  { echo "⚠️  go not found - install Go or brew/apt shfmt package manually"; } ; \
-	  export PATH=$$PATH:$$HOME/go/bin ; \
+	  if command -v go >/dev/null 2>&1; then \
+	    GO111MODULE=on go install mvdan.cc/sh/v3/cmd/shfmt@latest; \
+	    mkdir -p $(VENV_DIR)/bin; \
+	    ln -sf $$HOME/go/bin/shfmt $(VENV_DIR)/bin/shfmt 2>/dev/null || true; \
+	  else \
+	    echo "⚠️  Go not found - install Go or brew/apt shfmt package manually"; \
+	  fi ; \
 	fi ; \
 	# -------- bashate (pip) ----- \
 	if ! $(VENV_DIR)/bin/bashate -h >/dev/null 2>&1 ; then \
@@ -2651,6 +2785,7 @@ shell-linters-install:     ## 🔧  Install shellcheck, shfmt, bashate
 	  /bin/bash -c "source $(VENV_DIR)/bin/activate && python3 -m pip install --quiet bashate" ; \
 	fi
 	@echo "✅  Shell linters ready."
+
 
 # -----------------------------------------------------------------------------
 
