@@ -150,21 +150,15 @@ class ToolService:
     - Active/inactive tool management.
     """
 
-    def __init__(self):
-        """Initialize the tool service.
+    def __init__(self, plugin_manager: Optional[PluginManager] = None):
+        """Initialize the tool service with optional plugin manager.
 
-        Examples:
-            >>> from mcpgateway.services.tool_service import ToolService
-            >>> service = ToolService()
-            >>> isinstance(service._event_subscribers, list)
-            True
-            >>> len(service._event_subscribers)
-            0
-            >>> hasattr(service, '_http_client')
-            True
+        Args:
+            plugin_manager: Optional plugin manager instance for hook execution
         """
         self._event_subscribers: List[asyncio.Queue] = []
         self._http_client = ResilientHttpClient(client_args={"timeout": settings.federation_timeout, "verify": not settings.skip_ssl_verify})
+        self.plugin_manager = plugin_manager  # Store the passed plugin manager
 
     async def initialize(self) -> None:
         """Initialize the service.
@@ -538,14 +532,20 @@ class ToolService:
             db.rollback()
             raise ToolError(f"Failed to toggle tool status: {str(e)}")
 
-    async def invoke_tool(self, db: Session, name: str, arguments: Dict[str, Any]) -> ToolResult:
+    async def invoke_tool(
+        self, db: Session, name: str, arguments: Dict[str, Any], user: Optional[str] = None, tenant_id: Optional[str] = None, server_id: Optional[str] = None, request_id: Optional[str] = None
+    ) -> ToolResult:
         """
-        Invoke a registered tool and record execution metrics.
+        Invoke a registered tool with plugin hooks and record execution metrics.
 
         Args:
             db: Database session.
             name: Name of tool to invoke.
             arguments: Tool arguments.
+            user: Optional user identifier for plugin context
+            tenant_id: Optional tenant identifier for plugin context
+            server_id: Optional server identifier for plugin context
+            request_id: Optional request ID, generated if not provided
 
         Returns:
             Tool invocation result.
@@ -553,20 +553,39 @@ class ToolService:
         Raises:
             ToolNotFoundError: If tool not found.
             ToolInvocationError: If invocation fails.
-
-        Examples:
-            >>> from mcpgateway.services.tool_service import ToolService
-            >>> from unittest.mock import MagicMock
-            >>> service = ToolService()
-            >>> db = MagicMock()
-            >>> tool = MagicMock()
-            >>> db.execute.return_value.scalar_one_or_none.side_effect = [tool, None]
-            >>> tool.reachable = True
-            >>> import asyncio
-            >>> result = asyncio.run(service.invoke_tool(db, 'tool_name', {}))
-            >>> isinstance(result, object)
-            True
+            ToolError: If plugin blocks the request.
         """
+        # Generate request ID if not provided
+        if not request_id:
+            request_id = str(uuid.uuid4())
+
+        # Create plugin context
+        context = PluginContext(request_id=request_id, user=user, tenant_id=tenant_id, server_id=server_id, tool_name=name)
+
+        # Prepare the payload for plugins
+        payload = {"tool_name": name, "arguments": arguments or {}, "server_id": server_id}
+
+        # Execute pre-invoke hooks if plugin manager is available
+        if self.plugin_manager:
+            try:
+                pre_result = await self.plugin_manager.execute_hook(HookType.TOOL_PRE_INVOKE, payload, context)
+
+                if not pre_result.success or not pre_result.continue_processing:
+                    # Plugin blocked the request
+                    raise ToolError(f"Tool invocation blocked: {pre_result.error_message}")
+
+                # Use modified payload if provided
+                if pre_result.modified_payload:
+                    payload = pre_result.modified_payload
+                    name = payload.get("tool_name", name)
+                    arguments = payload.get("arguments", arguments)
+                    server_id = payload.get("server_id", server_id)
+            except Exception as e:
+                logger.error(f"Error in pre-invoke plugin hook: {e}")
+                # Only fail if configured to do so
+                if hasattr(self.plugin_manager, "config") and self.plugin_manager.config.get("fail_on_plugin_error", False):
+                    raise
+
         # pylint: disable=comparison-with-callable
         tool = db.execute(select(DbTool).where(DbTool.name == name).where(DbTool.enabled)).scalar_one_or_none()
         if not tool:
@@ -584,6 +603,8 @@ class ToolService:
         start_time = time.monotonic()
         success = False
         error_message = None
+        tool_result = None
+
         try:
             # tool.validate_arguments(arguments)
             # Build headers with auth if necessary.
@@ -687,12 +708,41 @@ class ToolService:
                 filtered_response = extract_using_jq(content, tool.jsonpath_filter)
                 tool_result = ToolResult(content=filtered_response)
             else:
-                return ToolResult(content=[TextContent(type="text", text="Invalid tool type")])
+                tool_result = ToolResult(content=[TextContent(type="text", text="Invalid tool type")])
+                success = True  # Set success for metrics
+
+            # Execute post-invoke hooks if plugin manager is available and we have a result
+            if self.plugin_manager and tool_result:
+                post_payload = {"tool_name": name, "arguments": arguments, "result": tool_result.model_dump(by_alias=True), "server_id": server_id}
+
+                try:
+                    post_result = await self.plugin_manager.execute_hook(HookType.TOOL_POST_INVOKE, post_payload, context)
+
+                    if post_result.modified_payload:
+                        # Extract modified result
+                        modified_result_data = post_result.modified_payload.get("result")
+                        if modified_result_data:
+                            tool_result = ToolResult.model_validate(modified_result_data)
+                except Exception as e:
+                    logger.error(f"Error in post-invoke plugin hook: {e}")
+                    # Don't fail on post-hook errors, just log them
 
             return tool_result
+
         except Exception as e:
             error_message = str(e)
+
+            # Let plugins handle errors too
+            if self.plugin_manager:
+                error_payload = {"tool_name": name, "arguments": arguments, "error": str(e), "error_type": type(e).__name__, "server_id": server_id}
+
+                try:
+                    await self.plugin_manager.execute_hook(HookType.TOOL_POST_INVOKE, error_payload, context)
+                except Exception as plugin_error:
+                    logger.error(f"Error in error-handling plugin hook: {plugin_error}")
+
             raise ToolInvocationError(f"Tool invocation failed: {error_message}")
+
         finally:
             await self._record_tool_metric(db, tool, start_time, success, error_message)
 

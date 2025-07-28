@@ -304,6 +304,85 @@ class Settings(BaseSettings):
     use_stateful_sessions: bool = False  # Set to False to use stateless sessions without event store
     json_response_enabled: bool = True  # Enable JSON responses instead of SSE streams
 
+    # ===== PLUGIN FRAMEWORK SETTINGS =====
+
+    # Core plugin settings
+    plugins_enabled: bool = Field(default=True, description="Enable the plugin framework")
+
+    plugin_dirs: List[str] = Field(default=["plugins/native", "plugins/microservices", "plugins/custom"], description="Directories to scan for plugins")
+
+    plugin_config_file: Optional[str] = Field(default="plugins/config.yaml", description="Path to main plugin configuration file")
+
+    plugins: List[Dict[str, Any]] = Field(default=[], description="Plugin configurations (can be overridden by config file)")
+
+    plugin_timeout: int = Field(default=30, description="Default timeout for plugin execution in seconds")
+
+    plugin_parallel_execution: bool = Field(default=True, description="Execute plugins in parallel within priority bands")
+
+    plugin_fail_on_error: bool = Field(default=False, description="Fail startup if plugin loading fails")
+
+    plugin_health_check_interval: int = Field(default=60, description="Interval for plugin health checks in seconds")
+
+    # External service configurations for plugins
+    llmguard_service_url: Optional[str] = Field(default=None, env="LLMGUARD_SERVICE_URL", description="LLMGuard service URL")
+
+    llmguard_api_token: Optional[str] = Field(default=None, env="LLMGUARD_API_TOKEN", description="LLMGuard API token")
+
+    opa_service_url: Optional[str] = Field(default=None, env="OPA_SERVICE_URL", description="Open Policy Agent service URL")
+
+    # Plugin-specific Redis settings (if different from main Redis)
+    plugin_redis_url: Optional[str] = Field(default=None, description="Redis URL for plugin state (defaults to main redis_url)")
+
+    # Vault settings for plugin state
+    vault_enabled: bool = Field(default=False, description="Enable HashiCorp Vault for plugin state")
+
+    vault_url: Optional[str] = Field(default="http://vault:8200", description="HashiCorp Vault URL")
+
+    vault_token: Optional[str] = Field(default=None, env="VAULT_TOKEN", description="HashiCorp Vault token")
+
+    # ===== VALIDATORS FOR PLUGIN SETTINGS =====
+
+    @validator("plugin_dirs", pre=True)
+    def parse_plugin_dirs(cls, v):
+        """Parse plugin directories from environment variable"""
+        if isinstance(v, str):
+            # Handle JSON array string from environment
+            if v.startswith("["):
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to parse plugin_dirs as JSON: {v}")
+                    return [v]
+            # Handle comma-separated list
+            return [d.strip() for d in v.split(",") if d.strip()]
+        return v
+
+    @validator("plugins", pre=True)
+    def parse_plugins(cls, v):
+        """Parse plugins configuration from environment variable"""
+        if isinstance(v, str):
+            if v.startswith("["):
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to parse plugins as JSON: {v}")
+                    return []
+            elif v.startswith("{"):
+                try:
+                    # Single plugin as JSON object
+                    return [json.loads(v)]
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to parse plugin as JSON: {v}")
+                    return []
+        return v
+
+    @validator("plugin_redis_url", always=True)
+    def set_plugin_redis_url(cls, v, values):
+        """Default plugin Redis URL to main Redis URL if not set"""
+        if v is None and "redis_url" in values:
+            return values["redis_url"]
+        return v
+
     # Development
     dev_mode: bool = False
     reload: bool = False

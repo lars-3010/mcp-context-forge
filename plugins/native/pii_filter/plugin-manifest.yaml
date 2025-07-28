@@ -1,0 +1,26 @@
+# plugins/native/pii_filter/plugin-manifest.yaml
+name: "PII_Filter"
+version: "1.0.0"
+description: "Detects and masks personally identifiable information"
+author: "MCP Gateway Team"
+type: "platform-native"
+
+requires:
+  - "redis"  # Optional, for caching
+
+hooks:
+  - "TOOL_PRE_INVOKE"
+  - "TOOL_POST_INVOKE"
+  - "PROMPT_PRE_FETCH"
+  - "PROMPT_POST_FETCH"
+
+default_config:
+  block_on_pii: false
+  mask_character: "*"
+  store_mappings: true
+  pii_types:
+    - ssn
+    - credit_card
+    - email
+    - phone
+    - ip_address

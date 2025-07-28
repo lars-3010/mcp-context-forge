@@ -1,0 +1,32 @@
+name: "LLMGuard"
+version: "1.0.0"
+description: "AI-powered content safety using LLMGuard service"
+author: "MCP Gateway Team"
+type: "external-service"
+
+requires:
+  - "vault"  # For anonymization
+  - "external_service"
+
+hooks:
+  - "TOOL_PRE_INVOKE"
+  - "TOOL_POST_INVOKE"
+  - "PROMPT_PRE_FETCH"
+  - "PROMPT_POST_FETCH"
+
+service:
+  url: "${LLMGUARD_SERVICE_URL}"
+  health_check: "/health"
+  timeout: 10
+
+default_config:
+  safety_threshold: 0.8
+  check_prompts: true
+  check_outputs: true
+  use_anonymization: true
+  categories:
+    - "violence"
+    - "sexual"
+    - "hate"
+    - "self-harm"
+    - "illegal"

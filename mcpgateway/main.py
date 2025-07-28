@@ -73,6 +73,9 @@ from mcpgateway.models import (
     ResourceContent,
     Root,
 )
+
+# Plugin
+from mcpgateway.plugin_framework import PluginManager
 from mcpgateway.schemas import (
     GatewayCreate,
     GatewayRead,
@@ -93,7 +96,7 @@ from mcpgateway.schemas import (
     ToolUpdate,
 )
 from mcpgateway.services.completion_service import CompletionService
-from mcpgateway.services.gateway_service import GatewayConnectionError, GatewayNameConflictError, GatewayService
+from mcpgateway.services.gateway_service import GatewayConnectionError, GatewayNameConflictError
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.prompt_service import (
     PromptError,
@@ -147,6 +150,17 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
+# Initialize plugin manager
+plugin_config = {
+    "plugin_dirs": settings.plugin_dirs if hasattr(settings, "plugin_dirs") else ["plugins/native", "plugins/custom"],
+    "plugins": settings.plugins if hasattr(settings, "plugins") else [],
+    "parallel_execution_within_band": settings.plugin_parallel_execution if hasattr(settings, "plugin_parallel_execution") else True,
+    "plugin_timeout": settings.plugin_timeout if hasattr(settings, "plugin_timeout") else 30,
+    "fail_on_plugin_error": settings.plugin_fail_on_error if hasattr(settings, "plugin_fail_on_error") else False,
+}
+plugin_manager = PluginManager(plugin_config) if settings.plugins_enabled else None
+
+
 # Wait for database to be ready before creating tables
 wait_for_db_ready(max_tries=int(settings.db_max_retries), interval=int(settings.db_retry_interval_ms) / 1000, sync=True)  # Converting ms to s
 
@@ -160,10 +174,10 @@ else:
 
 
 # Initialize services
-tool_service = ToolService()
-resource_service = ResourceService()
-prompt_service = PromptService()
-gateway_service = GatewayService()
+tool_service = ToolService(plugin_manager=plugin_manager)
+resource_service = ResourceService(plugin_manager=plugin_manager) if hasattr(ResourceService, "__init__") else ResourceService()
+prompt_service = PromptService(plugin_manager=plugin_manager) if hasattr(PromptService, "__init__") else PromptService()
+server_service = ServerService(plugin_manager=plugin_manager) if hasattr(ServerService, "__init__") else ServerService()
 root_service = RootService()
 completion_service = CompletionService()
 sampling_handler = SamplingHandler()
@@ -212,6 +226,11 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """
     logger.info("Starting MCP Gateway services")
     try:
+        # Initialize plugin manager first if enabled
+        if plugin_manager:
+            await plugin_manager.initialize()
+            logger.info(f"Plugin manager initialized with {len(plugin_manager.registry.get_all_plugins())} plugins")
+
         await tool_service.initialize()
         await resource_service.initialize()
         await prompt_service.initialize()
@@ -231,6 +250,15 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         raise
     finally:
         logger.info("Shutting down MCP Gateway services")
+
+        # Shutdown plugin manager
+        if plugin_manager:
+            try:
+                await plugin_manager.shutdown()
+                logger.info("Plugin manager shutdown complete")
+            except Exception as e:
+                logger.error(f"Error shutting down plugin manager: {str(e)}")
+
         # await stop_streamablehttp()
         for service in [resource_cache, sampling_handler, logging_service, completion_service, root_service, gateway_service, prompt_service, resource_service, tool_service, streamable_http_session]:
             try:

@@ -226,7 +226,7 @@ class TestPluginFramework:
         plugin_manager.registry.register(plugin)
 
         # Execute pre-hook
-        pre_result = await plugin_manager.execute_hook(HookType.TOOL_PRE_INVOKE, {}, plugin_context)
+        await plugin_manager.execute_hook(HookType.TOOL_PRE_INVOKE, {}, plugin_context)
 
         # Execute post-hook with same context
         post_result = await plugin_manager.execute_hook(HookType.TOOL_POST_INVOKE, {}, plugin_context)
