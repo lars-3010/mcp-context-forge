@@ -51,6 +51,9 @@ from mcpgateway.utils.services_auth import decode_auth
 # Local
 from ..config import extract_using_jq
 
+# Plugin Framework
+
+
 logger = logging.getLogger(__name__)
 
 

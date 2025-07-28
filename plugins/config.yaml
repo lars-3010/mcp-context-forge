@@ -1,0 +1,173 @@
+# plugins/config.yaml - Main plugin configuration file
+
+plugins:
+  # Self-contained PII Filter Plugin
+  - name: "PII_Filter"
+    type: "module"
+    module_path: "mcpgateway.plugins.pii_filter"
+    class_name: "PIIFilterPlugin"
+    enabled: true
+    mode: "enforcing"  # enforcing | permissive | disabled
+    priority: 150
+    config:
+      block_on_pii: false
+      mask_character: "*"
+      store_mappings: true
+      custom_patterns:
+        employee_id: "\\bEMP\\d{6}\\b"
+        project_code: "\\bPROJ-[A-Z]{3}-\\d{4}\\b"
+    conditions:
+      # Apply to specific tools/servers
+      tool_names: ["sensitive_data_processor", "customer_info"]
+      server_ids: []  # Apply to all servers
+      tenant_ids: []  # Apply to all tenants
+
+  # External LLMGuard Service Plugin
+  - name: "LLMGuard"
+    type: "external"
+    enabled: true
+    mode: "permissive"  # Start in permissive mode
+    priority: 120
+    service_url: "http://llmguard-service:8080"
+    timeout: 10
+    retry:
+      max_attempts: 3
+      backoff: 1.0
+    auth:
+      type: "bearer"
+      token: "${LLMGUARD_API_TOKEN}"  # From environment
+    config:
+      safety_threshold: 0.8
+      check_prompts: true
+      check_outputs: true
+      use_anonymization: true
+      categories:
+        - "violence"
+        - "sexual"
+        - "hate"
+        - "self-harm"
+        - "illegal"
+        - "pii"
+    conditions:
+      # Don't apply to internal tools
+      tool_names: ["!internal_*"]  # Exclude pattern
+
+  # Rate Limiting Plugin
+  - name: "RateLimiter"
+    type: "module"
+    module_path: "mcpgateway.plugins.rate_limiter"
+    class_name: "RateLimitPlugin"
+    enabled: true
+    mode: "enforcing"
+    priority: 50  # Authentication band
+    config:
+      default_limits:
+        per_minute: 60
+        per_hour: 1000
+        per_day: 10000
+      user_overrides:
+        "premium_user@example.com":
+          per_minute: 300
+          per_hour: 5000
+      tool_limits:
+        "expensive_ai_tool":
+          per_minute: 10
+          per_hour: 100
+
+  # Audit Logger Plugin
+  - name: "AuditLogger"
+    type: "module"
+    module_path: "mcpgateway.plugins.audit"
+    class_name: "AuditLoggerPlugin"
+    enabled: true
+    mode: "enforcing"
+    priority: 450  # Logging band
+    config:
+      log_requests: true
+      log_responses: true
+      log_errors: true
+      redact_sensitive_fields: ["password", "token", "api_key"]
+      destinations:
+        - type: "file"
+          path: "/var/log/mcpgateway/audit.log"
+        - type: "syslog"
+          host: "syslog.internal"
+          port: 514
+        - type: "webhook"
+          url: "https://audit.example.com/webhook"
+          headers:
+            X-Audit-Source: "mcp-gateway"
+
+# Plugin directories to scan
+plugin_dirs:
+  - "plugins/native"      # Built-in plugins
+  - "plugins/custom"      # Custom organization plugins
+  - "/etc/mcpgateway/plugins"  # System-wide plugins
+
+# Global plugin settings
+plugin_settings:
+  parallel_execution_within_band: true
+  plugin_timeout: 30
+  fail_on_plugin_error: false
+  enable_plugin_api: true
+  plugin_health_check_interval: 60
+
+---
+# Example plugin manifest file: plugins/native/pii_filter/plugin-manifest.yaml
+
+name: "PII_Filter"
+version: "1.0.0"
+description: "Detects and masks personally identifiable information"
+author: "MCP Gateway Team"
+type: "platform-native"
+
+# Dependencies this plugin requires
+requires:
+  - "redis"      # For caching PII patterns
+  - "vault"      # For storing PII mappings (optional)
+
+# Hooks this plugin implements
+hooks:
+  - "TOOL_PRE_INVOKE"
+  - "TOOL_POST_INVOKE"
+  - "PROMPT_PRE_FETCH"
+  - "PROMPT_POST_FETCH"
+
+# Default configuration
+default_config:
+  block_on_pii: false
+  mask_character: "*"
+  store_mappings: true
+  pii_types:
+    - ssn
+    - credit_card
+    - email
+    - phone
+    - ip_address
+
+# Configuration schema for validation
+config_schema:
+  type: object
+  properties:
+    block_on_pii:
+      type: boolean
+      description: "Block requests containing PII"
+    mask_character:
+      type: string
+      maxLength: 1
+      description: "Character to use for masking"
+    store_mappings:
+      type: boolean
+      description: "Store PII mappings for reversal"
+    custom_patterns:
+      type: object
+      additionalProperties:
+        type: string
+        description: "Regex pattern"
+
+# Deployment information
+deployment:
+  type: "embedded"  # embedded | container | external
+  resource_requirements:
+    memory: "128Mi"
+    cpu: "100m"
