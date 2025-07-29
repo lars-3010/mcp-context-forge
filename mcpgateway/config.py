@@ -551,6 +551,9 @@ class Settings(BaseSettings):
     # Masking value for all sensitive data
     masked_auth_value: str = "*****"
 
+    ### passthrough headers
+    default_passthrough_headers = ["Authorization", "X-Tenant-Id", "X-Trace-Id"]
+
 
 def extract_using_jq(data, jq_filter=""):
     """
