@@ -1419,6 +1419,7 @@ async function editTool(toolId) {
         );
 
         if (!response.ok) {
+            // If the response is not OK, throw an error
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
@@ -3021,50 +3022,73 @@ function updateEditToolRequestTypes(selectedMethod = null) {
 // TOOL SELECT FUNCTIONALITY
 // ===================================================================
 
-function initToolSelect(selectId, pillsId, warnId, max = 6) {
-    const select = safeGetElement(selectId);
-    const pillsBox = safeGetElement(pillsId);
-    const warnBox = safeGetElement(warnId);
+function initToolSelect(
+    selectId,
+    pillsId,
+    warnId,
+    max = 6,
+    selectBtnId = null,
+    clearBtnId = null,
+) {
+    const container = document.getElementById(selectId);
+    const pillsBox = document.getElementById(pillsId);
+    const warnBox = document.getElementById(warnId);
+    const clearBtn = clearBtnId ? document.getElementById(clearBtnId) : null;
+    const selectBtn = selectBtnId ? document.getElementById(selectBtnId) : null;
 
-    if (!select || !pillsBox || !warnBox) {
+    if (!container || !pillsBox || !warnBox) {
         console.warn(
             `Tool select elements not found: ${selectId}, ${pillsId}, ${warnId}`,
         );
         return;
     }
 
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
     const pillClasses =
-        "inline-block px-2 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded";
+        "inline-block px-3 py-1 text-xs font-semibold text-indigo-700 bg-indigo-100 rounded-full shadow";
 
     function update() {
         try {
-            const chosen = Array.from(select.selectedOptions);
-            const count = chosen.length;
+            const checked = Array.from(checkboxes).filter((cb) => cb.checked);
+            const count = checked.length;
 
             // Rebuild pills safely
             pillsBox.innerHTML = "";
-            chosen.forEach((opt) => {
+            checked.forEach((cb) => {
                 const span = document.createElement("span");
                 span.className = pillClasses;
-                span.textContent = opt.text; // Safe text content
+                span.textContent =
+                    cb.nextElementSibling?.textContent?.trim() || "Unnamed";
                 pillsBox.appendChild(span);
             });
 
             // Warning when > max
             if (count > max) {
                 warnBox.textContent = `Selected ${count} tools. Selecting more than ${max} tools can degrade agent performance with the server.`;
-                warnBox.className = "text-yellow-600 text-sm mt-2";
             } else {
                 warnBox.textContent = "";
-                warnBox.className = "";
             }
         } catch (error) {
             console.error("Error updating tool select:", error);
         }
     }
 
+    if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+            checkboxes.forEach((cb) => (cb.checked = false));
+            update();
+        });
+    }
+
+    if (selectBtn) {
+        selectBtn.addEventListener("click", () => {
+            checkboxes.forEach((cb) => (cb.checked = true));
+            update();
+        });
+    }
+
     update(); // Initial render
-    select.addEventListener("change", update);
+    checkboxes.forEach((cb) => cb.addEventListener("change", update));
 }
 
 // ===================================================================
@@ -3123,6 +3147,8 @@ const toolTestState = {
     debounceDelay: 1000, // Increased from 500ms
     requestTimeout: 30000, // Increased from 10000ms
 };
+
+let toolInputSchemaRegistry = null;
 
 /**
  * ENHANCED: Tool testing with improved race condition handling
@@ -3219,6 +3245,7 @@ async function testTool(toolId) {
         }
 
         const tool = await response.json();
+        toolInputSchemaRegistry = tool;
 
         // 7. CLEAN STATE before proceeding
         toolTestState.activeRequests.delete(toolId);
@@ -3234,8 +3261,14 @@ async function testTool(toolId) {
             titleElement.textContent = "Test Tool: " + (tool.name || "Unknown");
         }
         if (descElement) {
-            descElement.textContent =
-                tool.description || "No description available.";
+            if (tool.description) {
+                descElement.innerHTML = tool.description.replace(
+                    /\n/g,
+                    "<br/>",
+                );
+            } else {
+                descElement.textContent = "No description available.";
+            }
         }
 
         const container = safeGetElement("tool-test-form-fields");
@@ -3296,20 +3329,91 @@ async function testTool(toolId) {
                 input.className =
                     "mt-1 block w-full rounded-md border border-gray-500 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 text-gray-700 dark:text-gray-300 dark:border-gray-700 dark:focus:border-indigo-400 dark:focus:ring-indigo-400";
 
-                // Add validation based on type
-                if (prop.type === "number") {
-                    input.type = "number";
-                } else if (prop.type === "boolean") {
-                    input.type = "checkbox";
+                if (prop.type === "array") {
+                    const arrayContainer = document.createElement("div");
+                    arrayContainer.className = "space-y-2";
+
+                    function createArrayInput(value = "") {
+                        const wrapper = document.createElement("div");
+                        wrapper.className = "flex items-center space-x-2";
+
+                        const input = document.createElement("input");
+                        input.name = keyValidation.value;
+                        input.required =
+                            schema.required && schema.required.includes(key);
+                        input.className =
+                            "mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 text-gray-700 dark:text-gray-300 dark:border-gray-700 dark:focus:border-indigo-400 dark:focus:ring-indigo-400";
+                        if (prop.items && prop.items.type === "number") {
+                            input.type = "number";
+                        } else if (
+                            prop.items &&
+                            prop.items.type === "boolean"
+                        ) {
+                            input.type = "checkbox";
+                            input.value = "true";
+                            input.checked = value === true || value === "true";
+                        } else {
+                            input.type = "text";
+                        }
+                        if (
+                            typeof value === "string" ||
+                            typeof value === "number"
+                        ) {
+                            input.value = value;
+                        }
+
+                        const delBtn = document.createElement("button");
+                        delBtn.type = "button";
+                        delBtn.className =
+                            "ml-2 text-red-600 hover:text-red-800 focus:outline-none";
+                        delBtn.title = "Delete";
+                        delBtn.textContent = "×";
+                        delBtn.addEventListener("click", () => {
+                            arrayContainer.removeChild(wrapper);
+                        });
+
+                        wrapper.appendChild(input);
+                        wrapper.appendChild(delBtn);
+                        return wrapper;
+                    }
+
+                    const addBtn = document.createElement("button");
+                    addBtn.type = "button";
+                    addBtn.className =
+                        "mt-2 px-2 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 focus:outline-none";
+                    addBtn.textContent = "Add items";
+                    addBtn.addEventListener("click", () => {
+                        arrayContainer.appendChild(createArrayInput());
+                    });
+
+                    arrayContainer.appendChild(createArrayInput());
+
+                    fieldDiv.appendChild(arrayContainer);
+                    fieldDiv.appendChild(addBtn);
+                } else {
+                    // Input field with validation
+                    const input = document.createElement("input");
+                    input.name = keyValidation.value;
+                    input.required =
+                        schema.required && schema.required.includes(key);
                     input.className =
-                        "mt-1 h-4 w-4 text-indigo-600 dark:text-indigo-200 border border-gray-300 rounded";
+                        "mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 text-gray-700 dark:text-gray-300 dark:border-gray-700 dark:focus:border-indigo-400 dark:focus:ring-indigo-400";
+                    // Add validation based on type
+                    if (prop.type === "text") {
+                        input.type = "text";
+                    } else if (prop.type === "number") {
+                        input.type = "number";
+                    } else if (prop.type === "boolean") {
+                        input.type = "checkbox";
+                        input.className =
+                            "mt-1 h-4 w-4 text-indigo-600 dark:text-indigo-200 border border-gray-300 rounded";
+                    }
+                    fieldDiv.appendChild(input);
                 }
 
-                fieldDiv.appendChild(input);
                 container.appendChild(fieldDiv);
             }
         }
-
         openModal("tool-test-modal");
         console.log("✓ Tool test modal loaded successfully");
     } catch (error) {
@@ -3391,27 +3495,111 @@ async function runToolTest() {
         const formData = new FormData(form);
         const params = {};
 
-        for (const [key, value] of formData.entries()) {
-            // Validate each parameter
-            const keyValidation = validateInputName(key, "parameter");
-            if (!keyValidation.valid) {
-                console.warn(`Skipping invalid parameter: ${key}`);
-                continue;
-            }
+        const schema = toolInputSchemaRegistry.inputSchema;
 
-            // Type conversion
-            if (isNaN(value) || value === "") {
-                if (
-                    value.toLowerCase() === "true" ||
-                    value.toLowerCase() === "false"
-                ) {
-                    params[keyValidation.value] =
-                        value.toLowerCase() === "true";
-                } else {
-                    params[keyValidation.value] = value;
+        if (schema && schema.properties) {
+            for (const key in schema.properties) {
+                const prop = schema.properties[key];
+                const keyValidation = validateInputName(key, "parameter");
+                if (!keyValidation.valid) {
+                    console.warn(`Skipping invalid parameter: ${key}`);
+                    continue;
                 }
-            } else {
-                params[keyValidation.value] = Number(value);
+                let value;
+                if (prop.type === "array") {
+                    const inputValues = formData.getAll(key);
+                    try {
+                        // Convert values based on the items schema type
+                        if (prop.items && prop.items.type) {
+                            switch (prop.items.type) {
+                                case "object":
+                                    value = inputValues.map((v) => {
+                                        try {
+                                            const parsed = JSON.parse(v);
+                                            if (
+                                                typeof parsed !== "object" ||
+                                                Array.isArray(parsed)
+                                            ) {
+                                                throw new Error(
+                                                    `Value must be an object, got ${typeof parsed}`,
+                                                );
+                                            }
+                                            return parsed;
+                                        } catch (e) {
+                                            console.error(
+                                                `Error parsing object for ${key}:`,
+                                                e,
+                                            );
+                                            throw new Error(
+                                                `Invalid object format for ${key}. Each item must be a valid JSON object.`,
+                                            );
+                                        }
+                                    });
+                                    break;
+                                case "number":
+                                    value = inputValues.map((v) =>
+                                        v === "" ? null : Number(v),
+                                    );
+                                    break;
+                                case "boolean":
+                                    value = inputValues.map(
+                                        (v) => v === "true" || v === true,
+                                    );
+                                    break;
+                                default:
+                                    // For other types (like strings), use raw values
+                                    value = inputValues;
+                            }
+                        } else {
+                            // If no items type specified, use raw values
+                            value = inputValues;
+                        }
+
+                        // Handle empty values
+                        if (
+                            value.length === 0 ||
+                            (value.length === 1 && value[0] === "")
+                        ) {
+                            if (
+                                schema.required &&
+                                schema.required.includes(key)
+                            ) {
+                                params[keyValidation.value] = [];
+                            }
+                            continue;
+                        }
+                        params[keyValidation.value] = value;
+                    } catch (error) {
+                        console.error(
+                            `Error parsing array values for ${key}:`,
+                            error,
+                        );
+                        showErrorMessage(
+                            `Invalid input format for ${key}. Please check the values are in correct format.`,
+                        );
+                        throw error;
+                    }
+                } else {
+                    value = formData.get(key);
+                    if (value === null || value === undefined || value === "") {
+                        if (schema.required && schema.required.includes(key)) {
+                            params[keyValidation.value] = "";
+                        }
+                        continue;
+                    }
+                    if (prop.type === "number" || prop.type === "integer") {
+                        params[keyValidation.value] = Number(value);
+                    } else if (prop.type === "boolean") {
+                        params[keyValidation.value] =
+                            value === "true" || value === true;
+                    } else if (prop.enum) {
+                        if (prop.enum.includes(value)) {
+                            params[keyValidation.value] = value;
+                        }
+                    } else {
+                        params[keyValidation.value] = value;
+                    }
+                }
             }
         }
 
@@ -4182,13 +4370,12 @@ async function handleGatewayFormSubmit(e) {
         }
     }
 }
-
 async function handleResourceFormSubmit(e) {
     e.preventDefault();
     const form = e.target;
     const formData = new FormData(form);
     const status = safeGetElement("status-resources");
-    const loading = safeGetElement("add-gateway-loading");
+    const loading = safeGetElement("add-resource-loading");
     try {
         // Validate inputs
         const name = formData.get("name");
@@ -4213,17 +4400,17 @@ async function handleResourceFormSubmit(e) {
             status.textContent = "";
             status.classList.remove("error-status");
         }
-        
+
         const isInactiveCheckedBool = isInactiveChecked("resources");
         formData.append("is_inactive_checked", isInactiveCheckedBool);
 
         const response = await fetchWithTimeout(
-                `${window.ROOT_PATH}/admin/resources`,
-                {
-                    method: "POST",
-                    body: formData,
-                },
-            );
+            `${window.ROOT_PATH}/admin/resources`,
+            {
+                method: "POST",
+                body: formData,
+            },
+        );
 
         const result = await response.json();
         if (!result.success) {
@@ -4233,20 +4420,125 @@ async function handleResourceFormSubmit(e) {
                 ? `${window.ROOT_PATH}/admin?include_inactive=true#resources`
                 : `${window.ROOT_PATH}/admin#resources`;
             window.location.href = redirectUrl;
-            }
-        } catch (error) {
-            console.error("Error:", error);
-            if (status) {
-                status.textContent = error.message || "An error occurred!";
-                status.classList.add("error-status");
-            }
-            showErrorMessage(error.message);
-        } finally {
-            // location.reload();
-            if (loading) {
-                loading.style.display = "none";
-            }
-        }		
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        if (status) {
+            status.textContent = error.message || "An error occurred!";
+            status.classList.add("error-status");
+        }
+        showErrorMessage(error.message);
+    } finally {
+        // location.reload();
+        if (loading) {
+            loading.style.display = "none";
+        }
+    }
+}
+
+async function handlePromptFormSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+    const status = safeGetElement("status-prompts");
+    const loading = safeGetElement("add-prompts-loading");
+    try {
+        // Validate inputs
+        const name = formData.get("name");
+        const nameValidation = validateInputName(name, "prompt");
+
+        if (!nameValidation.valid) {
+            showErrorMessage(nameValidation.error);
+            return;
+        }
+
+        if (loading) {
+            loading.style.display = "block";
+        }
+        if (status) {
+            status.textContent = "";
+            status.classList.remove("error-status");
+        }
+
+        const isInactiveCheckedBool = isInactiveChecked("prompts");
+        formData.append("is_inactive_checked", isInactiveCheckedBool);
+
+        const response = await fetchWithTimeout(
+            `${window.ROOT_PATH}/admin/prompts`,
+            {
+                method: "POST",
+                body: formData,
+            },
+        );
+
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || "An error occurred");
+        }
+        // Only redirect on success
+        const redirectUrl = isInactiveCheckedBool
+            ? `${window.ROOT_PATH}/admin?include_inactive=true#prompts`
+            : `${window.ROOT_PATH}/admin#prompts`;
+        window.location.href = redirectUrl;
+    } catch (error) {
+        console.error("Error:", error);
+        if (status) {
+            status.textContent = error.message || "An error occurred!";
+            status.classList.add("error-status");
+        }
+        showErrorMessage(error.message);
+    } finally {
+        // location.reload();
+        if (loading) {
+            loading.style.display = "none";
+        }
+    }
+}
+
+async function handleEditPromptFormSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+
+    try {
+        // Validate inputs
+        const name = formData.get("name");
+        const nameValidation = validateInputName(name, "prompt");
+        if (!nameValidation.valid) {
+            showErrorMessage(nameValidation.error);
+            return;
+        }
+
+        // Save CodeMirror editors' contents if present
+        if (window.promptToolHeadersEditor) {
+            window.promptToolHeadersEditor.save();
+        }
+        if (window.promptToolSchemaEditor) {
+            window.promptToolSchemaEditor.save();
+        }
+
+        const isInactiveCheckedBool = isInactiveChecked("prompts");
+        formData.append("is_inactive_checked", isInactiveCheckedBool);
+
+        // Submit via fetch
+        const response = await fetch(form.action, {
+            method: "POST",
+            body: formData,
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || "An error occurred");
+        }
+        // Only redirect on success
+        const redirectUrl = isInactiveCheckedBool
+            ? `${window.ROOT_PATH}/admin?include_inactive=true#prompts`
+            : `${window.ROOT_PATH}/admin#prompts`;
+        window.location.href = redirectUrl;
+    } catch (error) {
+        console.error("Error:", error);
+        showErrorMessage(error.message);
+    }
 }
 
 async function handleServerFormSubmit(e) {
@@ -4372,6 +4664,61 @@ async function handleToolFormSubmit(event) {
         );
 
         const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || "An error occurred");
+        } else {
+            const redirectUrl = isInactiveCheckedBool
+                ? `${window.ROOT_PATH}/admin?include_inactive=true#tools`
+                : `${window.ROOT_PATH}/admin#tools`;
+            window.location.href = redirectUrl;
+        }
+    } catch (error) {
+        console.error("Fetch error:", error);
+        showErrorMessage(error.message);
+    }
+}
+async function handleEditToolFormSubmit(event) {
+    event.preventDefault();
+
+    const form = event.target;
+
+    try {
+        const formData = new FormData(form);
+
+        // Basic validation (customize as needed)
+        const name = formData.get("name");
+        const url = formData.get("url");
+        const nameValidation = validateInputName(name, "tool");
+        const urlValidation = validateUrl(url);
+
+        if (!nameValidation.valid) {
+            throw new Error(nameValidation.error);
+        }
+        if (!urlValidation.valid) {
+            throw new Error(urlValidation.error);
+        }
+
+        // // Save CodeMirror editors' contents if present
+
+        if (window.editToolHeadersEditor) {
+            window.editToolHeadersEditor.save();
+        }
+        if (window.editToolSchemaEditor) {
+            window.editToolSchemaEditor.save();
+        }
+
+        const isInactiveCheckedBool = isInactiveChecked("tools");
+        formData.append("is_inactive_checked", isInactiveCheckedBool);
+
+        // Submit via fetch
+        const response = await fetch(form.action, {
+            method: "POST",
+            body: formData,
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        console.log("response:", response);
+        const result = await response.json();
+        console.log("result edit tool form:", result);
         if (!result.success) {
             throw new Error(result.message || "An error occurred");
         } else {
@@ -4780,12 +5127,16 @@ function initializeToolSelects() {
         "selectedToolsPills",
         "selectedToolsWarning",
         6,
+        "selectAllToolsBtn",
+        "clearAllToolsBtn",
     );
     initToolSelect(
         "edit-server-tools",
         "selectedEditToolsPills",
         "selectedEditToolsWarning",
         6,
+        "selectAllEditToolsBtn",
+        "clearAllEditToolsBtn",
     );
 }
 
@@ -4891,6 +5242,21 @@ function setupFormHandlers() {
         resourceForm.addEventListener("submit", handleResourceFormSubmit);
     }
 
+    const promptForm = safeGetElement("add-prompt-form");
+    if (promptForm) {
+        promptForm.addEventListener("submit", handlePromptFormSubmit);
+    }
+
+    const editPromptForm = safeGetElement("edit-prompt-form");
+    if (editPromptForm) {
+        editPromptForm.addEventListener("submit", handleEditPromptFormSubmit);
+        editPromptForm.addEventListener("click", () => {
+            if (getComputedStyle(editPromptForm).display !== "none") {
+                refreshEditors();
+            }
+        });
+    }
+
     const toolForm = safeGetElement("add-tool-form");
     if (toolForm) {
         toolForm.addEventListener("submit", handleToolFormSubmit);
@@ -4916,6 +5282,15 @@ function setupFormHandlers() {
         editResourceForm.addEventListener("submit", () => {
             if (window.editResourceContentEditor) {
                 window.editResourceContentEditor.save();
+            }
+        });
+    }
+    const editToolForm = safeGetElement("edit-tool-form");
+    if (editToolForm) {
+        editToolForm.addEventListener("submit", handleEditToolFormSubmit);
+        editToolForm.addEventListener("click", () => {
+            if (getComputedStyle(editToolForm).display !== "none") {
+                refreshEditors();
             }
         });
     }

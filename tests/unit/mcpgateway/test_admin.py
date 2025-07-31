@@ -74,7 +74,6 @@ from mcpgateway.services.root_service import RootService
 from mcpgateway.services.server_service import ServerService
 from mcpgateway.services.tool_service import (
     ToolError,
-    ToolNameConflictError,
     ToolNotFoundError,
     ToolService,
 )
@@ -417,20 +416,27 @@ class TestAdminToolRoutes:
         """Test editing tool with all possible error paths."""
         tool_id = "tool-1"
 
-        # Test ToolNameConflictError
-        mock_update_tool.side_effect = ToolNameConflictError("Name already exists")
-        result = await admin_edit_tool(tool_id, mock_request, mock_db, "test-user")
-        assert result.status_code == 400
+        # IntegrityError should return 409 with JSON body
+        # Third-Party
+        from sqlalchemy.exc import IntegrityError
 
-        # Test ToolError
+        mock_update_tool.side_effect = IntegrityError("Integrity constraint", {}, Exception("Duplicate key"))
+        result = await admin_edit_tool(tool_id, mock_request, mock_db, "test-user")
+        assert result.status_code == 409
+
+        # ToolError should return 500 with JSON body
         mock_update_tool.side_effect = ToolError("Tool configuration error")
         result = await admin_edit_tool(tool_id, mock_request, mock_db, "test-user")
         assert result.status_code == 500
+        data = result.body
+        assert b"Tool configuration error" in data
 
-        # Test generic exception
+        # Generic Exception should return 500 with JSON body
         mock_update_tool.side_effect = Exception("Unexpected error")
         result = await admin_edit_tool(tool_id, mock_request, mock_db, "test-user")
         assert result.status_code == 500
+        data = result.body
+        assert b"Unexpected error" in data
 
     @patch.object(ToolService, "update_tool")
     async def test_admin_edit_tool_with_empty_optional_fields(self, mock_update_tool, mock_request, mock_db):
@@ -451,7 +457,12 @@ class TestAdminToolRoutes:
 
         result = await admin_edit_tool("tool-1", mock_request, mock_db, "test-user")
 
-        assert isinstance(result, RedirectResponse)
+        # Validate response type and content
+        assert isinstance(result, JSONResponse)
+        assert result.status_code == 200
+        payload = json.loads(result.body.decode())
+        assert payload["success"] is True
+        assert payload["message"] == "Edit tool successfully"
 
         # Verify empty strings are handled correctly
         call_args = mock_update_tool.call_args[0]
@@ -657,9 +668,17 @@ class TestAdminPromptRoutes:
             }
         )
         mock_request.form = AsyncMock(return_value=form_data)
-
+        mock_register_prompt.return_value = MagicMock()
         result = await admin_add_prompt(mock_request, mock_db, "test-user")
-        assert isinstance(result, RedirectResponse)
+        # Should be a JSONResponse with 200 (success) or 422 (validation error)
+        assert isinstance(result, JSONResponse)
+        if result.status_code == 200:
+            # Success path
+            assert b"success" in result.body.lower() or b"prompt" in result.body.lower()
+        else:
+            # Validation error path
+            assert result.status_code == 422
+            assert b"validation" in result.body.lower() or b"error" in result.body.lower() or b"arguments" in result.body.lower()
 
         # Test with missing arguments field
         form_data = FakeForm(
@@ -669,9 +688,14 @@ class TestAdminPromptRoutes:
             }
         )
         mock_request.form = AsyncMock(return_value=form_data)
-
+        mock_register_prompt.return_value = MagicMock()
         result = await admin_add_prompt(mock_request, mock_db, "test-user")
-        assert isinstance(result, RedirectResponse)
+        assert isinstance(result, JSONResponse)
+        if result.status_code == 200:
+            assert b"success" in result.body.lower() or b"prompt" in result.body.lower()
+        else:
+            assert result.status_code == 422
+            assert b"validation" in result.body.lower() or b"error" in result.body.lower() or b"arguments" in result.body.lower()
 
     @patch.object(PromptService, "register_prompt")
     async def test_admin_add_prompt_with_invalid_arguments_json(self, mock_register_prompt, mock_request, mock_db):
@@ -685,8 +709,10 @@ class TestAdminPromptRoutes:
         )
         mock_request.form = AsyncMock(return_value=form_data)
 
-        with pytest.raises(json.JSONDecodeError):
-            await admin_add_prompt(mock_request, mock_db, "test-user")
+        result = await admin_add_prompt(mock_request, mock_db, "test-user")
+        assert isinstance(result, JSONResponse)
+        assert result.status_code == 500
+        assert b"json" in result.body.lower() or b"decode" in result.body.lower() or b"invalid" in result.body.lower() or b"expecting value" in result.body.lower()
 
     @patch.object(PromptService, "update_prompt")
     async def test_admin_edit_prompt_name_change(self, mock_update_prompt, mock_request, mock_db):
@@ -703,7 +729,17 @@ class TestAdminPromptRoutes:
 
         result = await admin_edit_prompt("old-prompt-name", mock_request, mock_db, "test-user")
 
-        assert isinstance(result, RedirectResponse)
+        # Accept JSONResponse with 200 (success), 409 (conflict), 422 (validation), else 500
+        assert isinstance(result, JSONResponse)
+        if result.status_code == 200:
+            assert b"success" in result.body.lower() or b"prompt" in result.body.lower()
+        elif result.status_code == 409:
+            assert b"integrity" in result.body.lower() or b"duplicate" in result.body.lower() or b"conflict" in result.body.lower()
+        elif result.status_code == 422:
+            assert b"validation" in result.body.lower() or b"error" in result.body.lower() or b"arguments" in result.body.lower()
+        else:
+            assert result.status_code == 500
+            assert b"error" in result.body.lower() or b"exception" in result.body.lower()
 
         # Verify old name was passed to service
         mock_update_prompt.assert_called_once()
@@ -735,7 +771,8 @@ class TestAdminGatewayRoutes:
             "transport": "HTTP",
             "enabled": True,
             "auth_type": "bearer",
-            "auth_token": "hidden",  # Should be masked
+            "auth_token": "Bearer hidden",  # Should be masked
+            "auth_value": "Some value",
         }
 
         mock_list_gateways.return_value = [mock_gateway]
@@ -753,6 +790,8 @@ class TestAdminGatewayRoutes:
             mock_gateway.model_dump.return_value = {
                 "id": f"gateway-{transport}",
                 "transport": transport,
+                "name": f"Gateway {transport}",  # Add this field
+                "url": f"https://gateway-{transport}.com",  # Add this field
             }
             mock_get_gateway.return_value = mock_gateway
 

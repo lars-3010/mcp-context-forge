@@ -78,11 +78,13 @@ from mcpgateway.schemas import (
     GatewayUpdate,
     JsonPathModifier,
     PromptCreate,
+    PromptExecuteArgs,
     PromptRead,
     PromptUpdate,
     ResourceCreate,
     ResourceRead,
     ResourceUpdate,
+    RPCRequest,
     ServerCreate,
     ServerRead,
     ServerUpdate,
@@ -91,7 +93,7 @@ from mcpgateway.schemas import (
     ToolUpdate,
 )
 from mcpgateway.services.completion_service import CompletionService
-from mcpgateway.services.gateway_service import GatewayConnectionError, GatewayService
+from mcpgateway.services.gateway_service import GatewayConnectionError, GatewayNameConflictError, GatewayService
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.prompt_service import (
     PromptError,
@@ -129,7 +131,6 @@ from mcpgateway.utils.retry_manager import ResilientHttpClient
 from mcpgateway.utils.verify_credentials import require_auth, require_auth_override
 from mcpgateway.validation.jsonrpc import (
     JSONRPCError,
-    validate_request,
 )
 
 # Import the admin routes from the new module
@@ -1622,7 +1623,13 @@ async def get_prompt(
         Rendered prompt or metadata.
     """
     logger.debug(f"User: {user} requested prompt: {name} with args={args}")
-    return await prompt_service.get_prompt(db, name, args)
+    try:
+        PromptExecuteArgs(args=args)
+        return await prompt_service.get_prompt(db, name, args)
+    except Exception as ex:
+        logger.error(f"Error retrieving prompt {name}: {ex}")
+        if isinstance(ex, ValueError):
+            return JSONResponse(content={"message": "Prompt execution arguments contains HTML tags that may cause security issues"}, status_code=422)
 
 
 @prompt_router.get("/{name}")
@@ -1791,6 +1798,8 @@ async def register_gateway(
             return JSONResponse(content={"message": "Unable to connect to gateway"}, status_code=502)
         if isinstance(ex, ValueError):
             return JSONResponse(content={"message": "Unable to process input"}, status_code=400)
+        if isinstance(ex, GatewayNameConflictError):
+            return JSONResponse(content={"message": "Gateway name already exists"}, status_code=400)
         if isinstance(ex, RuntimeError):
             return JSONResponse(content={"message": "Error during execution"}, status_code=500)
         return JSONResponse(content={"message": "Unexpected error"}, status_code=500)
@@ -1951,11 +1960,12 @@ async def handle_rpc(request: Request, db: Session = Depends(get_db), user: str 
     try:
         logger.debug(f"User {user} made an RPC request")
         body = await request.json()
-        validate_request(body)
         method = body["method"]
         # rpc_id = body.get("id")
         params = body.get("params", {})
         cursor = params.get("cursor")  # Extract cursor parameter
+
+        RPCRequest(jsonrpc="2.0", method=method, params=params)  # Validate the request body against the RPCRequest model
 
         if method == "tools/list":
             tools = await tool_service.list_tools(db, cursor=cursor)
@@ -2011,6 +2021,8 @@ async def handle_rpc(request: Request, db: Session = Depends(get_db), user: str 
     except JSONRPCError as e:
         return e.to_dict()
     except Exception as e:
+        if isinstance(e, ValueError):
+            return JSONResponse(content={"message": "Method invalid"}, status_code=422)
         logger.error(f"RPC error: {str(e)}")
         return {
             "jsonrpc": "2.0",
