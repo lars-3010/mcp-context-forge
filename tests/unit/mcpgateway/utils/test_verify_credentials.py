@@ -24,6 +24,7 @@ from __future__ import annotations
 
 # Standard
 from datetime import datetime, timedelta, timezone
+import base64
 
 # Third-Party
 from fastapi import HTTPException, status
@@ -212,3 +213,47 @@ async def test_require_auth_override_non_bearer(monkeypatch):
 
     # Assert
     assert result == await vc.require_auth(credentials=None, jwt_token=None)
+
+@pytest.mark.asyncio
+async def test_require_auth_override_basic_auth_enabled_success(monkeypatch):
+    monkeypatch.setattr(vc.settings, "docs_basic_auth_enabled", True, raising=False)
+    monkeypatch.setattr(vc.settings, "auth_required", True, raising=False)
+    monkeypatch.setattr(vc.settings, "basic_auth_user", "alice", raising=False)
+    monkeypatch.setattr(vc.settings, "basic_auth_password", "secret", raising=False)
+    basic_auth_header = f"Basic {base64.b64encode(f'alice:secret'.encode()).decode()}"
+    result = await vc.require_auth_override(auth_header=basic_auth_header)
+    assert result == vc.settings.basic_auth_user
+    assert result == "alice"
+
+@pytest.mark.asyncio
+async def test_require_auth_override_basic_auth_enabled_failure(monkeypatch):
+    monkeypatch.setattr(vc.settings, "docs_basic_auth_enabled", True, raising=False)
+    monkeypatch.setattr(vc.settings, "auth_required", True, raising=False)
+    monkeypatch.setattr(vc.settings, "basic_auth_user", "alice", raising=False)
+    monkeypatch.setattr(vc.settings, "basic_auth_password", "secret", raising=False)
+
+    # case1. format is wrong
+    header = "Basic fakeAuth"
+    with pytest.raises(HTTPException) as exc:
+        await vc.require_auth_override(auth_header=header)
+    assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
+    assert exc.value.detail == "Invalid basic auth credentials"
+
+    # case2. username or password is wrong
+    header = "Basic dGVzdDp0ZXN0"
+    with pytest.raises(HTTPException) as exc:
+        await vc.require_auth_override(auth_header=header)
+    assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
+    assert exc.value.detail == "Invalid credentials"
+
+@pytest.mark.asyncio
+async def test_require_auth_override_basic_auth_disabled(monkeypatch):
+    monkeypatch.setattr(vc.settings, "docs_basic_auth_enabled", False, raising=False)
+    monkeypatch.setattr(vc.settings, "jwt_secret_key", SECRET, raising=False)
+    monkeypatch.setattr(vc.settings, "jwt_algorithm", ALGO, raising=False)
+    monkeypatch.setattr(vc.settings, "auth_required", True, raising=False)
+    header = "Basic dGVzdDp0ZXN0"
+    with pytest.raises(HTTPException) as exc:
+        await vc.require_auth_override(auth_header=header)
+    assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
+    assert exc.value.detail == "Not authenticated"

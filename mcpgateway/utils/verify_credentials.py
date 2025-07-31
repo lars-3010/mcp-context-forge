@@ -18,6 +18,7 @@ Examples:
     ...     basic_auth_password = 'pass'
     ...     auth_required = True
     ...     require_token_expiration = False
+    ...     docs_basic_auth_enabled = False
     >>> vc.settings = DummySettings()
     >>> import jwt
     >>> token = jwt.encode({'sub': 'alice'}, 'secret', algorithm='HS256')
@@ -91,6 +92,7 @@ async def verify_jwt_token(token: str) -> dict:
         ...     basic_auth_password = 'pass'
         ...     auth_required = True
         ...     require_token_expiration = False
+        ...     docs_basic_auth_enabled = False
         >>> vc.settings = DummySettings()
         >>> import jwt
         >>> token = jwt.encode({'sub': 'alice'}, 'secret', algorithm='HS256')
@@ -201,6 +203,7 @@ async def verify_credentials(token: str) -> dict:
         ...     basic_auth_password = 'pass'
         ...     auth_required = True
         ...     require_token_expiration = False
+        ...     docs_basic_auth_enabled = False
         >>> vc.settings = DummySettings()
         >>> import jwt
         >>> token = jwt.encode({'sub': 'alice'}, 'secret', algorithm='HS256')
@@ -242,6 +245,7 @@ async def require_auth(credentials: Optional[HTTPAuthorizationCredentials] = Dep
         ...     basic_auth_password = 'pass'
         ...     auth_required = True
         ...     require_token_expiration = False
+        ...     docs_basic_auth_enabled = False
         >>> vc.settings = DummySettings()
         >>> import jwt
         >>> from fastapi.security import HTTPAuthorizationCredentials
@@ -307,6 +311,7 @@ async def verify_basic_credentials(credentials: HTTPBasicCredentials) -> str:
         ...     basic_auth_user = 'user'
         ...     basic_auth_password = 'pass'
         ...     auth_required = True
+        ...     docs_basic_auth_enabled = False
         >>> vc.settings = DummySettings()
         >>> from fastapi.security import HTTPBasicCredentials
         >>> creds = HTTPBasicCredentials(username='user', password='pass')
@@ -356,6 +361,7 @@ async def require_basic_auth(credentials: HTTPBasicCredentials = Depends(basic_s
         ...     basic_auth_user = 'user'
         ...     basic_auth_password = 'pass'
         ...     auth_required = True
+        ...     docs_basic_auth_enabled = False
         >>> vc.settings = DummySettings()
         >>> from fastapi.security import HTTPBasicCredentials
         >>> import asyncio
@@ -409,6 +415,10 @@ async def require_auth_override(
         str | dict: The decoded JWT payload or the string "anonymous",
             same as require_auth.
 
+    Raises:
+        HTTPException: If authentication fails or credentials are invalid.
+        ValueError: If basic auth credentials are malformed.
+
     Note:
         This wrapper may propagate HTTPException raised by require_auth,
         but it does not raise anything on its own.
@@ -422,6 +432,7 @@ async def require_auth_override(
         ...     basic_auth_password = 'pass'
         ...     auth_required = True
         ...     require_token_expiration = False
+        ...     docs_basic_auth_enabled = False
         >>> vc.settings = DummySettings()
         >>> import jwt
         >>> import asyncio
@@ -461,7 +472,7 @@ async def require_auth_override(
                 data = b64decode(param).decode("ascii")
                 username, separator, password = data.partition(":")
                 if not separator:
-                     raise ValueError("Invalid basic auth format")
+                    raise ValueError("Invalid basic auth format")
                 credentials = HTTPBasicCredentials(username=username, password=password)
                 return await require_basic_auth(credentials=credentials)
             except (ValueError, UnicodeDecodeError, binascii.Error):
