@@ -58,12 +58,6 @@ reuse_port = True  # Set the SO_REUSEPORT flag on the listening socket
 # ca-certs = '/etc/ca_bundle.crt'
 
 # server hooks
-
-def on_starting(server):
-    ini_path = files("mcpgateway").joinpath("alembic.ini")
-    cfg = Config(str(ini_path))
-    command.upgrade(cfg, "head")
-
 def when_ready(server):
     server.log.info("Server is ready. Spawning workers")
 
