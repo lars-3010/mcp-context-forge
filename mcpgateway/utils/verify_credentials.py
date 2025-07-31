@@ -44,6 +44,8 @@ import logging
 from typing import Optional
 
 # Third-Party
+import binascii
+from base64 import b64decode
 from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import (
     HTTPAuthorizationCredentials,
@@ -454,5 +456,18 @@ async def require_auth_override(
         scheme, param = get_authorization_scheme_param(auth_header)
         if scheme.lower() == "bearer" and param:
             credentials = HTTPAuthorizationCredentials(scheme=scheme, credentials=param)
-
+        elif scheme.lower() == "basic" and param:
+            try:
+                data = b64decode(param).decode("ascii")
+                username, separator, password = data.partition(":")
+                if not separator:
+                     raise ValueError("Invalid basic auth format")
+                credentials = HTTPBasicCredentials(username=username, password=password)
+                return await require_basic_auth(credentials=credentials)
+            except (ValueError, UnicodeDecodeError, binascii.Error):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid basic auth credentials",
+                    headers={"WWW-Authenticate": "Basic"},
+                )
     return await require_auth(credentials=credentials, jwt_token=jwt_token)
