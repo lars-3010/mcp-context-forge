@@ -3307,27 +3307,31 @@ async function testTool(toolId) {
 
                 // Field label - use textContent to avoid double escaping
                 const label = document.createElement("label");
-                label.textContent = keyValidation.value;
                 label.className =
                     "block text-sm font-medium text-gray-700 dark:text-gray-300";
+
+                // Create span for label text
+                const labelText = document.createElement("span");
+                labelText.textContent = keyValidation.value;
+                label.appendChild(labelText);
+
+                // Add red star if field is required
+                if (schema.required && schema.required.includes(key)) {
+                    const requiredMark = document.createElement("span");
+                    requiredMark.textContent = " *";
+                    requiredMark.className = "text-red-500";
+                    label.appendChild(requiredMark);
+                }
+
                 fieldDiv.appendChild(label);
 
                 // Description help text - use textContent
                 if (prop.description) {
                     const description = document.createElement("small");
-                    description.textContent = prop.description; // NO escapeHtml here
+                    description.textContent = prop.description;
                     description.className = "text-gray-500 block mb-1";
                     fieldDiv.appendChild(description);
                 }
-
-                // Input field with validation
-                const input = document.createElement("input");
-                input.name = keyValidation.value;
-                input.type = "text";
-                input.required =
-                    schema.required && schema.required.includes(key);
-                input.className =
-                    "mt-1 block w-full rounded-md border border-gray-500 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 text-gray-700 dark:text-gray-300 dark:border-gray-700 dark:focus:border-indigo-400 dark:focus:ring-indigo-400";
 
                 if (prop.type === "array") {
                     const arrayContainer = document.createElement("div");
@@ -3343,18 +3347,27 @@ async function testTool(toolId) {
                             schema.required && schema.required.includes(key);
                         input.className =
                             "mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 text-gray-700 dark:text-gray-300 dark:border-gray-700 dark:focus:border-indigo-400 dark:focus:ring-indigo-400";
-                        if (prop.items && prop.items.type === "number") {
-                            input.type = "number";
-                        } else if (
-                            prop.items &&
-                            prop.items.type === "boolean"
+
+                        const itemTypes = Array.isArray(prop.items?.anyOf)
+                            ? prop.items.anyOf.map((t) => t.type)
+                            : [prop.items?.type];
+
+                        if (
+                            itemTypes.includes("number") ||
+                            itemTypes.includes("integer")
                         ) {
+                            input.type = "number";
+                            input.step = itemTypes.includes("integer")
+                                ? "1"
+                                : "any";
+                        } else if (itemTypes.includes("boolean")) {
                             input.type = "checkbox";
                             input.value = "true";
                             input.checked = value === true || value === "true";
                         } else {
                             input.type = "text";
                         }
+
                         if (
                             typeof value === "string" ||
                             typeof value === "number"
@@ -3386,7 +3399,20 @@ async function testTool(toolId) {
                         arrayContainer.appendChild(createArrayInput());
                     });
 
-                    arrayContainer.appendChild(createArrayInput());
+                    if (Array.isArray(prop.default)) {
+                        if (prop.default.length > 0) {
+                            prop.default.forEach((val) => {
+                                arrayContainer.appendChild(
+                                    createArrayInput(val),
+                                );
+                            });
+                        } else {
+                            // Create one empty input for empty default arrays
+                            arrayContainer.appendChild(createArrayInput());
+                        }
+                    } else {
+                        arrayContainer.appendChild(createArrayInput());
+                    }
 
                     fieldDiv.appendChild(arrayContainer);
                     fieldDiv.appendChild(addBtn);
@@ -3401,19 +3427,35 @@ async function testTool(toolId) {
                     // Add validation based on type
                     if (prop.type === "text") {
                         input.type = "text";
-                    } else if (prop.type === "number") {
+                    } else if (
+                        prop.type === "number" ||
+                        prop.type === "integer"
+                    ) {
                         input.type = "number";
                     } else if (prop.type === "boolean") {
                         input.type = "checkbox";
                         input.className =
                             "mt-1 h-4 w-4 text-indigo-600 dark:text-indigo-200 border border-gray-300 rounded";
+                    } else {
+                        input.type = "text";
                     }
+
+                    // Set default values here
+                    if (prop.default !== undefined) {
+                        if (input.type === "checkbox") {
+                            input.checked = prop.default === true;
+                        } else {
+                            input.value = prop.default;
+                        }
+                    }
+
                     fieldDiv.appendChild(input);
                 }
 
                 container.appendChild(fieldDiv);
             }
         }
+
         openModal("tool-test-modal");
         console.log("✓ Tool test modal loaded successfully");
     } catch (error) {
@@ -3510,49 +3552,48 @@ async function runToolTest() {
                     const inputValues = formData.getAll(key);
                     try {
                         // Convert values based on the items schema type
-                        if (prop.items && prop.items.type) {
-                            switch (prop.items.type) {
-                                case "object":
-                                    value = inputValues.map((v) => {
-                                        try {
-                                            const parsed = JSON.parse(v);
-                                            if (
-                                                typeof parsed !== "object" ||
-                                                Array.isArray(parsed)
-                                            ) {
-                                                throw new Error(
-                                                    `Value must be an object, got ${typeof parsed}`,
-                                                );
-                                            }
-                                            return parsed;
-                                        } catch (e) {
-                                            console.error(
-                                                `Error parsing object for ${key}:`,
-                                                e,
-                                            );
+                        if (prop.items) {
+                            const itemType = Array.isArray(prop.items.anyOf)
+                                ? prop.items.anyOf.map((t) => t.type)
+                                : [prop.items.type];
+
+                            if (
+                                itemType.includes("number") ||
+                                itemType.includes("integer")
+                            ) {
+                                value = inputValues.map((v) => {
+                                    const num = Number(v);
+                                    if (isNaN(num)) {
+                                        throw new Error(`Invalid number: ${v}`);
+                                    }
+                                    return num;
+                                });
+                            } else if (itemType.includes("boolean")) {
+                                value = inputValues.map(
+                                    (v) => v === "true" || v === true,
+                                );
+                            } else if (itemType.includes("object")) {
+                                value = inputValues.map((v) => {
+                                    try {
+                                        const parsed = JSON.parse(v);
+                                        if (
+                                            typeof parsed !== "object" ||
+                                            Array.isArray(parsed)
+                                        ) {
                                             throw new Error(
-                                                `Invalid object format for ${key}. Each item must be a valid JSON object.`,
+                                                "Value must be an object",
                                             );
                                         }
-                                    });
-                                    break;
-                                case "number":
-                                    value = inputValues.map((v) =>
-                                        v === "" ? null : Number(v),
-                                    );
-                                    break;
-                                case "boolean":
-                                    value = inputValues.map(
-                                        (v) => v === "true" || v === true,
-                                    );
-                                    break;
-                                default:
-                                    // For other types (like strings), use raw values
-                                    value = inputValues;
+                                        return parsed;
+                                    } catch {
+                                        throw new Error(
+                                            `Invalid object format for ${key}`,
+                                        );
+                                    }
+                                });
+                            } else {
+                                value = inputValues;
                             }
-                        } else {
-                            // If no items type specified, use raw values
-                            value = inputValues;
                         }
 
                         // Handle empty values
