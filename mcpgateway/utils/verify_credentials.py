@@ -456,7 +456,7 @@ async def require_auth_override(
         scheme, param = get_authorization_scheme_param(auth_header)
         if scheme.lower() == "bearer" and param:
             credentials = HTTPAuthorizationCredentials(scheme=scheme, credentials=param)
-        elif scheme.lower() == "basic" and param:
+        elif scheme.lower() == "basic" and param and settings.docs_basic_auth_enabled:
             try:
                 data = b64decode(param).decode("ascii")
                 username, separator, password = data.partition(":")
