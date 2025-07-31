@@ -14,10 +14,12 @@ from __future__ import annotations
 import base64
 from typing import Dict
 
+# Third-Party
 # Third‑Party
 import pytest
 from starlette.testclient import TestClient
 
+# First-Party
 # First‑Party
 from mcpgateway.config import settings
 

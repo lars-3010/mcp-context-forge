@@ -278,7 +278,6 @@ class TestGatewayService:
         Test case logic to verify settings.skip_ssl_verify
 
         """
-        pass
 
     # ────────────────────────────────────────────────────────────────────
     # Validate Gateway URL Auth Failure - 401
