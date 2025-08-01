@@ -1005,7 +1005,7 @@ You can get started by copying the provided [.env.example](.env.example) to `.en
 | `SKIP_SSL_VERIFY`         | Skip upstream TLS verification | `false`                                        | bool       |
 | `ALLOWED_ORIGINS`         | CORS allow-list                | `["http://localhost","http://localhost:4444"]` | JSON array |
 | `CORS_ENABLED`            | Enable CORS                    | `true`                                         | bool       |
-| `DOCS_BASIC_AUTH_ENABLED` | Enable docs basic auth         | `false`                                        | bool       |
+| `DOCS_ALLOW_BASIC_AUTH`   | Allow Basic Auth for docs (in addition to JWT)         | `false`                                        | bool       |
 
 > Note: do not quote the ALLOWED_ORIGINS values, this needs to be valid JSON, such as: `ALLOWED_ORIGINS=["http://localhost", "http://localhost:4444"]`
 

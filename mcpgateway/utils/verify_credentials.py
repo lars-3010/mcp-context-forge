@@ -18,7 +18,7 @@ Examples:
     ...     basic_auth_password = 'pass'
     ...     auth_required = True
     ...     require_token_expiration = False
-    ...     docs_basic_auth_enabled = False
+    ...     docs_allow_basic_auth = False
     >>> vc.settings = DummySettings()
     >>> import jwt
     >>> token = jwt.encode({'sub': 'alice'}, 'secret', algorithm='HS256')
@@ -92,7 +92,7 @@ async def verify_jwt_token(token: str) -> dict:
         ...     basic_auth_password = 'pass'
         ...     auth_required = True
         ...     require_token_expiration = False
-        ...     docs_basic_auth_enabled = False
+        ...     docs_allow_basic_auth = False
         >>> vc.settings = DummySettings()
         >>> import jwt
         >>> token = jwt.encode({'sub': 'alice'}, 'secret', algorithm='HS256')
@@ -203,7 +203,7 @@ async def verify_credentials(token: str) -> dict:
         ...     basic_auth_password = 'pass'
         ...     auth_required = True
         ...     require_token_expiration = False
-        ...     docs_basic_auth_enabled = False
+        ...     docs_allow_basic_auth = False
         >>> vc.settings = DummySettings()
         >>> import jwt
         >>> token = jwt.encode({'sub': 'alice'}, 'secret', algorithm='HS256')
@@ -245,7 +245,7 @@ async def require_auth(credentials: Optional[HTTPAuthorizationCredentials] = Dep
         ...     basic_auth_password = 'pass'
         ...     auth_required = True
         ...     require_token_expiration = False
-        ...     docs_basic_auth_enabled = False
+        ...     docs_allow_basic_auth = False
         >>> vc.settings = DummySettings()
         >>> import jwt
         >>> from fastapi.security import HTTPAuthorizationCredentials
@@ -311,7 +311,7 @@ async def verify_basic_credentials(credentials: HTTPBasicCredentials) -> str:
         ...     basic_auth_user = 'user'
         ...     basic_auth_password = 'pass'
         ...     auth_required = True
-        ...     docs_basic_auth_enabled = False
+        ...     docs_allow_basic_auth = False
         >>> vc.settings = DummySettings()
         >>> from fastapi.security import HTTPBasicCredentials
         >>> creds = HTTPBasicCredentials(username='user', password='pass')
@@ -361,7 +361,7 @@ async def require_basic_auth(credentials: HTTPBasicCredentials = Depends(basic_s
         ...     basic_auth_user = 'user'
         ...     basic_auth_password = 'pass'
         ...     auth_required = True
-        ...     docs_basic_auth_enabled = False
+        ...     docs_allow_basic_auth = False
         >>> vc.settings = DummySettings()
         >>> from fastapi.security import HTTPBasicCredentials
         >>> import asyncio
@@ -393,6 +393,102 @@ async def require_basic_auth(credentials: HTTPBasicCredentials = Depends(basic_s
             )
         return await verify_basic_credentials(credentials)
     return "anonymous"
+
+
+async def require_docs_basic_auth(auth_header: str) -> str:
+    """Dedicated handler for HTTP Basic Auth for documentation endpoints only.
+
+    This function is ONLY intended for /docs, /redoc, or similar endpoints, and is enabled
+    via the settings.docs_allow_basic_auth flag. It should NOT be used for general API authentication.
+
+    Args:
+        auth_header: Raw Authorization header value (e.g. "Basic username:password").
+
+    Returns:
+        str: The authenticated username if credentials are valid.
+
+    Raises:
+        HTTPException: If credentials are invalid or malformed.
+        ValueError: If the basic auth format is invalid (missing colon).
+    """
+    """Dedicated handler for HTTP Basic Auth for documentation endpoints only.
+
+    This function is ONLY intended for /docs, /redoc, or similar endpoints, and is enabled
+    via the settings.docs_allow_basic_auth flag. It should NOT be used for general API authentication.
+
+    Args:
+        auth_header: Raw Authorization header value (e.g. "Basic dXNlcjpwYXNz").
+
+    Returns:
+        str: The authenticated username if credentials are valid.
+
+    Raises:
+        HTTPException: If credentials are invalid or malformed.
+
+    Examples:
+        >>> from mcpgateway.utils import verify_credentials as vc
+        >>> class DummySettings:
+        ...     jwt_secret_key = 'secret'
+        ...     jwt_algorithm = 'HS256'
+        ...     basic_auth_user = 'user'
+        ...     basic_auth_password = 'pass'
+        ...     auth_required = True
+        ...     require_token_expiration = False
+        ...     docs_allow_basic_auth = True
+        >>> vc.settings = DummySettings()
+        >>> import base64, asyncio
+        >>> userpass = base64.b64encode(b'user:pass').decode()
+        >>> auth_header = f'Basic {userpass}'
+        >>> asyncio.run(vc.require_docs_basic_auth(auth_header))
+        'user'
+
+        Test with invalid password:
+        >>> badpass = base64.b64encode(b'user:wrong').decode()
+        >>> bad_header = f'Basic {badpass}'
+        >>> try:
+        ...     asyncio.run(vc.require_docs_basic_auth(bad_header))
+        ... except vc.HTTPException as e:
+        ...     print(e.status_code, e.detail)
+        401 Invalid credentials
+
+        Test with malformed header:
+        >>> malformed = base64.b64encode(b'userpass').decode()
+        >>> malformed_header = f'Basic {malformed}'
+        >>> try:
+        ...     asyncio.run(vc.require_docs_basic_auth(malformed_header))
+        ... except vc.HTTPException as e:
+        ...     print(e.status_code, e.detail)
+        401 Invalid basic auth credentials
+
+        Test when docs_allow_basic_auth is False:
+        >>> vc.settings.docs_allow_basic_auth = False
+        >>> try:
+        ...     asyncio.run(vc.require_docs_basic_auth(auth_header))
+        ... except vc.HTTPException as e:
+        ...     print(e.status_code, e.detail)
+        401 Basic authentication not allowed or malformed
+        >>> vc.settings.docs_allow_basic_auth = True
+    """
+    scheme, param = get_authorization_scheme_param(auth_header)
+    if scheme.lower() == "basic" and param and settings.docs_allow_basic_auth:
+        try:
+            data = b64decode(param).decode("ascii")
+            username, separator, password = data.partition(":")
+            if not separator:
+                raise ValueError("Invalid basic auth format")
+            credentials = HTTPBasicCredentials(username=username, password=password)
+            return await require_basic_auth(credentials=credentials)
+        except (ValueError, UnicodeDecodeError, binascii.Error):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid basic auth credentials",
+                headers={"WWW-Authenticate": "Basic"},
+            )
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Basic authentication not allowed or malformed",
+        headers={"WWW-Authenticate": "Basic"},
+    )
 
 
 async def require_auth_override(
@@ -432,7 +528,7 @@ async def require_auth_override(
         ...     basic_auth_password = 'pass'
         ...     auth_required = True
         ...     require_token_expiration = False
-        ...     docs_basic_auth_enabled = False
+        ...     docs_allow_basic_auth = False
         >>> vc.settings = DummySettings()
         >>> import jwt
         >>> import asyncio
@@ -467,18 +563,6 @@ async def require_auth_override(
         scheme, param = get_authorization_scheme_param(auth_header)
         if scheme.lower() == "bearer" and param:
             credentials = HTTPAuthorizationCredentials(scheme=scheme, credentials=param)
-        elif scheme.lower() == "basic" and param and settings.docs_basic_auth_enabled:
-            try:
-                data = b64decode(param).decode("ascii")
-                username, separator, password = data.partition(":")
-                if not separator:
-                    raise ValueError("Invalid basic auth format")
-                credentials = HTTPBasicCredentials(username=username, password=password)
-                return await require_basic_auth(credentials=credentials)
-            except (ValueError, UnicodeDecodeError, binascii.Error):
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid basic auth credentials",
-                    headers={"WWW-Authenticate": "Basic"},
-                )
+        elif scheme.lower() == "basic" and param and settings.docs_allow_basic_auth:
+            return await require_docs_basic_auth(auth_header)
     return await require_auth(credentials=credentials, jwt_token=jwt_token)
