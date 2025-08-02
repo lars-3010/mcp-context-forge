@@ -77,9 +77,9 @@ jobs:
         echo "⏳  Waiting for startup..."
         sleep 10
 
-        # echo "🔍  Hitting health endpoint..."
-        # curl -fsSL http://localhost:4444/health || {
-        #   echo "❌ Health check failed"; docker logs mcpgateway; exit 1;
-        # }
+        echo "🔍  Hitting health endpoint..."
+        curl -fsSL http://localhost:4444/health || {
+          echo "❌ Health check failed"; docker logs mcpgateway; exit 1;
+        }
 
         echo "✅ Container is healthy!"

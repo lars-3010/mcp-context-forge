@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """auto migration
 
 Revision ID: 9c07b4bc5774
