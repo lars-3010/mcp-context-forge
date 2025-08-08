@@ -99,13 +99,13 @@ class TestPassthroughHeaders:
 
         # Authorization should be blocked, X-Tenant-Id should pass through
         expected = {
-            "Content-Type": "application/json", 
+            "Content-Type": "application/json",
             "X-Tenant-Id": "acme-corp"
         }
         assert result == expected
-        
+
         # Check warning was logged
-        assert any("Skipping Authorization header passthrough due to basic auth" in record.message 
+        assert any("Skipping Authorization header passthrough due to basic auth" in record.message
                   for record in caplog.records)
 
     def test_authorization_conflict_bearer_auth(self, caplog):
@@ -158,7 +158,7 @@ class TestPassthroughHeaders:
         assert result == expected
 
         # Check conflict warning was logged
-        assert any("conflicts with pre-defined headers" in record.message 
+        assert any("conflicts with pre-defined headers" in record.message
                   for record in caplog.records)
 
     def test_case_insensitive_header_matching(self):
@@ -170,7 +170,7 @@ class TestPassthroughHeaders:
 
         # Request headers are expected to be normalized to lowercase
         request_headers = {
-            "x-tenant-id": "mixed-case-value",  # Lowercase key  
+            "x-tenant-id": "mixed-case-value",  # Lowercase key
             "authorization": "bearer lowercase-header"
         }
         base_headers = {}
@@ -237,7 +237,7 @@ class TestPassthroughHeaders:
         # Mock settings fallback
         with patch('mcpgateway.utils.passthrough_headers.settings') as mock_settings:
             mock_settings.default_passthrough_headers = ["X-Default"]
-            
+
             result = get_passthrough_headers(request_headers, base_headers, mock_db)
 
         # Should fall back to settings, but request doesn't have X-Default
@@ -255,7 +255,7 @@ class TestPassthroughHeaders:
         # Mock settings fallback
         with patch('mcpgateway.utils.passthrough_headers.settings') as mock_settings:
             mock_settings.default_passthrough_headers = ["X-Default"]
-            
+
             result = get_passthrough_headers(request_headers, base_headers, mock_db)
 
         expected = {
@@ -311,7 +311,7 @@ class TestPassthroughHeaders:
 
         # Original base_headers should not be modified
         assert base_headers == original_base
-        
+
         # Result should include both base and passthrough headers
         assert "Content-Type" in result
         assert "X-Tenant-Id" in result
@@ -328,7 +328,7 @@ class TestPassthroughHeaders:
 
         # Test with different auth types
         auth_types = ["basic", "bearer", "api-key", None]
-        
+
         for auth_type in auth_types:
             caplog.clear()
             mock_gateway = Mock(spec=DbGateway)
@@ -418,7 +418,7 @@ class TestPassthroughHeaders:
 
         # Should have warnings for: missing header, auth conflict, base header conflict
         warning_messages = [record.message for record in caplog.records if record.levelno == logging.WARNING]
-        
+
         assert len(warning_messages) == 3
         assert any("not found in request headers" in msg for msg in warning_messages)
         assert any("due to basic auth" in msg for msg in warning_messages)

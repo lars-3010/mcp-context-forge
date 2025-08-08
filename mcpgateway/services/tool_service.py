@@ -333,7 +333,9 @@ class ToolService:
         except Exception as ex:
             raise ToolError(f"Failed to register tool: {str(ex)}")
 
-    async def list_tools(self, db: Session, include_inactive: bool = False, cursor: Optional[str] = None, tags: Optional[List[str]] = None, request_headers: Optional[Dict[str, str]] = None) -> List[ToolRead]:
+    async def list_tools(
+        self, db: Session, include_inactive: bool = False, cursor: Optional[str] = None, tags: Optional[List[str]] = None, request_headers: Optional[Dict[str, str]] = None
+    ) -> List[ToolRead]:
         """
         Retrieve a list of registered tools from the database.
 

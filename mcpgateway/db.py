@@ -1113,7 +1113,7 @@ class Gateway(Base):
     reachable: Mapped[bool] = mapped_column(default=True)
     last_seen: Mapped[Optional[datetime]]
     tags: Mapped[List[str]] = mapped_column(JSON, default=list, nullable=False)
-    
+
     # Header passthrough configuration
     passthrough_headers: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)  # Store list of strings as JSON array
 
