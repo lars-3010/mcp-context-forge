@@ -1776,40 +1776,40 @@ class TestSecurityBestPractices:
         finally:
             logger.removeHandler(handler)
 
-def test_constant_time_operations():
-    """Test that validation doesn't leak timing information."""
-    logger.debug("Testing constant-time validation")
+    def test_constant_time_operations(self):
+        """Test that validation doesn't leak timing information."""
+        logger.debug("Testing constant-time validation")
 
-    import time
-    import statistics
+        import time
+        import statistics
 
-    valid_times = []
-    invalid_times = []
+        valid_times = []
+        invalid_times = []
 
-    # Actual measurement
-    for _ in range(100):
-        start = time.time()
-        try:
-            ToolCreate(name="valid_name", url="https://example.com")
-        except:
-            pass
-        valid_times.append(time.perf_counter() - start)
+        # Actual measurement
+        for _ in range(100):
+            start = time.time()
+            try:
+                ToolCreate(name="valid_name", url="https://example.com")
+            except:
+                pass
+            valid_times.append(time.perf_counter() - start)
 
-        start = time.perf_counter()
-        try:
-            ToolCreate(name="<script>alert('XSS')</script>", url="https://example.com")
-        except:
-            pass
-        invalid_times.append(time.perf_counter() - start)
+            start = time.perf_counter()
+            try:
+                ToolCreate(name="<script>alert('XSS')</script>", url="https://example.com")
+            except:
+                pass
+            invalid_times.append(time.perf_counter() - start)
 
-    valid_median = statistics.median(valid_times)
-    invalid_median = statistics.median(invalid_times)
+        valid_median = statistics.median(valid_times)
+        invalid_median = statistics.median(invalid_times)
 
-    logger.debug(f"Valid median: {valid_median:.9f}s")
-    logger.debug(f"Invalid median: {invalid_median:.9f}s")
+        logger.debug(f"Valid median: {valid_median:.9f}s")
+        logger.debug(f"Invalid median: {invalid_median:.9f}s")
 
-    ratio = max(valid_median, invalid_median) / min(valid_median, invalid_median)
-    assert ratio < 1.5, f"Timing difference too large: {ratio:.2f}x"
+        ratio = max(valid_median, invalid_median) / min(valid_median, invalid_median)
+        assert ratio < 1.5, f"Timing difference too large: {ratio:.2f}x"
 
 
 if __name__ == "__main__":
