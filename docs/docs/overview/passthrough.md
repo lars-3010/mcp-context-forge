@@ -250,3 +250,42 @@ When upgrading to a version with header passthrough:
 2. **Configuration Review**: Review existing authentication setup for conflicts
 3. **Testing**: Test header forwarding in development before production deployment
 4. **Monitoring**: Monitor logs for any unexpected behavior after deployment
+
+## Testing with the Built-in Test Tool
+
+The MCP Gateway admin interface includes a built-in test tool with passthrough header support:
+
+### Using the Test Tool
+
+1. **Access the Admin UI**: Navigate to the **Tools** section
+2. **Select a Tool**: Click the **Test** button on any available tool
+3. **Configure Headers**: In the test modal, scroll to the **Passthrough Headers** section
+4. **Add Headers**: Enter headers in the format `Header-Name: Value` (one per line):
+   ```
+   Authorization: Bearer your-token-here
+   X-Tenant-Id: tenant-123
+   X-Trace-Id: abc-def-456
+   ```
+5. **Run Test**: Click **Run Tool** - the headers will be included in the request
+
+### Example Test Scenarios
+
+**Authentication Testing**:
+```
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
+```
+
+**Multi-Tenant Testing**:
+```
+X-Tenant-Id: acme-corp
+X-Organization-Id: org-12345
+```
+
+**Distributed Tracing**:
+```
+X-Trace-Id: trace-abc123
+X-Span-Id: span-def456
+X-Request-Id: req-789xyz
+```
+
+The test tool provides immediate feedback and allows you to verify that your passthrough header configuration is working correctly before deploying to production.
