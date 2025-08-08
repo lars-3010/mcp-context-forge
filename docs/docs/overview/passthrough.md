@@ -94,7 +94,7 @@ graph LR
     C --> D[Extract Configured Headers]
     D --> E[Conflict Prevention Check]
     E --> F[Forward to MCP Server]
-    
+
     G[Global Config] --> C
     H[Gateway Config] --> C
 ```

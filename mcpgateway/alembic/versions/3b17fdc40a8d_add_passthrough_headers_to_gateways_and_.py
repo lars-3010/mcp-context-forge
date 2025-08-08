@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Add passthrough headers to gateways and global config
 
 Revision ID: 3b17fdc40a8d

@@ -3773,14 +3773,35 @@ async function runToolTest() {
             params,
         };
 
+        // Parse custom headers from the passthrough headers field
+        const requestHeaders = {
+            "Content-Type": "application/json",
+        };
+
+        const passthroughHeadersField = document.getElementById("test-passthrough-headers");
+        if (passthroughHeadersField && passthroughHeadersField.value.trim()) {
+            const headerLines = passthroughHeadersField.value.trim().split('\n');
+            for (const line of headerLines) {
+                const trimmedLine = line.trim();
+                if (trimmedLine) {
+                    const colonIndex = trimmedLine.indexOf(':');
+                    if (colonIndex > 0) {
+                        const headerName = trimmedLine.substring(0, colonIndex).trim();
+                        const headerValue = trimmedLine.substring(colonIndex + 1).trim();
+                        if (headerName && headerValue) {
+                            requestHeaders[headerName] = headerValue;
+                        }
+                    }
+                }
+            }
+        }
+
         // Use longer timeout for test execution
         const response = await fetchWithTimeout(
             `${window.ROOT_PATH}/rpc`,
             {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: requestHeaders,
                 body: JSON.stringify(payload),
                 credentials: "include",
             },
