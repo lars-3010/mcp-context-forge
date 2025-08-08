@@ -45,9 +45,9 @@ from mcpgateway.schemas import (
     ToolUpdate,
 )
 from mcpgateway.utils.create_slug import slugify
+from mcpgateway.utils.passthrough_headers import get_passthrough_headers
 from mcpgateway.utils.retry_manager import ResilientHttpClient
 from mcpgateway.utils.services_auth import decode_auth
-from mcpgateway.utils.passthrough_headers import get_passthrough_headers
 
 # Local
 from ..config import extract_using_jq
@@ -381,7 +381,7 @@ class ToolService:
         tools = db.execute(query).scalars().all()
         return [self._convert_tool_to_read(t) for t in tools]
 
-    async def list_server_tools(self, db: Session, server_id: str, include_inactive: bool = False, cursor: Optional[str] = None, request_headers: Optional[Dict[str, str]] = None) -> List[ToolRead]:
+    async def list_server_tools(self, db: Session, server_id: str, include_inactive: bool = False, cursor: Optional[str] = None, _request_headers: Optional[Dict[str, str]] = None) -> List[ToolRead]:
         """
         Retrieve a list of registered tools from the database.
 
@@ -392,8 +392,8 @@ class ToolService:
                 Defaults to False.
             cursor (Optional[str], optional): An opaque cursor token for pagination. Currently,
                 this parameter is ignored. Defaults to None.
-            request_headers (Optional[Dict[str, str]], optional): Headers from the request to pass through.
-                Defaults to None.
+            _request_headers (Optional[Dict[str, str]], optional): Headers from the request to pass through.
+                Currently unused but kept for API consistency. Defaults to None.
 
         Returns:
             List[ToolRead]: A list of registered tools represented as ToolRead objects.
@@ -609,7 +609,9 @@ class ToolService:
                 credentials = decode_auth(tool.auth_value)
                 headers.update(credentials)
 
-                headers = get_passthrough_headers(request_headers, headers, db)
+                # Only call get_passthrough_headers if we actually have request headers to pass through
+                if request_headers:
+                    headers = get_passthrough_headers(request_headers, headers, db)
                 # Build the payload based on integration type
                 payload = arguments.copy()
 
@@ -657,7 +659,8 @@ class ToolService:
 
                 # Get combined headers including gateway auth and passthrough
                 # base_headers = decode_auth(gateway.auth_value) if gateway and gateway.auth_value else {}
-                headers = get_passthrough_headers(request_headers, headers, db, gateway)
+                if request_headers:
+                    headers = get_passthrough_headers(request_headers, headers, db, gateway)
 
                 async def connect_to_sse_server(server_url: str) -> str:
                     """

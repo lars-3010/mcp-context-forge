@@ -1,10 +1,15 @@
-from typing import Dict, Optional
-from sqlalchemy.orm import Session
+# -*- coding: utf-8 -*-
+# Standard
 import logging
+from typing import Dict, Optional
 
+# Third-Party
+from sqlalchemy.orm import Session
+
+# First-Party
 from mcpgateway.config import settings
-from mcpgateway.models import GlobalConfig
 from mcpgateway.db import Gateway as DbGateway
+from mcpgateway.db import GlobalConfig
 
 logger = logging.getLogger(__name__)
 

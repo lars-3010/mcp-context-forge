@@ -561,9 +561,6 @@ class Settings(BaseSettings):
             logger.warning(f"Invalid DEFAULT_PASSTHROUGH_HEADERS format in .env. Must be a list of header names, e.g. ['Authorization', 'X-Tenant-Id'], error: {e}")
             default_passthrough_headers = []
 
-    # Masking value for all sensitive data
-    masked_auth_value: str = "*****"
-
 
 def extract_using_jq(data, jq_filter=""):
     """

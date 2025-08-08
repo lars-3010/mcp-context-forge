@@ -93,13 +93,13 @@ admin_router = APIRouter(prefix="/admin", tags=["Admin UI"])
 @admin_router.get("/config/passthrough-headers", response_model=GlobalConfigRead)
 async def get_global_passthrough_headers(
     db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
+    _user: str = Depends(require_auth),
 ) -> GlobalConfigRead:
     """Get the global passthrough headers configuration.
 
     Args:
         db: Database session
-        user: Authenticated user
+        _user: Authenticated user
 
     Returns:
         GlobalConfigRead: The current global passthrough headers configuration
@@ -114,14 +114,14 @@ async def get_global_passthrough_headers(
 async def update_global_passthrough_headers(
     config_update: GlobalConfigUpdate,
     db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
+    _user: str = Depends(require_auth),
 ) -> GlobalConfigRead:
     """Update the global passthrough headers configuration.
 
     Args:
         config_update: The new configuration
         db: Database session
-        user: Authenticated user
+        _user: Authenticated user
 
     Returns:
         GlobalConfigRead: The updated configuration

@@ -2471,6 +2471,16 @@ async function editGateway(gatewayId) {
                 break;
         }
 
+        // Handle passthrough headers
+        const passthroughHeadersField = safeGetElement("edit-gateway-passthrough-headers");
+        if (passthroughHeadersField) {
+            if (gateway.passthroughHeaders && Array.isArray(gateway.passthroughHeaders)) {
+                passthroughHeadersField.value = gateway.passthroughHeaders.join(", ");
+            } else {
+                passthroughHeadersField.value = "";
+            }
+        }
+
         openModal("gateway-edit-modal");
         console.log("✓ Gateway edit modal loaded successfully");
     } catch (error) {
@@ -4510,6 +4520,20 @@ async function handleGatewayFormSubmit(e) {
         const isInactiveCheckedBool = isInactiveChecked("gateways");
         formData.append("is_inactive_checked", isInactiveCheckedBool);
 
+        // Process passthrough headers - convert comma-separated string to array
+        const passthroughHeadersString = formData.get("passthrough_headers");
+        if (passthroughHeadersString && passthroughHeadersString.trim()) {
+            // Split by comma and clean up each header name
+            const passthroughHeaders = passthroughHeadersString
+                .split(',')
+                .map(header => header.trim())
+                .filter(header => header.length > 0);
+
+            // Remove the original string and add as JSON array
+            formData.delete("passthrough_headers");
+            formData.append("passthrough_headers", JSON.stringify(passthroughHeaders));
+        }
+
         const response = await fetchWithTimeout(
             `${window.ROOT_PATH}/admin/gateways`,
             {
@@ -4920,6 +4944,14 @@ async function handleEditGatewayFormSubmit(e) {
         if (!urlValidation.valid) {
             throw new Error(urlValidation.error);
         }
+
+        // Handle passthrough headers
+        const passthroughHeadersString = formData.get("passthrough_headers") || "";
+        const passthroughHeaders = passthroughHeadersString
+            .split(',')
+            .map(header => header.trim())
+            .filter(header => header.length > 0);
+        formData.append("passthrough_headers", JSON.stringify(passthroughHeaders));
 
         const isInactiveCheckedBool = isInactiveChecked("gateways");
         formData.append("is_inactive_checked", isInactiveCheckedBool);
