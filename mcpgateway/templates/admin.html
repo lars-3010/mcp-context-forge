@@ -2221,7 +2221,9 @@
                   >Passthrough Headers</label
                 >
                 <small class="text-gray-500 dark:text-gray-400 block mb-2">
-                  List of headers to pass through from client requests (comma-separated, e.g., "Authorization, X-Tenant-Id, X-Trace-Id"). Leave empty to use global defaults.
+                  List of headers to pass through from client requests
+                  (comma-separated, e.g., "Authorization, X-Tenant-Id,
+                  X-Trace-Id"). Leave empty to use global defaults.
                 </small>
                 <input
                   type="text"
@@ -2550,11 +2552,15 @@
                 </div>
                 <div class="mt-4 border-t pt-4">
                   <div>
-                    <label for="test-passthrough-headers" class="block text-sm font-medium text-gray-700 dark:text-gray-400">
+                    <label
+                      for="test-passthrough-headers"
+                      class="block text-sm font-medium text-gray-700 dark:text-gray-400"
+                    >
                       Passthrough Headers (Optional)
                     </label>
                     <small class="text-gray-500 dark:text-gray-400 block mb-2">
-                      Additional headers to send with the request (format: "Header-Name: Value", one per line)
+                      Additional headers to send with the request (format:
+                      "Header-Name: Value", one per line)
                     </small>
                     <textarea
                       id="test-passthrough-headers"
@@ -3489,11 +3495,16 @@
                       </div>
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-400"
+                      <label
+                        class="block text-sm font-medium text-gray-700 dark:text-gray-400"
                         >Passthrough Headers</label
                       >
-                      <small class="text-gray-500 dark:text-gray-400 block mb-2">
-                        List of headers to pass through from client requests (comma-separated, e.g., "Authorization, X-Tenant-Id, X-Trace-Id"). Leave empty to use global defaults.
+                      <small
+                        class="text-gray-500 dark:text-gray-400 block mb-2"
+                      >
+                        List of headers to pass through from client requests
+                        (comma-separated, e.g., "Authorization, X-Tenant-Id,
+                        X-Trace-Id"). Leave empty to use global defaults.
                       </small>
                       <input
                         type="text"
