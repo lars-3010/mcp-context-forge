@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """merge passthrough headers and tags support
 
 Revision ID: eb17fd368f9d

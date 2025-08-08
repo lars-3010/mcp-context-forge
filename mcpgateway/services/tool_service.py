@@ -334,7 +334,7 @@ class ToolService:
             raise ToolError(f"Failed to register tool: {str(ex)}")
 
     async def list_tools(
-        self, db: Session, include_inactive: bool = False, cursor: Optional[str] = None, tags: Optional[List[str]] = None, request_headers: Optional[Dict[str, str]] = None
+        self, db: Session, include_inactive: bool = False, cursor: Optional[str] = None, tags: Optional[List[str]] = None, _request_headers: Optional[Dict[str, str]] = None
     ) -> List[ToolRead]:
         """
         Retrieve a list of registered tools from the database.
@@ -346,8 +346,8 @@ class ToolService:
             cursor (Optional[str], optional): An opaque cursor token for pagination. Currently,
                 this parameter is ignored. Defaults to None.
             tags (Optional[List[str]]): Filter tools by tags. If provided, only tools with at least one matching tag will be returned.
-            request_headers (Optional[Dict[str, str]], optional): Headers from the request to pass through.
-                Defaults to None.
+            _request_headers (Optional[Dict[str, str]], optional): Headers from the request to pass through.
+                Currently unused but kept for API consistency. Defaults to None.
 
         Returns:
             List[ToolRead]: A list of registered tools represented as ToolRead objects.
