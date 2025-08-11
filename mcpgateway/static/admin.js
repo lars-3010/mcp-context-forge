@@ -36,6 +36,59 @@ function escapeHtml(unsafe) {
 }
 
 /**
+ * Header validation constants and functions
+ */
+const HEADER_NAME_REGEX = /^[A-Za-z0-9-]+$/;
+const MAX_HEADER_VALUE_LENGTH = 4096;
+
+/**
+ * Validate a passthrough header name and value
+ * @param {string} name - Header name to validate
+ * @param {string} value - Header value to validate
+ * @returns {Object} Validation result with 'valid' boolean and 'error' message
+ */
+function validatePassthroughHeader(name, value) {
+    // Validate header name
+    if (!HEADER_NAME_REGEX.test(name)) {
+        return {
+            valid: false,
+            error: `Header name "${name}" contains invalid characters. Only letters, numbers, and hyphens are allowed.`,
+        };
+    }
+
+    // Check for dangerous characters in value
+    if (value.includes("\n") || value.includes("\r")) {
+        return {
+            valid: false,
+            error: "Header value cannot contain newline characters",
+        };
+    }
+
+    // Check value length
+    if (value.length > MAX_HEADER_VALUE_LENGTH) {
+        return {
+            valid: false,
+            error: `Header value too long (${value.length} chars, max ${MAX_HEADER_VALUE_LENGTH})`,
+        };
+    }
+
+    // Check for control characters (except tab)
+    const hasControlChars = Array.from(value).some((char) => {
+        const code = char.charCodeAt(0);
+        return code < 32 && code !== 9; // Allow tab (9) but not other control chars
+    });
+
+    if (hasControlChars) {
+        return {
+            valid: false,
+            error: "Header value contains invalid control characters",
+        };
+    }
+
+    return { valid: true };
+}
+
+/**
  * SECURITY: Validate input names to prevent XSS and ensure clean data
  */
 function validateInputName(name, type = "input") {
@@ -837,7 +890,9 @@ function displayMetrics(data) {
         // Top Performers section (before individual metrics)
         if (data.topPerformers || data.top) {
             const topData = data.topPerformers || data.top;
-            const topSection = createTopPerformersSection(topData);
+            // const topSection = createTopPerformersSection(topData);
+            const topSection = createEnhancedTopPerformersSection(topData);
+
             mainContainer.appendChild(topSection);
         }
 
@@ -1145,7 +1200,54 @@ function extractKPIData(data) {
 /**
  * SECURITY: Create top performers section with safe display
  */
-function createTopPerformersSection(topData) {
+// function createTopPerformersSection(topData) {
+//     try {
+//         const section = document.createElement("div");
+//         section.className = "bg-white rounded-lg shadow p-6 dark:bg-gray-800";
+
+//         const title = document.createElement("h3");
+//         title.className = "text-lg font-medium mb-4 dark:text-gray-200";
+//         title.textContent = "Top Performers";
+//         section.appendChild(title);
+
+//         const grid = document.createElement("div");
+//         grid.className = "grid grid-cols-1 md:grid-cols-2 gap-4";
+
+//         // Top Tools
+//         if (topData.tools && Array.isArray(topData.tools)) {
+//             const toolsCard = createTopItemCard("Tools", topData.tools);
+//             grid.appendChild(toolsCard);
+//         }
+
+//         // Top Resources
+//         if (topData.resources && Array.isArray(topData.resources)) {
+//             const resourcesCard = createTopItemCard(
+//                 "Resources",
+//                 topData.resources,
+//             );
+//             grid.appendChild(resourcesCard);
+//         }
+
+//         // Top Prompts
+//         if (topData.prompts && Array.isArray(topData.prompts)) {
+//             const promptsCard = createTopItemCard("Prompts", topData.prompts);
+//             grid.appendChild(promptsCard);
+//         }
+
+//         // Top Servers
+//         if (topData.servers && Array.isArray(topData.servers)) {
+//             const serversCard = createTopItemCard("Servers", topData.servers);
+//             grid.appendChild(serversCard);
+//         }
+
+//         section.appendChild(grid);
+//         return section;
+//     } catch (error) {
+//         console.error("Error creating top performers section:", error);
+//         return document.createElement("div"); // Safe fallback
+//     }
+// }
+function createEnhancedTopPerformersSection(topData) {
     try {
         const section = document.createElement("div");
         section.className = "bg-white rounded-lg shadow p-6 dark:bg-gray-800";
@@ -1153,86 +1255,452 @@ function createTopPerformersSection(topData) {
         const title = document.createElement("h3");
         title.className = "text-lg font-medium mb-4 dark:text-gray-200";
         title.textContent = "Top Performers";
+        title.setAttribute("aria-label", "Top Performers Section");
         section.appendChild(title);
 
-        const grid = document.createElement("div");
-        grid.className = "grid grid-cols-1 md:grid-cols-2 gap-4";
+        // Loading skeleton
+        const skeleton = document.createElement("div");
+        skeleton.className = "animate-pulse space-y-4";
+        skeleton.innerHTML = `
+            <div class="h-4 bg-gray-200 rounded w-1/4 dark:bg-gray-700"></div>
+            <div class="space-y-2">
+                <div class="h-10 bg-gray-200 rounded dark:bg-gray-700"></div>
+                <div class="h-32 bg-gray-200 rounded dark:bg-gray-700"></div>
+            </div>`;
+        section.appendChild(skeleton);
 
-        // Top Tools
-        if (topData.tools && Array.isArray(topData.tools)) {
-            const toolsCard = createTopItemCard("Tools", topData.tools);
-            grid.appendChild(toolsCard);
-        }
+        // Tabs
+        const tabsContainer = document.createElement("div");
+        tabsContainer.className =
+            "border-b border-gray-200 dark:border-gray-700";
+        const tabList = document.createElement("nav");
+        tabList.className = "-mb-px flex space-x-8 overflow-x-auto";
+        tabList.setAttribute("aria-label", "Top Performers Tabs");
 
-        // Top Resources
-        if (topData.resources && Array.isArray(topData.resources)) {
-            const resourcesCard = createTopItemCard(
-                "Resources",
-                topData.resources,
-            );
-            grid.appendChild(resourcesCard);
-        }
+        const entityTypes = [
+            "tools",
+            "resources",
+            "prompts",
+            "gateways",
+            "servers",
+        ];
+        entityTypes.forEach((type, index) => {
+            if (topData[type] && Array.isArray(topData[type])) {
+                const tab = createTab(type, index === 0);
+                tabList.appendChild(tab);
+            }
+        });
 
-        // Top Prompts
-        if (topData.prompts && Array.isArray(topData.prompts)) {
-            const promptsCard = createTopItemCard("Prompts", topData.prompts);
-            grid.appendChild(promptsCard);
-        }
+        tabsContainer.appendChild(tabList);
+        section.appendChild(tabsContainer);
 
-        // Top Servers
-        if (topData.servers && Array.isArray(topData.servers)) {
-            const serversCard = createTopItemCard("Servers", topData.servers);
-            grid.appendChild(serversCard);
-        }
+        // Content panels
+        const contentContainer = document.createElement("div");
+        contentContainer.className = "mt-4";
 
-        section.appendChild(grid);
+        entityTypes.forEach((type, index) => {
+            if (topData[type] && Array.isArray(topData[type])) {
+                const panel = createTopPerformersTable(
+                    type,
+                    topData[type],
+                    index === 0,
+                );
+                contentContainer.appendChild(panel);
+            }
+        });
+
+        section.appendChild(contentContainer);
+
+        // Remove skeleton once data is loaded
+        setTimeout(() => skeleton.remove(), 500); // Simulate async data load
+
+        // Export button
+        const exportButton = document.createElement("button");
+        exportButton.className =
+            "mt-4 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600";
+        exportButton.textContent = "Export Metrics";
+        exportButton.onclick = () => exportMetricsToCSV(topData);
+        section.appendChild(exportButton);
+
         return section;
     } catch (error) {
-        console.error("Error creating top performers section:", error);
-        return document.createElement("div"); // Safe fallback
+        console.error("Error creating enhanced top performers section:", error);
+        showErrorMessage("Failed to load top performers section");
+        return document.createElement("div");
     }
+}
+function calculateSuccessRate(item) {
+    // API returns successRate directly as a percentage
+    if (item.successRate !== undefined && item.successRate !== null) {
+        return Math.round(item.successRate);
+    }
+    // Fallback for legacy format (if needed)
+    const total =
+        item.execution_count || item.executions || item.executionCount || 0;
+    const successful = item.successful_count || item.successfulExecutions || 0;
+    return total > 0 ? Math.round((successful / total) * 100) : 0;
+}
+
+function formatNumber(num) {
+    return new Intl.NumberFormat().format(num);
+}
+
+function formatLastUsed(timestamp) {
+    if (!timestamp) {
+        return "Never";
+    }
+
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) {
+        return "Just now";
+    }
+    if (diffMins < 60) {
+        return `${diffMins} min ago`;
+    }
+    if (diffMins < 1440) {
+        return `${Math.floor(diffMins / 60)} hours ago`;
+    }
+    if (diffMins < 10080) {
+        return `${Math.floor(diffMins / 1440)} days ago`;
+    }
+
+    return date.toLocaleDateString();
+}
+function createTopPerformersTable(entityType, data, isActive) {
+    const panel = document.createElement("div");
+    panel.id = `top-${entityType}-panel`;
+    panel.className = `transition-opacity duration-300 ${isActive ? "opacity-100" : "hidden opacity-0"}`;
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", `top-${entityType}-tab`);
+
+    if (data.length === 0) {
+        const emptyState = document.createElement("p");
+        emptyState.className =
+            "text-gray-500 dark:text-gray-400 text-center py-4";
+        emptyState.textContent = `No ${entityType} data available`;
+        panel.appendChild(emptyState);
+        return panel;
+    }
+
+    // Responsive table wrapper
+    const tableWrapper = document.createElement("div");
+    tableWrapper.className = "overflow-x-auto sm:overflow-x-visible";
+
+    const table = document.createElement("table");
+    table.className =
+        "min-w-full divide-y divide-gray-200 dark:divide-gray-700";
+
+    // Table header
+    const thead = document.createElement("thead");
+    thead.className =
+        "bg-gray-50 dark:bg-gray-700 hidden sm:table-header-group";
+    const headerRow = document.createElement("tr");
+    const headers = [
+        "Rank",
+        "Name",
+        "Executions",
+        "Avg Response Time",
+        "Success Rate",
+        "Last Used",
+    ];
+
+    headers.forEach((headerText, index) => {
+        const th = document.createElement("th");
+        th.className =
+            "px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider";
+        th.setAttribute("scope", "col");
+        th.textContent = headerText;
+        if (index === 0) {
+            th.setAttribute("aria-sort", "ascending");
+        }
+        headerRow.appendChild(th);
+    });
+
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Table body
+    const tbody = document.createElement("tbody");
+    tbody.className =
+        "bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700";
+
+    // Pagination (if > 5 items)
+    const paginatedData = data.slice(0, 5); // Limit to top 5
+    paginatedData.forEach((item, index) => {
+        const row = document.createElement("tr");
+        row.className =
+            "hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200";
+
+        // Rank
+        const rankCell = document.createElement("td");
+        rankCell.className =
+            "px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 sm:px-6 sm:py-4";
+        const rankBadge = document.createElement("span");
+        rankBadge.className = `inline-flex items-center justify-center w-6 h-6 rounded-full ${
+            index === 0
+                ? "bg-yellow-400 text-yellow-900"
+                : index === 1
+                  ? "bg-gray-300 text-gray-900"
+                  : index === 2
+                    ? "bg-orange-400 text-orange-900"
+                    : "bg-gray-100 text-gray-600"
+        }`;
+        rankBadge.textContent = index + 1;
+        rankBadge.setAttribute("aria-label", `Rank ${index + 1}`);
+        rankCell.appendChild(rankBadge);
+        row.appendChild(rankCell);
+
+        // Name (clickable for drill-down)
+        const nameCell = document.createElement("td");
+        nameCell.className =
+            "px-6 py-4 whitespace-nowrap text-sm text-indigo-600 dark:text-indigo-400 cursor-pointer";
+        nameCell.textContent = escapeHtml(item.name || "Unknown");
+        // nameCell.onclick = () => showDetailedMetrics(entityType, item.id);
+        nameCell.setAttribute("role", "button");
+        nameCell.setAttribute(
+            "aria-label",
+            `View details for ${item.name || "Unknown"}`,
+        );
+        row.appendChild(nameCell);
+
+        // Executions
+        const execCell = document.createElement("td");
+        execCell.className =
+            "px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 sm:px-6 sm:py-4";
+        execCell.textContent = formatNumber(
+            item.executionCount || item.execution_count || item.executions || 0,
+        );
+        row.appendChild(execCell);
+
+        // Avg Response Time
+        const avgTimeCell = document.createElement("td");
+        avgTimeCell.className =
+            "px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 sm:px-6 sm:py-4";
+        const avgTime = item.avg_response_time || item.avgResponseTime;
+        avgTimeCell.textContent = avgTime ? `${Math.round(avgTime)}ms` : "N/A";
+        row.appendChild(avgTimeCell);
+
+        // Success Rate
+        const successCell = document.createElement("td");
+        successCell.className =
+            "px-6 py-4 whitespace-nowrap text-sm sm:px-6 sm:py-4";
+        const successRate = calculateSuccessRate(item);
+        const successBadge = document.createElement("span");
+        successBadge.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            successRate >= 95
+                ? "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100"
+                : successRate >= 80
+                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100"
+                  : "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100"
+        }`;
+        successBadge.textContent = `${successRate}%`;
+        successBadge.setAttribute(
+            "aria-label",
+            `Success rate: ${successRate}%`,
+        );
+        successCell.appendChild(successBadge);
+        row.appendChild(successCell);
+
+        // Last Used
+        const lastUsedCell = document.createElement("td");
+        lastUsedCell.className =
+            "px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 sm:px-6 sm:py-4";
+        lastUsedCell.textContent = formatLastUsed(
+            item.last_execution || item.lastExecution,
+        );
+        row.appendChild(lastUsedCell);
+
+        tbody.appendChild(row);
+    });
+
+    table.appendChild(tbody);
+    tableWrapper.appendChild(table);
+    panel.appendChild(tableWrapper);
+
+    // Pagination controls (if needed)
+    if (data.length > 5) {
+        const pagination = createPaginationControls(data.length, 5, (page) => {
+            updateTableRows(panel, entityType, data, page);
+        });
+        panel.appendChild(pagination);
+    }
+
+    return panel;
+}
+
+function createTab(type, isActive) {
+    const tab = document.createElement("a");
+    tab.href = "#";
+    tab.id = `top-${type}-tab`;
+    tab.className = `${
+        isActive
+            ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm capitalize transition-colors duration-200 sm:py-4 sm:px-1`;
+    tab.textContent = type;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-controls", `top-${type}-panel`);
+    tab.setAttribute("aria-selected", isActive.toString());
+    tab.onclick = (e) => {
+        e.preventDefault();
+        showTopPerformerTab(type);
+    };
+    return tab;
+}
+
+function showTopPerformerTab(activeType) {
+    const entityTypes = [
+        "tools",
+        "resources",
+        "prompts",
+        "gateways",
+        "servers",
+    ];
+    entityTypes.forEach((type) => {
+        const panel = document.getElementById(`top-${type}-panel`);
+        const tab = document.getElementById(`top-${type}-tab`);
+        if (panel) {
+            panel.classList.toggle("hidden", type !== activeType);
+            panel.classList.toggle("opacity-100", type === activeType);
+            panel.classList.toggle("opacity-0", type !== activeType);
+            panel.setAttribute("aria-hidden", type !== activeType);
+        }
+        if (tab) {
+            tab.classList.toggle("border-indigo-500", type === activeType);
+            tab.classList.toggle("text-indigo-600", type === activeType);
+            tab.classList.toggle("dark:text-indigo-400", type === activeType);
+            tab.classList.toggle("border-transparent", type !== activeType);
+            tab.classList.toggle("text-gray-500", type !== activeType);
+            tab.setAttribute("aria-selected", type === activeType);
+        }
+    });
+}
+
+function createPaginationControls(totalItems, itemsPerPage, onPageChange) {
+    const pagination = document.createElement("div");
+    pagination.className = "mt-4 flex justify-end space-x-2";
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+    for (let page = 1; page <= totalPages; page++) {
+        const button = document.createElement("button");
+        button.className = `px-3 py-1 rounded ${page === 1 ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300"}`;
+        button.textContent = page;
+        button.onclick = () => {
+            onPageChange(page);
+            pagination.querySelectorAll("button").forEach((btn) => {
+                btn.className = `px-3 py-1 rounded ${btn === button ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300"}`;
+            });
+        };
+        pagination.appendChild(button);
+    }
+
+    return pagination;
+}
+
+function updateTableRows(panel, entityType, data, page) {
+    const tbody = panel.querySelector("tbody");
+    tbody.innerHTML = "";
+    const start = (page - 1) * 5;
+    const paginatedData = data.slice(start, start + 5);
+
+    paginatedData.forEach((item, index) => {
+        const row = document.createElement("tr");
+        // ... (same row creation logic as in createTopPerformersTable)
+        tbody.appendChild(row);
+    });
+}
+
+function exportMetricsToCSV(topData) {
+    const headers = [
+        "Entity Type",
+        "Rank",
+        "Name",
+        "Executions",
+        "Avg Response Time",
+        "Success Rate",
+        "Last Used",
+    ];
+    const rows = [];
+
+    ["tools", "resources", "prompts", "gateways", "servers"].forEach((type) => {
+        if (topData[type] && Array.isArray(topData[type])) {
+            topData[type].forEach((item, index) => {
+                rows.push([
+                    type,
+                    index + 1,
+                    `"${escapeHtml(item.name || "Unknown")}"`,
+                    formatNumber(
+                        item.executionCount ||
+                            item.execution_count ||
+                            item.executions ||
+                            0,
+                    ),
+                    item.avg_response_time || item.avgResponseTime
+                        ? `${Math.round(item.avg_response_time || item.avgResponseTime)}ms`
+                        : "N/A",
+                    `${calculateSuccessRate(item)}%`,
+                    formatLastUsed(item.last_execution || item.lastExecution),
+                ]);
+            });
+        }
+    });
+
+    const csv = [headers.join(","), ...rows.map((row) => row.join(","))].join(
+        "\n",
+    );
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `top_performers_${new Date().toISOString()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 /**
  * SECURITY: Create top item card with safe content handling
  */
-function createTopItemCard(title, items) {
-    try {
-        const card = document.createElement("div");
-        card.className = "bg-gray-50 rounded p-4 dark:bg-gray-700";
+// function createTopItemCard(title, items) {
+//     try {
+//         const card = document.createElement("div");
+//         card.className = "bg-gray-50 rounded p-4 dark:bg-gray-700";
 
-        const cardTitle = document.createElement("h4");
-        cardTitle.className = "font-medium mb-2 dark:text-gray-200";
-        cardTitle.textContent = `Top ${title}`;
-        card.appendChild(cardTitle);
+//         const cardTitle = document.createElement("h4");
+//         cardTitle.className = "font-medium mb-2 dark:text-gray-200";
+//         cardTitle.textContent = `Top ${title}`;
+//         card.appendChild(cardTitle);
 
-        const list = document.createElement("ul");
-        list.className = "space-y-1";
+//         const list = document.createElement("ul");
+//         list.className = "space-y-1";
 
-        items.slice(0, 5).forEach((item) => {
-            const listItem = document.createElement("li");
-            listItem.className =
-                "text-sm text-gray-600 dark:text-gray-300 flex justify-between";
+//         items.slice(0, 5).forEach((item) => {
+//             const listItem = document.createElement("li");
+//             listItem.className =
+//                 "text-sm text-gray-600 dark:text-gray-300 flex justify-between";
 
-            const nameSpan = document.createElement("span");
-            nameSpan.textContent = item.name || "Unknown";
+//             const nameSpan = document.createElement("span");
+//             nameSpan.textContent = item.name || "Unknown";
 
-            const countSpan = document.createElement("span");
-            countSpan.className = "font-medium";
-            countSpan.textContent = String(item.executions || 0);
+//             const countSpan = document.createElement("span");
+//             countSpan.className = "font-medium";
+//             countSpan.textContent = String(item.executions || 0);
 
-            listItem.appendChild(nameSpan);
-            listItem.appendChild(countSpan);
-            list.appendChild(listItem);
-        });
+//             listItem.appendChild(nameSpan);
+//             listItem.appendChild(countSpan);
+//             list.appendChild(listItem);
+//         });
 
-        card.appendChild(list);
-        return card;
-    } catch (error) {
-        console.error("Error creating top item card:", error);
-        return document.createElement("div"); // Safe fallback
-    }
-}
+//         card.appendChild(list);
+//         return card;
+//     } catch (error) {
+//         console.error("Error creating top item card:", error);
+//         return document.createElement("div"); // Safe fallback
+//     }
+// }
 
 /**
  * SECURITY: Create performance metrics card with safe display
@@ -1467,6 +1935,12 @@ async function editTool(toolId) {
             typeField.value = tool.integrationType || "MCP";
         }
 
+        // Set tags field
+        const tagsField = safeGetElement("edit-tool-tags");
+        if (tagsField) {
+            tagsField.value = tool.tags ? tool.tags.join(", ") : "";
+        }
+
         // Handle JSON fields safely with validation
         const headersValidation = validateJson(
             JSON.stringify(tool.headers || {}),
@@ -1692,6 +2166,25 @@ async function viewResource(resourceUri) {
                 container.appendChild(p);
             });
 
+            // Tags section
+            const tagsP = document.createElement("p");
+            const tagsStrong = document.createElement("strong");
+            tagsStrong.textContent = "Tags: ";
+            tagsP.appendChild(tagsStrong);
+
+            if (resource.tags && resource.tags.length > 0) {
+                resource.tags.forEach((tag) => {
+                    const tagSpan = document.createElement("span");
+                    tagSpan.className =
+                        "inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-1 mb-1 dark:bg-blue-900 dark:text-blue-200";
+                    tagSpan.textContent = tag;
+                    tagsP.appendChild(tagSpan);
+                });
+            } else {
+                tagsP.appendChild(document.createTextNode("None"));
+            }
+            container.appendChild(tagsP);
+
             // Status with safe styling
             const statusP = document.createElement("p");
             const statusStrong = document.createElement("strong");
@@ -1861,6 +2354,13 @@ async function editResource(resourceUri) {
         if (mimeField) {
             mimeField.value = resource.mimeType || "";
         }
+
+        // Set tags field
+        const tagsField = safeGetElement("edit-resource-tags");
+        if (tagsField) {
+            tagsField.value = resource.tags ? resource.tags.join(", ") : "";
+        }
+
         if (contentField) {
             let contentStr = extractContent(
                 content,
@@ -1947,6 +2447,25 @@ async function viewPrompt(promptName) {
                 p.appendChild(document.createTextNode(field.value));
                 container.appendChild(p);
             });
+
+            // Tags section
+            const tagsP = document.createElement("p");
+            const tagsStrong = document.createElement("strong");
+            tagsStrong.textContent = "Tags: ";
+            tagsP.appendChild(tagsStrong);
+
+            if (prompt.tags && prompt.tags.length > 0) {
+                prompt.tags.forEach((tag) => {
+                    const tagSpan = document.createElement("span");
+                    tagSpan.className =
+                        "inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-1 mb-1 dark:bg-blue-900 dark:text-blue-200";
+                    tagSpan.textContent = tag;
+                    tagsP.appendChild(tagSpan);
+                });
+            } else {
+                tagsP.appendChild(document.createTextNode("None"));
+            }
+            container.appendChild(tagsP);
 
             // Status
             const statusP = document.createElement("p");
@@ -2114,6 +2633,13 @@ async function editPrompt(promptName) {
         if (descField) {
             descField.value = prompt.description || "";
         }
+
+        // Set tags field
+        const tagsField = safeGetElement("edit-prompt-tags");
+        if (tagsField) {
+            tagsField.value = prompt.tags ? prompt.tags.join(", ") : "";
+        }
+
         if (templateField) {
             templateField.value = prompt.template || "";
         }
@@ -2187,6 +2713,24 @@ async function viewGateway(gatewayId) {
                 { label: "URL", value: gateway.url },
                 { label: "Description", value: gateway.description || "N/A" },
             ];
+
+            // Add tags field with special handling
+            const tagsP = document.createElement("p");
+            const tagsStrong = document.createElement("strong");
+            tagsStrong.textContent = "Tags: ";
+            tagsP.appendChild(tagsStrong);
+            if (gateway.tags && gateway.tags.length > 0) {
+                gateway.tags.forEach((tag, index) => {
+                    const tagSpan = document.createElement("span");
+                    tagSpan.className =
+                        "inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-1";
+                    tagSpan.textContent = tag;
+                    tagsP.appendChild(tagSpan);
+                });
+            } else {
+                tagsP.appendChild(document.createTextNode("No tags"));
+            }
+            container.appendChild(tagsP);
 
             fields.forEach((field) => {
                 const p = document.createElement("p");
@@ -2305,6 +2849,12 @@ async function editGateway(gatewayId) {
             descField.value = gateway.description || "";
         }
 
+        // Set tags field
+        const tagsField = safeGetElement("edit-gateway-tags");
+        if (tagsField) {
+            tagsField.value = gateway.tags ? gateway.tags.join(", ") : "";
+        }
+
         if (transportField) {
             transportField.value = gateway.transport || "SSE"; // falls back to SSE(default)
         }
@@ -2389,6 +2939,22 @@ async function editGateway(gatewayId) {
                 break;
         }
 
+        // Handle passthrough headers
+        const passthroughHeadersField = safeGetElement(
+            "edit-gateway-passthrough-headers",
+        );
+        if (passthroughHeadersField) {
+            if (
+                gateway.passthroughHeaders &&
+                Array.isArray(gateway.passthroughHeaders)
+            ) {
+                passthroughHeadersField.value =
+                    gateway.passthroughHeaders.join(", ");
+            } else {
+                passthroughHeadersField.value = "";
+            }
+        }
+
         openModal("gateway-edit-modal");
         console.log("✓ Gateway edit modal loaded successfully");
     } catch (error) {
@@ -2438,6 +3004,25 @@ async function viewServer(serverId) {
                 p.appendChild(document.createTextNode(field.value));
                 container.appendChild(p);
             });
+
+            // Tags section
+            const tagsP = document.createElement("p");
+            const tagsStrong = document.createElement("strong");
+            tagsStrong.textContent = "Tags: ";
+            tagsP.appendChild(tagsStrong);
+
+            if (server.tags && server.tags.length > 0) {
+                server.tags.forEach((tag) => {
+                    const tagSpan = document.createElement("span");
+                    tagSpan.className =
+                        "inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-1 mb-1 dark:bg-blue-900 dark:text-blue-200";
+                    tagSpan.textContent = tag;
+                    tagsP.appendChild(tagSpan);
+                });
+            } else {
+                tagsP.appendChild(document.createTextNode("None"));
+            }
+            container.appendChild(tagsP);
 
             // Status
             const statusP = document.createElement("p");
@@ -2520,6 +3105,12 @@ async function editServer(serverId) {
         }
         if (descField) {
             descField.value = server.description || "";
+        }
+
+        // Set tags field
+        const tagsField = safeGetElement("edit-server-tags");
+        if (tagsField) {
+            tagsField.value = server.tags ? server.tags.join(", ") : "";
         }
 
         openModal("server-edit-modal");
@@ -2680,9 +3271,19 @@ function handleAuthTypeSelection(
         case "bearer":
             bearerFields.style.display = "block";
             break;
-        case "authheaders":
+        case "authheaders": {
             headersFields.style.display = "block";
+            // Ensure at least one header row is present
+            const containerId =
+                headersFields.querySelector('[id$="-container"]')?.id;
+            if (containerId) {
+                const container = document.getElementById(containerId);
+                if (container && container.children.length === 0) {
+                    addAuthHeader(containerId);
+                }
+            }
             break;
+        }
         default:
             // All fields already hidden
             break;
@@ -2958,7 +3559,6 @@ function createParameterForm(parameterCount) {
 // ===================================================================
 
 const integrationRequestMap = {
-    MCP: ["SSE", "STREAMABLE", "STDIO"],
     REST: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 };
 
@@ -3656,14 +4256,61 @@ async function runToolTest() {
             params,
         };
 
+        // Parse custom headers from the passthrough headers field
+        const requestHeaders = {
+            "Content-Type": "application/json",
+        };
+
+        const passthroughHeadersField = document.getElementById(
+            "test-passthrough-headers",
+        );
+        if (passthroughHeadersField && passthroughHeadersField.value.trim()) {
+            const headerLines = passthroughHeadersField.value
+                .trim()
+                .split("\n");
+            for (const line of headerLines) {
+                const trimmedLine = line.trim();
+                if (trimmedLine) {
+                    const colonIndex = trimmedLine.indexOf(":");
+                    if (colonIndex > 0) {
+                        const headerName = trimmedLine
+                            .substring(0, colonIndex)
+                            .trim();
+                        const headerValue = trimmedLine
+                            .substring(colonIndex + 1)
+                            .trim();
+
+                        // Validate header name and value
+                        const validation = validatePassthroughHeader(
+                            headerName,
+                            headerValue,
+                        );
+                        if (!validation.valid) {
+                            showErrorMessage(
+                                `Invalid header: ${validation.error}`,
+                            );
+                            return;
+                        }
+
+                        if (headerName && headerValue) {
+                            requestHeaders[headerName] = headerValue;
+                        }
+                    } else if (colonIndex === -1) {
+                        showErrorMessage(
+                            `Invalid header format: "${trimmedLine}". Expected format: "Header-Name: Value"`,
+                        );
+                        return;
+                    }
+                }
+            }
+        }
+
         // Use longer timeout for test execution
         const response = await fetchWithTimeout(
             `${window.ROOT_PATH}/rpc`,
             {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: requestHeaders,
                 body: JSON.stringify(payload),
                 credentials: "include",
             },
@@ -4200,6 +4847,7 @@ async function viewTool(toolId) {
           <p><strong>URL:</strong> <span class="tool-url"></span></p>
           <p><strong>Type:</strong> <span class="tool-type"></span></p>
           <p><strong>Description:</strong> <span class="tool-description"></span></p>
+          <p><strong>Tags:</strong> <span class="tool-tags"></span></p>
           <p><strong>Request Type:</strong> <span class="tool-request-type"></span></p>
           ${authHTML}
           ${renderAnnotations(tool.annotations)}
@@ -4242,6 +4890,22 @@ async function viewTool(toolId) {
             setTextSafely(".tool-url", tool.url);
             setTextSafely(".tool-type", tool.integrationType);
             setTextSafely(".tool-description", tool.description);
+
+            // Set tags as HTML with badges
+            const tagsElement = toolDetailsDiv.querySelector(".tool-tags");
+            if (tagsElement) {
+                if (tool.tags && tool.tags.length > 0) {
+                    tagsElement.innerHTML = tool.tags
+                        .map(
+                            (tag) =>
+                                `<span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-1 mb-1 dark:bg-blue-900 dark:text-blue-200">${tag}</span>`,
+                        )
+                        .join("");
+                } else {
+                    tagsElement.textContent = "None";
+                }
+            }
+
             setTextSafely(".tool-request-type", tool.requestType);
             setTextSafely(
                 ".tool-headers",
@@ -4385,6 +5049,51 @@ async function handleGatewayFormSubmit(e) {
 
         const isInactiveCheckedBool = isInactiveChecked("gateways");
         formData.append("is_inactive_checked", isInactiveCheckedBool);
+
+        // Process passthrough headers - convert comma-separated string to array
+        const passthroughHeadersString = formData.get("passthrough_headers");
+        if (passthroughHeadersString && passthroughHeadersString.trim()) {
+            // Split by comma and clean up each header name
+            const passthroughHeaders = passthroughHeadersString
+                .split(",")
+                .map((header) => header.trim())
+                .filter((header) => header.length > 0);
+
+            // Validate each header name
+            for (const headerName of passthroughHeaders) {
+                if (!HEADER_NAME_REGEX.test(headerName)) {
+                    showErrorMessage(
+                        `Invalid passthrough header name: "${headerName}". Only letters, numbers, and hyphens are allowed.`,
+                    );
+                    return;
+                }
+            }
+
+            // Remove the original string and add as JSON array
+            formData.delete("passthrough_headers");
+            formData.append(
+                "passthrough_headers",
+                JSON.stringify(passthroughHeaders),
+            );
+        }
+
+        // Handle auth_headers JSON field
+        const authHeadersJson = formData.get("auth_headers");
+        if (authHeadersJson) {
+            try {
+                const authHeaders = JSON.parse(authHeadersJson);
+                if (Array.isArray(authHeaders) && authHeaders.length > 0) {
+                    // Remove the JSON string and add as parsed data for backend processing
+                    formData.delete("auth_headers");
+                    formData.append(
+                        "auth_headers",
+                        JSON.stringify(authHeaders),
+                    );
+                }
+            } catch (e) {
+                console.error("Invalid auth_headers JSON:", e);
+            }
+        }
 
         const response = await fetchWithTimeout(
             `${window.ROOT_PATH}/admin/gateways`,
@@ -4627,7 +5336,6 @@ async function handleServerFormSubmit(e) {
 
         const result = await response.json();
         if (!result.success) {
-            console.log(result.message);
             throw new Error(result.message || "Failed to add server.");
         } else {
             // Success redirect
@@ -4778,7 +5486,6 @@ async function handleEditToolFormSubmit(event) {
         showErrorMessage(error.message);
     }
 }
-
 async function handleEditGatewayFormSubmit(e) {
     e.preventDefault();
     const form = e.target;
@@ -4798,6 +5505,29 @@ async function handleEditGatewayFormSubmit(e) {
         if (!urlValidation.valid) {
             throw new Error(urlValidation.error);
         }
+
+        // Handle passthrough headers
+        const passthroughHeadersString =
+            formData.get("passthrough_headers") || "";
+        const passthroughHeaders = passthroughHeadersString
+            .split(",")
+            .map((header) => header.trim())
+            .filter((header) => header.length > 0);
+
+        // Validate each header name
+        for (const headerName of passthroughHeaders) {
+            if (headerName && !HEADER_NAME_REGEX.test(headerName)) {
+                showErrorMessage(
+                    `Invalid passthrough header name: "${headerName}". Only letters, numbers, and hyphens are allowed.`,
+                );
+                return;
+            }
+        }
+
+        formData.append(
+            "passthrough_headers",
+            JSON.stringify(passthroughHeaders),
+        );
 
         const isInactiveCheckedBool = isInactiveChecked("gateways");
         formData.append("is_inactive_checked", isInactiveCheckedBool);
@@ -4821,6 +5551,111 @@ async function handleEditGatewayFormSubmit(e) {
         showErrorMessage(error.message);
     }
 }
+
+async function handleEditServerFormSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+
+    try {
+        // Validate inputs
+        const name = formData.get("name");
+        const nameValidation = validateInputName(name, "server");
+        if (!nameValidation.valid) {
+            throw new Error(nameValidation.error);
+        }
+
+        // Save CodeMirror editors' contents if present
+        if (window.promptToolHeadersEditor) {
+            window.promptToolHeadersEditor.save();
+        }
+        if (window.promptToolSchemaEditor) {
+            window.promptToolSchemaEditor.save();
+        }
+
+        const isInactiveCheckedBool = isInactiveChecked("servers");
+        formData.append("is_inactive_checked", isInactiveCheckedBool);
+
+        // Submit via fetch
+        const response = await fetch(form.action, {
+            method: "POST",
+            body: formData,
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || "An error occurred");
+        }
+        // Only redirect on success
+        else {
+            // Redirect to the appropriate page based on inactivity checkbox
+            const redirectUrl = isInactiveCheckedBool
+                ? `${window.ROOT_PATH}/admin?include_inactive=true#catalog`
+                : `${window.ROOT_PATH}/admin#catalog`;
+            window.location.href = redirectUrl;
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        showErrorMessage(error.message);
+    }
+}
+
+async function handleEditResFormSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+
+    try {
+        // Validate inputs
+        const name = formData.get("name");
+        const uri = formData.get("uri");
+        const nameValidation = validateInputName(name, "resource");
+        const uriValidation = validateInputName(uri, "resource URI");
+
+        if (!nameValidation.valid) {
+            showErrorMessage(nameValidation.error);
+            return;
+        }
+
+        if (!uriValidation.valid) {
+            showErrorMessage(uriValidation.error);
+            return;
+        }
+
+        // Save CodeMirror editors' contents if present
+        if (window.promptToolHeadersEditor) {
+            window.promptToolHeadersEditor.save();
+        }
+        if (window.promptToolSchemaEditor) {
+            window.promptToolSchemaEditor.save();
+        }
+
+        const isInactiveCheckedBool = isInactiveChecked("resources");
+        formData.append("is_inactive_checked", isInactiveCheckedBool);
+        // Submit via fetch
+        const response = await fetch(form.action, {
+            method: "POST",
+            body: formData,
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || "An error occurred");
+        }
+        // Only redirect on success
+        else {
+            // Redirect to the appropriate page based on inactivity checkbox
+            const redirectUrl = isInactiveCheckedBool
+                ? `${window.ROOT_PATH}/admin?include_inactive=true#resources`
+                : `${window.ROOT_PATH}/admin#resources`;
+            window.location.href = redirectUrl;
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        showErrorMessage(error.message);
+    }
+}
+
 // ===================================================================
 // ENHANCED FORM VALIDATION for All Forms
 // ===================================================================
@@ -5365,14 +6200,26 @@ function setupFormHandlers() {
         serverForm.addEventListener("submit", handleServerFormSubmit);
     }
 
-    const editResourceForm = safeGetElement("edit-resource-form");
-    if (editResourceForm) {
-        editResourceForm.addEventListener("submit", () => {
-            if (window.editResourceContentEditor) {
-                window.editResourceContentEditor.save();
+    const editServerForm = safeGetElement("edit-server-form");
+    if (editServerForm) {
+        editServerForm.addEventListener("submit", handleEditServerFormSubmit);
+        editServerForm.addEventListener("click", () => {
+            if (getComputedStyle(editServerForm).display !== "none") {
+                refreshEditors();
             }
         });
     }
+
+    const editResourceForm = safeGetElement("edit-resource-form");
+    if (editResourceForm) {
+        editResourceForm.addEventListener("submit", handleEditResFormSubmit);
+        editResourceForm.addEventListener("click", () => {
+            if (getComputedStyle(editResourceForm).display !== "none") {
+                refreshEditors();
+            }
+        });
+    }
+
     const editToolForm = safeGetElement("edit-tool-form");
     if (editToolForm) {
         editToolForm.addEventListener("submit", handleEditToolFormSubmit);
@@ -5532,5 +6379,519 @@ window.editServer = editServer;
 window.runToolTest = runToolTest;
 window.closeModal = closeModal;
 window.testGateway = testGateway;
+
+// ===============================================
+// TAG FILTERING FUNCTIONALITY
+// ===============================================
+
+/**
+ * Extract all unique tags from entities in a given entity type
+ * @param {string} entityType - The entity type (tools, resources, prompts, servers, gateways)
+ * @returns {Array<string>} - Array of unique tags
+ */
+function extractAvailableTags(entityType) {
+    const tags = new Set();
+    const tableSelector = `#${entityType}-panel tbody tr:not(.inactive-row)`;
+    const rows = document.querySelectorAll(tableSelector);
+
+    console.log(
+        `[DEBUG] extractAvailableTags for ${entityType}: Found ${rows.length} rows`,
+    );
+
+    // Find the Tags column index by examining the table header
+    const tableHeaderSelector = `#${entityType}-panel thead tr th`;
+    const headerCells = document.querySelectorAll(tableHeaderSelector);
+    let tagsColumnIndex = -1;
+
+    headerCells.forEach((header, index) => {
+        const headerText = header.textContent.trim().toLowerCase();
+        if (headerText === "tags") {
+            tagsColumnIndex = index;
+            console.log(
+                `[DEBUG] Found Tags column at index ${index} for ${entityType}`,
+            );
+        }
+    });
+
+    if (tagsColumnIndex === -1) {
+        console.log(`[DEBUG] Could not find Tags column for ${entityType}`);
+        return [];
+    }
+
+    rows.forEach((row, index) => {
+        const cells = row.querySelectorAll("td");
+
+        if (tagsColumnIndex < cells.length) {
+            const tagsCell = cells[tagsColumnIndex];
+
+            // Look for tag badges ONLY within the Tags column
+            const tagElements = tagsCell.querySelectorAll(`
+                span.inline-flex.items-center.px-2.py-0\\.5.rounded.text-xs.font-medium.bg-blue-100.text-blue-800,
+                span.inline-block.bg-blue-100.text-blue-800.text-xs.px-2.py-1.rounded-full
+            `);
+
+            console.log(
+                `[DEBUG] Row ${index}: Found ${tagElements.length} tag elements in Tags column`,
+            );
+
+            tagElements.forEach((tagEl) => {
+                const tagText = tagEl.textContent.trim();
+                console.log(
+                    `[DEBUG] Row ${index}: Tag element text: "${tagText}"`,
+                );
+
+                // Basic validation for tag content
+                if (
+                    tagText &&
+                    tagText !== "No tags" &&
+                    tagText !== "None" &&
+                    tagText !== "N/A" &&
+                    tagText.length >= 2 &&
+                    tagText.length <= 50
+                ) {
+                    tags.add(tagText);
+                    console.log(
+                        `[DEBUG] Row ${index}: Added tag: "${tagText}"`,
+                    );
+                } else {
+                    console.log(
+                        `[DEBUG] Row ${index}: Filtered out: "${tagText}"`,
+                    );
+                }
+            });
+        }
+    });
+
+    const result = Array.from(tags).sort();
+    console.log(
+        `[DEBUG] extractAvailableTags for ${entityType}: Final result:`,
+        result,
+    );
+    return result;
+}
+
+/**
+ * Update the available tags display for an entity type
+ * @param {string} entityType - The entity type
+ */
+function updateAvailableTags(entityType) {
+    const availableTagsContainer = document.getElementById(
+        `${entityType}-available-tags`,
+    );
+    if (!availableTagsContainer) {
+        return;
+    }
+
+    const tags = extractAvailableTags(entityType);
+    availableTagsContainer.innerHTML = "";
+
+    if (tags.length === 0) {
+        availableTagsContainer.innerHTML =
+            '<span class="text-sm text-gray-500">No tags found</span>';
+        return;
+    }
+
+    tags.forEach((tag) => {
+        const tagButton = document.createElement("button");
+        tagButton.type = "button";
+        tagButton.className =
+            "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full text-blue-700 bg-blue-100 hover:bg-blue-200 cursor-pointer";
+        tagButton.textContent = tag;
+        tagButton.title = `Click to filter by "${tag}"`;
+        tagButton.onclick = () => addTagToFilter(entityType, tag);
+        availableTagsContainer.appendChild(tagButton);
+    });
+}
+
+/**
+ * Add a tag to the filter input
+ * @param {string} entityType - The entity type
+ * @param {string} tag - The tag to add
+ */
+function addTagToFilter(entityType, tag) {
+    const filterInput = document.getElementById(`${entityType}-tag-filter`);
+    if (!filterInput) {
+        return;
+    }
+
+    const currentTags = filterInput.value
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t);
+    if (!currentTags.includes(tag)) {
+        currentTags.push(tag);
+        filterInput.value = currentTags.join(", ");
+        filterEntitiesByTags(entityType, filterInput.value);
+    }
+}
+
+/**
+ * Filter entities by tags
+ * @param {string} entityType - The entity type (tools, resources, prompts, servers, gateways)
+ * @param {string} tagsInput - Comma-separated string of tags to filter by
+ */
+function filterEntitiesByTags(entityType, tagsInput) {
+    const filterTags = tagsInput
+        .split(",")
+        .map((tag) => tag.trim().toLowerCase())
+        .filter((tag) => tag);
+    const tableSelector = `#${entityType}-panel tbody tr`;
+    const rows = document.querySelectorAll(tableSelector);
+
+    let visibleCount = 0;
+
+    rows.forEach((row) => {
+        if (filterTags.length === 0) {
+            // Show all rows when no filter is applied
+            row.style.display = "";
+            visibleCount++;
+            return;
+        }
+
+        // Extract tags from this row using specific tag selectors (not status badges)
+        const rowTags = new Set();
+        const tagElements = row.querySelectorAll(`
+            span.inline-flex.items-center.px-2.py-0\\.5.rounded.text-xs.font-medium.bg-blue-100.text-blue-800,
+            span.inline-block.bg-blue-100.text-blue-800.text-xs.px-2.py-1.rounded-full
+        `);
+        tagElements.forEach((tagEl) => {
+            const tagText = tagEl.textContent.trim().toLowerCase();
+            // Filter out any remaining non-tag content
+            if (
+                tagText &&
+                tagText !== "no tags" &&
+                tagText !== "none" &&
+                tagText !== "active" &&
+                tagText !== "inactive" &&
+                tagText !== "online" &&
+                tagText !== "offline"
+            ) {
+                rowTags.add(tagText);
+            }
+        });
+
+        // Check if any of the filter tags match any of the row tags (OR logic)
+        const hasMatchingTag = filterTags.some((filterTag) =>
+            Array.from(rowTags).some(
+                (rowTag) =>
+                    rowTag.includes(filterTag) || filterTag.includes(rowTag),
+            ),
+        );
+
+        if (hasMatchingTag) {
+            row.style.display = "";
+            visibleCount++;
+        } else {
+            row.style.display = "none";
+        }
+    });
+
+    // Update empty state message
+    updateFilterEmptyState(entityType, visibleCount, filterTags.length > 0);
+}
+
+/**
+ * Update empty state message when filtering
+ * @param {string} entityType - The entity type
+ * @param {number} visibleCount - Number of visible entities
+ * @param {boolean} isFiltering - Whether filtering is active
+ */
+function updateFilterEmptyState(entityType, visibleCount, isFiltering) {
+    const tableContainer = document.querySelector(
+        `#${entityType}-panel .overflow-x-auto`,
+    );
+    if (!tableContainer) {
+        return;
+    }
+
+    let emptyMessage = tableContainer.querySelector(
+        ".tag-filter-empty-message",
+    );
+
+    if (visibleCount === 0 && isFiltering) {
+        if (!emptyMessage) {
+            emptyMessage = document.createElement("div");
+            emptyMessage.className =
+                "tag-filter-empty-message text-center py-8 text-gray-500";
+            emptyMessage.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No matching ${entityType}</h3>
+                    <p class="text-gray-500 dark:text-gray-400">No ${entityType} found with the specified tags. Try adjusting your filter or <button onclick="clearTagFilter('${entityType}')" class="text-indigo-600 hover:text-indigo-500 underline">clear the filter</button>.</p>
+                </div>
+            `;
+            tableContainer.appendChild(emptyMessage);
+        }
+        emptyMessage.style.display = "block";
+    } else if (emptyMessage) {
+        emptyMessage.style.display = "none";
+    }
+}
+
+/**
+ * Clear the tag filter for an entity type
+ * @param {string} entityType - The entity type
+ */
+function clearTagFilter(entityType) {
+    const filterInput = document.getElementById(`${entityType}-tag-filter`);
+    if (filterInput) {
+        filterInput.value = "";
+        filterEntitiesByTags(entityType, "");
+    }
+}
+
+/**
+ * Initialize tag filtering for all entity types on page load
+ */
+function initializeTagFiltering() {
+    const entityTypes = [
+        "catalog",
+        "tools",
+        "resources",
+        "prompts",
+        "servers",
+        "gateways",
+    ];
+
+    entityTypes.forEach((entityType) => {
+        // Update available tags on page load
+        updateAvailableTags(entityType);
+
+        // Set up event listeners for tab switching to refresh tags
+        const tabButton = document.getElementById(`tab-${entityType}`);
+        if (tabButton) {
+            tabButton.addEventListener("click", () => {
+                // Delay to ensure tab content is visible
+                setTimeout(() => updateAvailableTags(entityType), 100);
+            });
+        }
+    });
+}
+
+// Initialize tag filtering when page loads
+document.addEventListener("DOMContentLoaded", function () {
+    initializeTagFiltering();
+});
+
+// Expose tag filtering functions to global scope
+window.filterEntitiesByTags = filterEntitiesByTags;
+window.clearTagFilter = clearTagFilter;
+window.updateAvailableTags = updateAvailableTags;
+
+// ===================================================================
+// MULTI-HEADER AUTHENTICATION MANAGEMENT
+// ===================================================================
+
+/**
+ * Global counter for unique header IDs
+ */
+let headerCounter = 0;
+
+/**
+ * Add a new authentication header row to the specified container
+ * @param {string} containerId - ID of the container to add the header row to
+ */
+function addAuthHeader(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error(`Container with ID ${containerId} not found`);
+        return;
+    }
+
+    const headerId = `auth-header-${++headerCounter}`;
+
+    const headerRow = document.createElement("div");
+    headerRow.className = "flex items-center space-x-2";
+    headerRow.id = headerId;
+
+    headerRow.innerHTML = `
+        <div class="flex-1">
+            <input
+                type="text"
+                placeholder="Header Key (e.g., X-API-Key)"
+                class="auth-header-key block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300 text-sm"
+                oninput="updateAuthHeadersJSON('${containerId}')"
+            />
+        </div>
+        <div class="flex-1">
+            <input
+                type="password"
+                placeholder="Header Value"
+                class="auth-header-value block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300 text-sm"
+                oninput="updateAuthHeadersJSON('${containerId}')"
+            />
+        </div>
+        <button
+            type="button"
+            onclick="removeAuthHeader('${headerId}', '${containerId}')"
+            class="inline-flex items-center px-2 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800"
+            title="Remove header"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+        </button>
+    `;
+
+    container.appendChild(headerRow);
+    updateAuthHeadersJSON(containerId);
+
+    // Focus on the key input of the new header
+    const keyInput = headerRow.querySelector(".auth-header-key");
+    if (keyInput) {
+        keyInput.focus();
+    }
+}
+
+/**
+ * Remove an authentication header row
+ * @param {string} headerId - ID of the header row to remove
+ * @param {string} containerId - ID of the container to update
+ */
+function removeAuthHeader(headerId, containerId) {
+    const headerRow = document.getElementById(headerId);
+    if (headerRow) {
+        headerRow.remove();
+        updateAuthHeadersJSON(containerId);
+    }
+}
+
+/**
+ * Update the JSON representation of authentication headers
+ * @param {string} containerId - ID of the container with headers
+ */
+function updateAuthHeadersJSON(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        return;
+    }
+
+    const headers = [];
+    const headerRows = container.querySelectorAll('[id^="auth-header-"]');
+    const duplicateKeys = new Set();
+    const seenKeys = new Set();
+    let hasValidationErrors = false;
+
+    headerRows.forEach((row) => {
+        const keyInput = row.querySelector(".auth-header-key");
+        const valueInput = row.querySelector(".auth-header-value");
+
+        if (keyInput && valueInput) {
+            const key = keyInput.value.trim();
+            const value = valueInput.value.trim();
+
+            // Skip completely empty rows
+            if (!key && !value) {
+                return;
+            }
+
+            // Require key but allow empty values
+            if (!key) {
+                keyInput.setCustomValidity("Header key is required");
+                keyInput.reportValidity();
+                hasValidationErrors = true;
+                return;
+            }
+
+            // Validate header key format (letters, numbers, hyphens, underscores)
+            if (!/^[a-zA-Z0-9\-_]+$/.test(key)) {
+                keyInput.setCustomValidity(
+                    "Header keys should contain only letters, numbers, hyphens, and underscores",
+                );
+                keyInput.reportValidity();
+                hasValidationErrors = true;
+                return;
+            } else {
+                keyInput.setCustomValidity("");
+            }
+
+            // Track duplicate keys
+            if (seenKeys.has(key.toLowerCase())) {
+                duplicateKeys.add(key);
+            }
+            seenKeys.add(key.toLowerCase());
+
+            headers.push({
+                key,
+                value, // Allow empty values
+            });
+        }
+    });
+
+    // Find the corresponding JSON input field
+    let jsonInput = null;
+    if (containerId === "auth-headers-container") {
+        jsonInput = document.getElementById("auth-headers-json");
+    } else if (containerId === "auth-headers-container-gw") {
+        jsonInput = document.getElementById("auth-headers-json-gw");
+    } else if (containerId === "edit-auth-headers-container") {
+        jsonInput = document.getElementById("edit-auth-headers-json");
+    } else if (containerId === "auth-headers-container-gw-edit") {
+        jsonInput = document.getElementById("auth-headers-json-gw-edit");
+    }
+
+    // Warn about duplicate keys in console
+    if (duplicateKeys.size > 0 && !hasValidationErrors) {
+        console.warn(
+            "Duplicate header keys detected (last value will be used):",
+            Array.from(duplicateKeys),
+        );
+    }
+
+    // Check for excessive headers
+    if (headers.length > 100) {
+        console.error("Maximum of 100 headers allowed per gateway");
+        return;
+    }
+
+    if (jsonInput) {
+        jsonInput.value = headers.length > 0 ? JSON.stringify(headers) : "";
+    }
+}
+
+/**
+ * Load existing authentication headers for editing
+ * @param {string} containerId - ID of the container to populate
+ * @param {Array} headers - Array of header objects with key and value properties
+ */
+function loadAuthHeaders(containerId, headers) {
+    const container = document.getElementById(containerId);
+    if (!container || !headers || !Array.isArray(headers)) {
+        return;
+    }
+
+    // Clear existing headers
+    container.innerHTML = "";
+
+    // Add each header
+    headers.forEach((header) => {
+        if (header.key && header.value) {
+            addAuthHeader(containerId);
+            // Find the last added header row and populate it
+            const headerRows = container.querySelectorAll(
+                '[id^="auth-header-"]',
+            );
+            const lastRow = headerRows[headerRows.length - 1];
+            if (lastRow) {
+                const keyInput = lastRow.querySelector(".auth-header-key");
+                const valueInput = lastRow.querySelector(".auth-header-value");
+                if (keyInput && valueInput) {
+                    keyInput.value = header.key;
+                    valueInput.value = header.value;
+                }
+            }
+        }
+    });
+
+    updateAuthHeadersJSON(containerId);
+}
+
+// Expose authentication header functions to global scope
+window.addAuthHeader = addAuthHeader;
+window.removeAuthHeader = removeAuthHeader;
+window.updateAuthHeadersJSON = updateAuthHeadersJSON;
+window.loadAuthHeaders = loadAuthHeaders;
 
 console.log("🛡️ ContextForge MCP Gateway admin.js initialized");

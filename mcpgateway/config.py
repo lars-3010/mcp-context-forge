@@ -52,6 +52,7 @@ from functools import lru_cache
 from importlib.resources import files
 import json
 import logging
+import os
 from pathlib import Path
 import re
 from typing import Annotated, Any, ClassVar, Dict, List, Optional, Set, Union
@@ -64,11 +65,14 @@ from jsonpath_ng.jsonpath import JSONPath
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%H:%M:%S",
-)
+# Only configure basic logging if no handlers exist yet
+# This prevents conflicts with LoggingService while ensuring config logging works
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -190,12 +194,22 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
     log_format: str = "json"  # json or text
-    log_file: Optional[Path] = None
+    log_to_file: bool = False  # Enable file logging (default: stdout/stderr only)
+    log_filemode: str = "a+"  # append or overwrite
+    log_file: Optional[str] = None  # Only used if log_to_file=True
+    log_folder: Optional[str] = None  # Only used if log_to_file=True
+
+    # Log Rotation (optional - only used if log_to_file=True)
+    log_rotation_enabled: bool = False  # Enable log file rotation
+    log_max_size_mb: int = 1  # Max file size in MB before rotation (default: 1MB)
+    log_backup_count: int = 5  # Number of backup files to keep (default: 5)
 
     # Transport
     transport_type: str = "all"  # http, ws, sse, all
     websocket_ping_interval: int = 30  # seconds
     sse_retry_timeout: int = 5000  # milliseconds
+    sse_keepalive_enabled: bool = True  # Enable SSE keepalive events
+    sse_keepalive_interval: int = 30  # seconds between keepalive events
 
     # Federation
     federation_enabled: bool = True
@@ -311,6 +325,10 @@ class Settings(BaseSettings):
     use_stateful_sessions: bool = False  # Set to False to use stateless sessions without event store
     json_response_enabled: bool = True  # Enable JSON responses instead of SSE streams
 
+    # Core plugin settings
+    plugins_enabled: bool = Field(default=False, description="Enable the plugin framework")
+    plugin_config_file: str = Field(default="plugins/config.yaml", description="Path to main plugin configuration file")
+
     # Development
     dev_mode: bool = False
     reload: bool = False
@@ -331,6 +349,18 @@ class Settings(BaseSettings):
 
         Returns:
             The validated separator, defaults to '-' if invalid.
+
+        Examples:
+            >>> Settings.must_be_allowed_sep('-')
+            '-'
+            >>> Settings.must_be_allowed_sep('--')
+            '--'
+            >>> Settings.must_be_allowed_sep('_')
+            '_'
+            >>> Settings.must_be_allowed_sep('.')
+            '.'
+            >>> Settings.must_be_allowed_sep('invalid')
+            '-'
         """
         if not re.fullmatch(cls.valid_slug_separator_regexp, v):
             logger.warning(
@@ -447,6 +477,17 @@ class Settings(BaseSettings):
 
         Returns:
             dict: Dictionary containing CORS configuration options.
+
+        Examples:
+            >>> s = Settings(cors_enabled=True, allowed_origins={'http://localhost'})
+            >>> cors = s.cors_settings
+            >>> cors['allow_origins']
+            ['http://localhost']
+            >>> cors['allow_credentials']
+            True
+            >>> s2 = Settings(cors_enabled=False)
+            >>> s2.cors_settings
+            {}
         """
         return (
             {
@@ -543,6 +584,52 @@ class Settings(BaseSettings):
 
     # Rate limiting
     validation_max_requests_per_minute: int = 60
+
+    # Header passthrough feature (disabled by default for security)
+    enable_header_passthrough: bool = Field(default=False, description="Enable HTTP header passthrough feature (WARNING: Security implications - only enable if needed)")
+
+    # Passthrough headers configuration
+    default_passthrough_headers: List[str] = Field(default_factory=list)
+
+    def __init__(self, **kwargs):
+        """Initialize Settings with environment variable parsing.
+
+        Args:
+            **kwargs: Keyword arguments passed to parent Settings class
+
+        Raises:
+            ValueError: When environment variable parsing fails or produces invalid data
+
+        Examples:
+            >>> import os
+            >>> # Test with no environment variable set
+            >>> old_val = os.environ.get('DEFAULT_PASSTHROUGH_HEADERS')
+            >>> if 'DEFAULT_PASSTHROUGH_HEADERS' in os.environ:
+            ...     del os.environ['DEFAULT_PASSTHROUGH_HEADERS']
+            >>> s = Settings()
+            >>> s.default_passthrough_headers
+            ['X-Tenant-Id', 'X-Trace-Id']
+            >>> # Restore original value if it existed
+            >>> if old_val is not None:
+            ...     os.environ['DEFAULT_PASSTHROUGH_HEADERS'] = old_val
+        """
+        super().__init__(**kwargs)
+
+        # Parse DEFAULT_PASSTHROUGH_HEADERS environment variable
+        default_value = os.environ.get("DEFAULT_PASSTHROUGH_HEADERS")
+        if default_value:
+            try:
+                # Try JSON parsing first
+                self.default_passthrough_headers = json.loads(default_value)
+                if not isinstance(self.default_passthrough_headers, list):
+                    raise ValueError("Must be a JSON array")
+            except (json.JSONDecodeError, ValueError):
+                # Fallback to comma-separated parsing
+                self.default_passthrough_headers = [h.strip() for h in default_value.split(",") if h.strip()]
+                logger.info(f"Parsed comma-separated passthrough headers: {self.default_passthrough_headers}")
+        else:
+            # Safer defaults without Authorization header
+            self.default_passthrough_headers = ["X-Tenant-Id", "X-Trace-Id"]
 
     # Masking value for all sensitive data
     masked_auth_value: str = "*****"
@@ -673,6 +760,15 @@ def get_settings() -> Settings:
 
     Returns:
         Settings: A cached instance of the Settings class.
+
+    Examples:
+        >>> settings = get_settings()
+        >>> isinstance(settings, Settings)
+        True
+        >>> # Second call returns the same cached instance
+        >>> settings2 = get_settings()
+        >>> settings is settings2
+        True
     """
     # Instantiate a fresh Pydantic Settings object,
     # loading from env vars or .env exactly once.

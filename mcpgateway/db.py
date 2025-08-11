@@ -28,34 +28,11 @@ import uuid
 
 # Third-Party
 import jsonschema
-from sqlalchemy import (
-    Boolean,
-    Column,
-    create_engine,
-    DateTime,
-    event,
-    Float,
-    ForeignKey,
-    func,
-    Integer,
-    JSON,
-    make_url,
-    select,
-    String,
-    Table,
-    Text,
-    UniqueConstraint,
-)
+from sqlalchemy import Boolean, Column, create_engine, DateTime, event, Float, ForeignKey, func, Integer, JSON, make_url, select, String, Table, Text, UniqueConstraint
 from sqlalchemy.event import listen
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import (
-    DeclarativeBase,
-    Mapped,
-    mapped_column,
-    relationship,
-    sessionmaker,
-)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 from sqlalchemy.orm.attributes import get_history
 
 # First-Party
@@ -198,6 +175,20 @@ server_prompt_association = Table(
     Column("server_id", String, ForeignKey("servers.id"), primary_key=True),
     Column("prompt_id", Integer, ForeignKey("prompts.id"), primary_key=True),
 )
+
+
+class GlobalConfig(Base):
+    """Global configuration settings.
+
+    Attributes:
+        id (int): Primary key
+        passthrough_headers (List[str]): List of headers allowed to be passed through globally
+    """
+
+    __tablename__ = "global_config"
+
+    id = Column(Integer, primary_key=True)
+    passthrough_headers: Mapped[Optional[List[str]]] = Column(JSON, nullable=True)  # Store list of strings as JSON array
 
 
 class ToolMetric(Base):
@@ -355,6 +346,7 @@ class Tool(Base):
     enabled: Mapped[bool] = mapped_column(default=True)
     reachable: Mapped[bool] = mapped_column(default=True)
     jsonpath_filter: Mapped[str] = mapped_column(default="")
+    tags: Mapped[List[str]] = mapped_column(JSON, default=list, nullable=False)
 
     # Request type and authentication fields
     auth_type: Mapped[Optional[str]] = mapped_column(default=None)  # "basic", "bearer", or None
@@ -600,6 +592,7 @@ class Resource(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
     is_active: Mapped[bool] = mapped_column(default=True)
+    tags: Mapped[List[str]] = mapped_column(JSON, default=list, nullable=False)
     metrics: Mapped[List["ResourceMetric"]] = relationship("ResourceMetric", back_populates="resource", cascade="all, delete-orphan")
 
     # Content storage - can be text or binary
@@ -810,6 +803,7 @@ class Prompt(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
     is_active: Mapped[bool] = mapped_column(default=True)
+    tags: Mapped[List[str]] = mapped_column(JSON, default=list, nullable=False)
     metrics: Mapped[List["PromptMetric"]] = relationship("PromptMetric", back_populates="prompt", cascade="all, delete-orphan")
 
     gateway_id: Mapped[Optional[str]] = mapped_column(ForeignKey("gateways.id"))
@@ -977,6 +971,7 @@ class Server(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
     is_active: Mapped[bool] = mapped_column(default=True)
+    tags: Mapped[List[str]] = mapped_column(JSON, default=list, nullable=False)
     metrics: Mapped[List["ServerMetric"]] = relationship("ServerMetric", back_populates="server", cascade="all, delete-orphan")
 
     # Many-to-many relationships for associated items
@@ -1111,6 +1106,10 @@ class Gateway(Base):
     enabled: Mapped[bool] = mapped_column(default=True)
     reachable: Mapped[bool] = mapped_column(default=True)
     last_seen: Mapped[Optional[datetime]]
+    tags: Mapped[List[str]] = mapped_column(JSON, default=list, nullable=False)
+
+    # Header passthrough configuration
+    passthrough_headers: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)  # Store list of strings as JSON array
 
     # Relationship with local tools this gateway provides
     tools: Mapped[List["Tool"]] = relationship(back_populates="gateway", foreign_keys="Tool.gateway_id", cascade="all, delete-orphan")

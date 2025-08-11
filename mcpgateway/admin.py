@@ -18,10 +18,11 @@ underlying data.
 """
 
 # Standard
+from collections import defaultdict
+from functools import wraps
 import json
-import logging
 import time
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 # Third-Party
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -34,13 +35,15 @@ from sqlalchemy.orm import Session
 
 # First-Party
 from mcpgateway.config import settings
-from mcpgateway.db import get_db
+from mcpgateway.db import get_db, GlobalConfig
 from mcpgateway.schemas import (
     GatewayCreate,
     GatewayRead,
     GatewayTestRequest,
     GatewayTestResponse,
     GatewayUpdate,
+    GlobalConfigRead,
+    GlobalConfigUpdate,
     PromptCreate,
     PromptMetrics,
     PromptRead,
@@ -59,15 +62,21 @@ from mcpgateway.schemas import (
     ToolUpdate,
 )
 from mcpgateway.services.gateway_service import GatewayConnectionError, GatewayNotFoundError, GatewayService
+from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.prompt_service import PromptNotFoundError, PromptService
 from mcpgateway.services.resource_service import ResourceNotFoundError, ResourceService
 from mcpgateway.services.root_service import RootService
-from mcpgateway.services.server_service import ServerError, ServerNotFoundError, ServerService
+from mcpgateway.services.server_service import ServerError, ServerNameConflictError, ServerNotFoundError, ServerService
+from mcpgateway.services.tag_service import TagService
 from mcpgateway.services.tool_service import ToolError, ToolNotFoundError, ToolService
 from mcpgateway.utils.create_jwt_token import get_jwt_token
 from mcpgateway.utils.error_formatter import ErrorFormatter
 from mcpgateway.utils.retry_manager import ResilientHttpClient
 from mcpgateway.utils.verify_credentials import require_auth, require_basic_auth
+
+# Initialize logging service first
+logging_service = LoggingService()
+logger = logging_service.get_logger("mcpgateway")
 
 # Initialize services
 server_service = ServerService()
@@ -78,13 +87,162 @@ resource_service = ResourceService()
 root_service = RootService()
 
 # Set up basic authentication
-logger = logging.getLogger("mcpgateway")
+
+# Rate limiting storage
+rate_limit_storage = defaultdict(list)
+
+
+# Rate limiting decorator
+def rate_limit(requests_per_minute: int = None):
+    """Rate limiting decorator for admin endpoints.
+
+    Args:
+        requests_per_minute: Maximum requests per minute (default: uses config value)
+
+    Returns:
+        Decorator function that applies rate limiting to the wrapped endpoint
+
+    Examples:
+        >>> # Test that rate_limit is callable
+        >>> from mcpgateway.admin import rate_limit
+        >>> callable(rate_limit)
+        True
+        >>> # Test that it returns a decorator function
+        >>> import inspect
+        >>> decorator = rate_limit(30)
+        >>> inspect.isfunction(decorator)
+        True
+    """
+
+    def decorator(func):
+        """Inner decorator function that wraps the endpoint with rate limiting.
+
+        Args:
+            func: The FastAPI endpoint function to wrap
+
+        Returns:
+            The wrapped function with rate limiting applied
+        """
+
+        @wraps(func)
+        async def wrapper(*args, request: Request = None, **kwargs):
+            """Wrapper function that applies rate limiting logic.
+
+            Args:
+                *args: Variable length argument list passed to wrapped function
+                request: FastAPI Request object containing client information
+                **kwargs: Arbitrary keyword arguments passed to wrapped function
+
+            Returns:
+                The result of the wrapped function call
+
+            Raises:
+                HTTPException: When rate limit is exceeded (429 Too Many Requests)
+            """
+            # Get the rate limit from parameter or config
+            limit = requests_per_minute or settings.validation_max_requests_per_minute
+
+            # Get client identifier (IP address)
+            client_ip = request.client.host if request and request.client else "unknown"
+            current_time = time.time()
+            minute_ago = current_time - 60
+
+            # Clean old entries and get current requests
+            rate_limit_storage[client_ip] = [timestamp for timestamp in rate_limit_storage[client_ip] if timestamp > minute_ago]
+
+            # Check rate limit
+            if len(rate_limit_storage[client_ip]) >= limit:
+                logger.warning(f"Rate limit exceeded for IP {client_ip} on endpoint {func.__name__}")
+                raise HTTPException(status_code=429, detail=f"Rate limit exceeded. Maximum {limit} requests per minute.")
+
+            # Add current request timestamp
+            rate_limit_storage[client_ip].append(current_time)
+
+            # Call the original function
+            return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
 
 admin_router = APIRouter(prefix="/admin", tags=["Admin UI"])
 
 ####################
 # Admin UI Routes  #
 ####################
+
+
+@admin_router.get("/config/passthrough-headers", response_model=GlobalConfigRead)
+@rate_limit(requests_per_minute=30)  # Lower limit for config endpoints
+async def get_global_passthrough_headers(
+    request: Request,  # pylint: disable=unused-argument
+    db: Session = Depends(get_db),
+    _user: str = Depends(require_auth),
+) -> GlobalConfigRead:
+    """Get the global passthrough headers configuration.
+
+    Args:
+        request: HTTP request object
+        db: Database session
+        _user: Authenticated user
+
+    Returns:
+        GlobalConfigRead: The current global passthrough headers configuration
+
+    Examples:
+        >>> # Test function exists and has correct name
+        >>> from mcpgateway.admin import get_global_passthrough_headers
+        >>> get_global_passthrough_headers.__name__
+        'get_global_passthrough_headers'
+        >>> # Test it's a coroutine function
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(get_global_passthrough_headers)
+        True
+    """
+    config = db.query(GlobalConfig).first()
+    if not config:
+        config = GlobalConfig()
+    return GlobalConfigRead(passthrough_headers=config.passthrough_headers)
+
+
+@admin_router.put("/config/passthrough-headers", response_model=GlobalConfigRead)
+@rate_limit(requests_per_minute=20)  # Stricter limit for config updates
+async def update_global_passthrough_headers(
+    request: Request,  # pylint: disable=unused-argument
+    config_update: GlobalConfigUpdate,
+    db: Session = Depends(get_db),
+    _user: str = Depends(require_auth),
+) -> GlobalConfigRead:
+    """Update the global passthrough headers configuration.
+
+    Args:
+        request: HTTP request object
+        config_update: The new configuration
+        db: Database session
+        _user: Authenticated user
+
+    Returns:
+        GlobalConfigRead: The updated configuration
+
+    Examples:
+        >>> # Test function exists and has correct name
+        >>> from mcpgateway.admin import update_global_passthrough_headers
+        >>> update_global_passthrough_headers.__name__
+        'update_global_passthrough_headers'
+        >>> # Test it's a coroutine function
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(update_global_passthrough_headers)
+        True
+    """
+    config = db.query(GlobalConfig).first()
+    if not config:
+        config = GlobalConfig(passthrough_headers=config_update.passthrough_headers)
+        db.add(config)
+    else:
+        config.passthrough_headers = config_update.passthrough_headers
+    db.commit()
+    return GlobalConfigRead(passthrough_headers=config.passthrough_headers)
 
 
 @admin_router.get("/servers", response_model=List[ServerRead])
@@ -294,7 +452,7 @@ async def admin_get_server(server_id: str, db: Session = Depends(get_db), user: 
 
 
 @admin_router.post("/servers", response_model=ServerRead)
-async def admin_add_server(request: Request, db: Session = Depends(get_db), user: str = Depends(require_auth)) -> RedirectResponse:
+async def admin_add_server(request: Request, db: Session = Depends(get_db), user: str = Depends(require_auth)) -> JSONResponse:
     """
     Add a new server via the admin UI.
 
@@ -316,7 +474,7 @@ async def admin_add_server(request: Request, db: Session = Depends(get_db), user
         user (str): Authenticated user dependency
 
     Returns:
-        RedirectResponse: A redirect to the admin dashboard catalog section
+        JSONResponse: A JSON response indicating success or failure of the server creation operation.
 
     Examples:
         >>> import asyncio
@@ -411,6 +569,11 @@ async def admin_add_server(request: Request, db: Session = Depends(get_db), user
     form = await request.form()
     # root_path = request.scope.get("root_path", "")
     # is_inactive_checked = form.get("is_inactive_checked", "false")
+
+    # Parse tags from comma-separated string
+    tags_str = form.get("tags", "")
+    tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()] if tags_str else []
+
     try:
         logger.debug(f"User {user} is adding a new server with name: {form['name']}")
         server = ServerCreate(
@@ -420,6 +583,7 @@ async def admin_add_server(request: Request, db: Session = Depends(get_db), user
             associated_tools=",".join(form.getlist("associatedTools")),
             associated_resources=form.get("associatedResources"),
             associated_prompts=form.get("associatedPrompts"),
+            tags=tags,
         )
     except KeyError as e:
         # Convert KeyError to ValidationError-like response
@@ -436,7 +600,6 @@ async def admin_add_server(request: Request, db: Session = Depends(get_db), user
         return JSONResponse(content={"message": str(ex), "success": False}, status_code=422)
 
     except Exception as ex:
-        logger.info(f"error,{ex}")
         if isinstance(ex, ServerError):
             # Custom server logic error — 500 Internal Server Error makes sense
             return JSONResponse(content={"message": str(ex), "success": False}, status_code=500)
@@ -467,7 +630,7 @@ async def admin_edit_server(
     request: Request,
     db: Session = Depends(get_db),
     user: str = Depends(require_auth),
-) -> RedirectResponse:
+) -> JSONResponse:
     """
     Edit an existing server via the admin UI.
 
@@ -490,13 +653,13 @@ async def admin_edit_server(
         user (str): Authenticated user dependency
 
     Returns:
-        RedirectResponse: A redirect to the admin dashboard catalog section with a status code of 303
+        JSONResponse: A JSON response indicating success or failure of the server update operation.
 
     Examples:
         >>> import asyncio
         >>> from unittest.mock import AsyncMock, MagicMock
         >>> from fastapi import Request
-        >>> from fastapi.responses import RedirectResponse
+        >>> from fastapi.responses import JSONResponse
         >>> from starlette.datastructures import FormData
         >>>
         >>> mock_db = MagicMock()
@@ -512,21 +675,9 @@ async def admin_edit_server(
         >>>
         >>> async def test_admin_edit_server_success():
         ...     result = await admin_edit_server(server_id, mock_request_edit, mock_db, mock_user)
-        ...     return isinstance(result, RedirectResponse) and result.status_code == 303 and "/admin#catalog" in result.headers["location"]
+        ...     return isinstance(result, JSONResponse) and result.status_code == 200 and result.body == b'{"message":"Server updated successfully!","success":true}'
         >>>
         >>> asyncio.run(test_admin_edit_server_success())
-        True
-        >>>
-        >>> # Edge case: Edit server and include inactive checkbox
-        >>> form_data_inactive = FormData([("name", "Inactive Server Edit"), ("is_inactive_checked", "true")])
-        >>> mock_request_inactive = MagicMock(spec=Request, scope={"root_path": "/api"})
-        >>> mock_request_inactive.form = AsyncMock(return_value=form_data_inactive)
-        >>>
-        >>> async def test_admin_edit_server_inactive_checked():
-        ...     result = await admin_edit_server(server_id, mock_request_inactive, mock_db, mock_user)
-        ...     return isinstance(result, RedirectResponse) and result.status_code == 303 and "/api/admin/?include_inactive=true#catalog" in result.headers["location"]
-        >>>
-        >>> asyncio.run(test_admin_edit_server_inactive_checked())
         True
         >>>
         >>> # Error path: Simulate an exception during update
@@ -535,18 +686,65 @@ async def admin_edit_server(
         >>> mock_request_error.form = AsyncMock(return_value=form_data_error)
         >>> server_service.update_server = AsyncMock(side_effect=Exception("Update failed"))
         >>>
-        >>> async def test_admin_edit_server_exception():
+        >>> # Restore original method
+        >>> server_service.update_server = original_update_server
+        >>> # 409 Conflict: ServerNameConflictError
+        >>> server_service.update_server = AsyncMock(side_effect=ServerNameConflictError("Name conflict"))
+        >>> async def test_admin_edit_server_conflict():
         ...     result = await admin_edit_server(server_id, mock_request_error, mock_db, mock_user)
-        ...     return isinstance(result, RedirectResponse) and result.status_code == 303 and "/admin#catalog" in result.headers["location"]
-        >>>
-        >>> asyncio.run(test_admin_edit_server_exception())
+        ...     return isinstance(result, JSONResponse) and result.status_code == 409 and b'Name conflict' in result.body
+        >>> asyncio.run(test_admin_edit_server_conflict())
         True
-        >>>
+        >>> # 409 Conflict: IntegrityError
+        >>> from sqlalchemy.exc import IntegrityError
+        >>> server_service.update_server = AsyncMock(side_effect=IntegrityError("Integrity error", None, None))
+        >>> async def test_admin_edit_server_integrity():
+        ...     result = await admin_edit_server(server_id, mock_request_error, mock_db, mock_user)
+        ...     return isinstance(result, JSONResponse) and result.status_code == 409
+        >>> asyncio.run(test_admin_edit_server_integrity())
+        True
+        >>> # 422 Unprocessable Entity: ValidationError
+        >>> from pydantic import ValidationError, BaseModel
+        >>> from mcpgateway.schemas import ServerUpdate
+        >>> validation_error = ValidationError.from_exception_data("ServerUpdate validation error", [
+        ...     {"loc": ("name",), "msg": "Field required", "type": "missing"}
+        ... ])
+        >>> server_service.update_server = AsyncMock(side_effect=validation_error)
+        >>> async def test_admin_edit_server_validation():
+        ...     result = await admin_edit_server(server_id, mock_request_error, mock_db, mock_user)
+        ...     return isinstance(result, JSONResponse) and result.status_code == 422
+        >>> asyncio.run(test_admin_edit_server_validation())
+        True
+        >>> # 400 Bad Request: ValueError
+        >>> server_service.update_server = AsyncMock(side_effect=ValueError("Bad value"))
+        >>> async def test_admin_edit_server_valueerror():
+        ...     result = await admin_edit_server(server_id, mock_request_error, mock_db, mock_user)
+        ...     return isinstance(result, JSONResponse) and result.status_code == 400 and b'Bad value' in result.body
+        >>> asyncio.run(test_admin_edit_server_valueerror())
+        True
+        >>> # 500 Internal Server Error: ServerError
+        >>> server_service.update_server = AsyncMock(side_effect=ServerError("Server error"))
+        >>> async def test_admin_edit_server_servererror():
+        ...     result = await admin_edit_server(server_id, mock_request_error, mock_db, mock_user)
+        ...     return isinstance(result, JSONResponse) and result.status_code == 500 and b'Server error' in result.body
+        >>> asyncio.run(test_admin_edit_server_servererror())
+        True
+        >>> # 500 Internal Server Error: RuntimeError
+        >>> server_service.update_server = AsyncMock(side_effect=RuntimeError("Runtime error"))
+        >>> async def test_admin_edit_server_runtimeerror():
+        ...     result = await admin_edit_server(server_id, mock_request_error, mock_db, mock_user)
+        ...     return isinstance(result, JSONResponse) and result.status_code == 500 and b'Runtime error' in result.body
+        >>> asyncio.run(test_admin_edit_server_runtimeerror())
+        True
         >>> # Restore original method
         >>> server_service.update_server = original_update_server
     """
     form = await request.form()
-    is_inactive_checked = form.get("is_inactive_checked", "false")
+
+    # Parse tags from comma-separated string
+    tags_str = form.get("tags", "")
+    tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()] if tags_str else []
+
     try:
         logger.debug(f"User {user} is editing server ID {server_id} with name: {form.get('name')}")
         server = ServerUpdate(
@@ -556,21 +754,29 @@ async def admin_edit_server(
             associated_tools=",".join(form.getlist("associatedTools")),
             associated_resources=form.get("associatedResources"),
             associated_prompts=form.get("associatedPrompts"),
+            tags=tags,
         )
         await server_service.update_server(db, server_id, server)
 
-        root_path = request.scope.get("root_path", "")
-
-        if is_inactive_checked.lower() == "true":
-            return RedirectResponse(f"{root_path}/admin/?include_inactive=true#catalog", status_code=303)
-        return RedirectResponse(f"{root_path}/admin#catalog", status_code=303)
-    except Exception as e:
-        logger.error(f"Error editing server: {e}")
-
-        root_path = request.scope.get("root_path", "")
-        if is_inactive_checked.lower() == "true":
-            return RedirectResponse(f"{root_path}/admin/?include_inactive=true#catalog", status_code=303)
-        return RedirectResponse(f"{root_path}/admin#catalog", status_code=303)
+        return JSONResponse(
+            content={"message": "Server updated successfully!", "success": True},
+            status_code=200,
+        )
+    except (ValidationError, CoreValidationError) as ex:
+        # Catch both Pydantic and pydantic_core validation errors
+        return JSONResponse(content=ErrorFormatter.format_validation_error(ex), status_code=422)
+    except ServerNameConflictError as ex:
+        return JSONResponse(content={"message": str(ex), "success": False}, status_code=409)
+    except ServerError as ex:
+        return JSONResponse(content={"message": str(ex), "success": False}, status_code=500)
+    except ValueError as ex:
+        return JSONResponse(content={"message": str(ex), "success": False}, status_code=400)
+    except RuntimeError as ex:
+        return JSONResponse(content={"message": str(ex), "success": False}, status_code=500)
+    except IntegrityError as ex:
+        return JSONResponse(content=ErrorFormatter.format_database_error(ex), status_code=409)
+    except Exception as ex:
+        return JSONResponse(content={"message": str(ex), "success": False}, status_code=500)
 
 
 @admin_router.post("/servers/{server_id}/toggle")
@@ -809,7 +1015,8 @@ async def admin_list_resources(
         ...         total_executions=5, successful_executions=5, failed_executions=0,
         ...         failure_rate=0.0, min_response_time=0.1, max_response_time=0.5,
         ...         avg_response_time=0.3, last_execution_time=datetime.now(timezone.utc)
-        ...     )
+        ...     ),
+        ...     tags=[]
         ... )
         >>>
         >>> # Mock the resource_service.list_resources method
@@ -832,8 +1039,8 @@ async def admin_list_resources(
         ...     is_active=False, metrics=ResourceMetrics(
         ...         total_executions=0, successful_executions=0, failed_executions=0,
         ...         failure_rate=0.0, min_response_time=0.0, max_response_time=0.0,
-        ...         avg_response_time=0.0, last_execution_time=None
-        ...     )
+        ...         avg_response_time=0.0, last_execution_time=None),
+        ...     tags=[]
         ... )
         >>> resource_service.list_resources = AsyncMock(return_value=[mock_resource, mock_inactive_resource])
         >>> async def test_admin_list_resources_all():
@@ -916,7 +1123,8 @@ async def admin_list_prompts(
         ...         total_executions=10, successful_executions=10, failed_executions=0,
         ...         failure_rate=0.0, min_response_time=0.01, max_response_time=0.1,
         ...         avg_response_time=0.05, last_execution_time=datetime.now(timezone.utc)
-        ...     )
+        ...     ),
+        ...     tags=[]
         ... )
         >>>
         >>> # Mock the prompt_service.list_prompts method
@@ -939,7 +1147,8 @@ async def admin_list_prompts(
         ...         total_executions=0, successful_executions=0, failed_executions=0,
         ...         failure_rate=0.0, min_response_time=0.0, max_response_time=0.0,
         ...         avg_response_time=0.0, last_execution_time=None
-        ...     )
+        ...     ),
+        ...     tags=[]
         ... )
         >>> prompt_service.list_prompts = AsyncMock(return_value=[mock_prompt, mock_inactive_prompt])
         >>> async def test_admin_list_prompts_all():
@@ -1281,7 +1490,8 @@ async def admin_ui(
         ...         failure_rate=0.0, min_response_time=0.0, max_response_time=0.0,
         ...         avg_response_time=0.0, last_execution_time=None
         ...     ),
-        ...     gateway_id=None
+        ...     gateway_id=None,
+        ...     tags=[]
         ... )
         >>> server_service.list_servers = AsyncMock(return_value=[mock_server])
         >>> tool_service.list_tools = AsyncMock(return_value=[mock_tool])
@@ -1405,7 +1615,8 @@ async def admin_list_tools(
         ...         avg_response_time=0.3, last_execution_time=datetime.now(timezone.utc)
         ...     ),
         ...     gateway_slug="default",
-        ...     original_name_slug="test-tool"
+        ...     original_name_slug="test-tool",
+        ...     tags=[]
         ... )  #  Added gateway_id=None
         >>>
         >>> # Mock the tool_service.list_tools method
@@ -1432,7 +1643,8 @@ async def admin_list_tools(
         ...         failure_rate=0.0, min_response_time=0.0, max_response_time=0.0,
         ...         avg_response_time=0.0, last_execution_time=None
         ...     ),
-        ...     gateway_slug="default", original_name_slug="inactive-tool"
+        ...     gateway_slug="default", original_name_slug="inactive-tool",
+        ...     tags=[]
         ... )
         >>> tool_service.list_tools = AsyncMock(return_value=[mock_tool, mock_inactive_tool])
         >>> async def test_admin_list_tools_all():
@@ -1517,7 +1729,8 @@ async def admin_get_tool(tool_id: str, db: Session = Depends(get_db), user: str 
         ...         failure_rate=0.0, min_response_time=0.0, max_response_time=0.0, avg_response_time=0.0,
         ...         last_execution_time=None
         ...     ),
-        ...     gateway_slug="default", original_name_slug="get-tool"
+        ...     gateway_slug="default", original_name_slug="get-tool",
+        ...     tags=[]
         ... )
         >>>
         >>> # Mock the tool_service.get_tool method
@@ -1625,8 +1838,8 @@ async def admin_add_tool(
         >>> form_data_success = FormData([
         ...     ("name", "New_Tool"),
         ...     ("url", "http://new.tool.com"),
-        ...     ("requestType", "SSE"),
-        ...     ("integrationType", "MCP"),
+        ...     ("requestType", "GET"),
+        ...     ("integrationType", "REST"),
         ...     ("headers", '{"X-Api-Key": "abc"}')
         ... ])
         >>> mock_request_success = MagicMock(spec=Request)
@@ -1645,8 +1858,8 @@ async def admin_add_tool(
         >>> form_data_conflict = FormData([
         ...     ("name", "Existing_Tool"),
         ...     ("url", "http://existing.com"),
-        ...     ("requestType", "SSE"),
-        ...     ("integrationType", "MCP")
+        ...     ("requestType", "GET"),
+        ...     ("integrationType", "REST")
         ... ])
         >>> mock_request_conflict = MagicMock(spec=Request)
         >>> mock_request_conflict.form = AsyncMock(return_value=form_data_conflict)
@@ -1663,8 +1876,8 @@ async def admin_add_tool(
         >>> # Error path: Missing required field (Pydantic ValidationError)
         >>> form_data_missing = FormData([
         ...     ("url", "http://missing.com"),
-        ...     ("requestType", "SSE"),
-        ...     ("integrationType", "MCP")
+        ...     ("requestType", "GET"),
+        ...     ("integrationType", "REST")
         ... ])
         >>> mock_request_missing = MagicMock(spec=Request)
         >>> mock_request_missing.form = AsyncMock(return_value=form_data_missing)
@@ -1680,8 +1893,8 @@ async def admin_add_tool(
         >>> form_data_generic_error = FormData([
         ...     ("name", "Generic_Error_Tool"),
         ...     ("url", "http://generic.com"),
-        ...     ("requestType", "SSE"),
-        ...     ("integrationType", "MCP")
+        ...     ("requestType", "GET"),
+        ...     ("integrationType", "REST")
         ... ])
         >>> mock_request_generic_error = MagicMock(spec=Request)
         >>> mock_request_generic_error.form = AsyncMock(return_value=form_data_generic_error)
@@ -1702,12 +1915,27 @@ async def admin_add_tool(
     form = await request.form()
     logger.debug(f"Received form data: {dict(form)}")
 
+    integration_type = form.get("integrationType", "REST")
+    request_type = form.get("requestType")
+
+    if request_type is None:
+        if integration_type == "REST":
+            request_type = "GET"  # or any valid REST method default
+        elif integration_type == "MCP":
+            request_type = "SSE"
+        else:
+            request_type = "GET"
+
+    # Parse tags from comma-separated string
+    tags_str = form.get("tags", "")
+    tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()] if tags_str else []
+
     tool_data = {
         "name": form.get("name"),
         "url": form.get("url"),
         "description": form.get("description"),
-        "request_type": form.get("requestType", "SSE"),
-        "integration_type": form.get("integrationType", "MCP"),
+        "request_type": request_type,
+        "integration_type": integration_type,
         "headers": json.loads(form.get("headers") or "{}"),
         "input_schema": json.loads(form.get("input_schema") or "{}"),
         "jsonpath_filter": form.get("jsonpath_filter", ""),
@@ -1717,6 +1945,7 @@ async def admin_add_tool(
         "auth_token": form.get("auth_token", ""),
         "auth_header_key": form.get("auth_header_key", ""),
         "auth_header_value": form.get("auth_header_value", ""),
+        "tags": tags,
     }
     logger.debug(f"Tool data built: {tool_data}")
     try:
@@ -1803,9 +2032,11 @@ async def admin_edit_tool(
         >>> form_data_success = FormData([
         ...     ("name", "Updated_Tool"),
         ...     ("url", "http://updated.com"),
-        ...     ("is_inactive_checked", "false"),
-        ...     ("requestType", "SSE"),
-        ...     ("integrationType", "MCP")
+        ...     ("requestType", "GET"),
+        ...     ("integrationType", "REST"),
+        ...     ("headers", '{"X-Api-Key": "abc"}'),
+        ...     ("input_schema", '{}'),  # ✅ Required field
+        ...     ("description", "Sample tool")
         ... ])
         >>> mock_request_success = MagicMock(spec=Request, scope={"root_path": ""})
         >>> mock_request_success.form = AsyncMock(return_value=form_data_success)
@@ -1824,8 +2055,8 @@ async def admin_edit_tool(
         ...     ("name", "Inactive_Edit"),
         ...     ("url", "http://inactive.com"),
         ...     ("is_inactive_checked", "true"),
-        ...     ("requestType", "SSE"),
-        ...     ("integrationType", "MCP")
+        ...     ("requestType", "GET"),
+        ...     ("integrationType", "REST")
         ... ])
         >>> mock_request_inactive = MagicMock(spec=Request, scope={"root_path": "/api"})
         >>> mock_request_inactive.form = AsyncMock(return_value=form_data_inactive)
@@ -1841,8 +2072,8 @@ async def admin_edit_tool(
         >>> form_data_conflict = FormData([
         ...     ("name", "Conflicting_Name"),
         ...     ("url", "http://conflict.com"),
-        ...     ("requestType", "SSE"),
-        ...     ("integrationType", "MCP")
+        ...     ("requestType", "GET"),
+        ...     ("integrationType", "REST")
         ... ])
         >>> mock_request_conflict = MagicMock(spec=Request, scope={"root_path": ""})
         >>> mock_request_conflict.form = AsyncMock(return_value=form_data_conflict)
@@ -1859,8 +2090,8 @@ async def admin_edit_tool(
         >>> form_data_tool_error = FormData([
         ...     ("name", "Tool_Error"),
         ...     ("url", "http://toolerror.com"),
-        ...     ("requestType", "SSE"),
-        ...     ("integrationType", "MCP")
+        ...     ("requestType", "GET"),
+        ...     ("integrationType", "REST")
         ... ])
         >>> mock_request_tool_error = MagicMock(spec=Request, scope={"root_path": ""})
         >>> mock_request_tool_error.form = AsyncMock(return_value=form_data_tool_error)
@@ -1877,8 +2108,8 @@ async def admin_edit_tool(
         >>> form_data_validation_error = FormData([
         ...     ("name", "Bad_URL"),
         ...     ("url", "not-a-valid-url"),
-        ...     ("requestType", "SSE"),
-        ...     ("integrationType", "MCP")
+        ...     ("requestType", "GET"),
+        ...     ("integrationType", "REST")
         ... ])
         >>> mock_request_validation_error = MagicMock(spec=Request, scope={"root_path": ""})
         >>> mock_request_validation_error.form = AsyncMock(return_value=form_data_validation_error)
@@ -1894,8 +2125,8 @@ async def admin_edit_tool(
         >>> form_data_unexpected = FormData([
         ...     ("name", "Crash_Tool"),
         ...     ("url", "http://crash.com"),
-        ...     ("requestType", "SSE"),
-        ...     ("integrationType", "MCP")
+        ...     ("requestType", "GET"),
+        ...     ("integrationType", "REST")
         ... ])
         >>> mock_request_unexpected = MagicMock(spec=Request, scope={"root_path": ""})
         >>> mock_request_unexpected.form = AsyncMock(return_value=form_data_unexpected)
@@ -1914,12 +2145,17 @@ async def admin_edit_tool(
     """
     logger.debug(f"User {user} is editing tool ID {tool_id}")
     form = await request.form()
+
+    # Parse tags from comma-separated string
+    tags_str = form.get("tags", "")
+    tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()] if tags_str else []
+
     tool_data = {
         "name": form.get("name"),
         "url": form.get("url"),
         "description": form.get("description"),
         "request_type": form.get("requestType", "SSE"),
-        "integration_type": form.get("integrationType", "MCP"),
+        "integration_type": form.get("integrationType", "REST"),
         "headers": json.loads(form.get("headers") or "{}"),
         "input_schema": json.loads(form.get("input_schema") or "{}"),
         "jsonpath_filter": form.get("jsonpathFilter", ""),
@@ -1929,6 +2165,7 @@ async def admin_edit_tool(
         "auth_token": form.get("auth_token", ""),
         "auth_header_key": form.get("auth_header_key", ""),
         "auth_header_value": form.get("auth_header_value", ""),
+        "tags": tags,
     }
     logger.debug(f"Tool update data built: {tool_data}")
     try:
@@ -1937,7 +2174,7 @@ async def admin_edit_tool(
         return JSONResponse(content={"message": "Edit tool successfully", "success": True}, status_code=200)
     except IntegrityError as ex:
         error_message = ErrorFormatter.format_database_error(ex)
-        logger.error(f"IntegrityError in admin_edit_resource: {error_message}")
+        logger.error(f"IntegrityError in admin_tool_resource: {error_message}")
         return JSONResponse(status_code=409, content=error_message)
     except ToolError as ex:
         logger.error(f"ToolError in admin_edit_tool: {str(ex)}")
@@ -2238,6 +2475,7 @@ async def admin_add_gateway(request: Request, db: Session = Depends(get_db), use
       - name
       - url
       - description (optional)
+      - tags (optional, comma-separated)
 
     Args:
         request: FastAPI request containing form data.
@@ -2343,10 +2581,35 @@ async def admin_add_gateway(request: Request, db: Session = Depends(get_db), use
     logger.debug(f"User {user} is adding a new gateway")
     form = await request.form()
     try:
+        # Parse tags from comma-separated string
+        tags_str = form.get("tags", "")
+        tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()] if tags_str else []
+
+        # Parse auth_headers JSON if present
+        auth_headers_json = form.get("auth_headers")
+        auth_headers = []
+        if auth_headers_json:
+            try:
+                auth_headers = json.loads(auth_headers_json)
+            except (json.JSONDecodeError, ValueError):
+                auth_headers = []
+
+        # Handle passthrough_headers
+        passthrough_headers = form.get("passthrough_headers")
+        if passthrough_headers and passthrough_headers.strip():
+            try:
+                passthrough_headers = json.loads(passthrough_headers)
+            except (json.JSONDecodeError, ValueError):
+                # Fallback to comma-separated parsing
+                passthrough_headers = [h.strip() for h in passthrough_headers.split(",") if h.strip()]
+        else:
+            passthrough_headers = None
+
         gateway = GatewayCreate(
             name=form["name"],
             url=form["url"],
             description=form.get("description"),
+            tags=tags,
             transport=form.get("transport", "SSE"),
             auth_type=form.get("auth_type", ""),
             auth_username=form.get("auth_username", ""),
@@ -2354,6 +2617,8 @@ async def admin_add_gateway(request: Request, db: Session = Depends(get_db), use
             auth_token=form.get("auth_token", ""),
             auth_header_key=form.get("auth_header_key", ""),
             auth_header_value=form.get("auth_header_value", ""),
+            auth_headers=auth_headers if auth_headers else None,
+            passthrough_headers=passthrough_headers,
         )
     except KeyError as e:
         # Convert KeyError to ValidationError-like response
@@ -2398,6 +2663,7 @@ async def admin_edit_gateway(
       - name
       - url
       - description (optional)
+      - tags (optional, comma-separated)
 
     Args:
         gateway_id: Gateway ID.
@@ -2493,10 +2759,35 @@ async def admin_edit_gateway(
     logger.debug(f"User {user} is editing gateway ID {gateway_id}")
     form = await request.form()
     try:
+        # Parse tags from comma-separated string
+        tags_str = form.get("tags", "")
+        tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()] if tags_str else []
+
+        # Parse auth_headers JSON if present
+        auth_headers_json = form.get("auth_headers")
+        auth_headers = []
+        if auth_headers_json:
+            try:
+                auth_headers = json.loads(auth_headers_json)
+            except (json.JSONDecodeError, ValueError):
+                auth_headers = []
+
+        # Handle passthrough_headers
+        passthrough_headers = form.get("passthrough_headers")
+        if passthrough_headers and passthrough_headers.strip():
+            try:
+                passthrough_headers = json.loads(passthrough_headers)
+            except (json.JSONDecodeError, ValueError):
+                # Fallback to comma-separated parsing
+                passthrough_headers = [h.strip() for h in passthrough_headers.split(",") if h.strip()]
+        else:
+            passthrough_headers = None
+
         gateway = GatewayUpdate(  # Pydantic validation happens here
             name=form.get("name"),
             url=form["url"],
             description=form.get("description"),
+            tags=tags,
             transport=form.get("transport", "SSE"),
             auth_type=form.get("auth_type", None),
             auth_username=form.get("auth_username", None),
@@ -2504,10 +2795,12 @@ async def admin_edit_gateway(
             auth_token=form.get("auth_token", None),
             auth_header_key=form.get("auth_header_key", None),
             auth_header_value=form.get("auth_header_value", None),
+            auth_headers=auth_headers if auth_headers else None,
+            passthrough_headers=passthrough_headers,
         )
         await gateway_service.update_gateway(db, gateway_id, gateway)
         return JSONResponse(
-            content={"message": "Gateway update successfully!", "success": True},
+            content={"message": "Gateway updated successfully!", "success": True},
             status_code=200,
         )
     except Exception as ex:
@@ -2647,7 +2940,8 @@ async def admin_get_resource(uri: str, db: Session = Depends(get_db), user: str 
         ...         total_executions=0, successful_executions=0, failed_executions=0,
         ...         failure_rate=0.0, min_response_time=0.0, max_response_time=0.0, avg_response_time=0.0,
         ...         last_execution_time=None
-        ...     )
+        ...     ),
+        ...     tags=[]
         ... )
         >>> mock_content = ResourceContent(type="resource", uri=resource_uri, mime_type="text/plain", text="Hello content")
         >>>
@@ -2707,7 +3001,7 @@ async def admin_get_resource(uri: str, db: Session = Depends(get_db), user: str 
 
 
 @admin_router.post("/resources")
-async def admin_add_resource(request: Request, db: Session = Depends(get_db), user: str = Depends(require_auth)) -> RedirectResponse:
+async def admin_add_resource(request: Request, db: Session = Depends(get_db), user: str = Depends(require_auth)) -> JSONResponse:
     """
     Add a resource via the admin UI.
 
@@ -2759,6 +3053,11 @@ async def admin_add_resource(request: Request, db: Session = Depends(get_db), us
     """
     logger.debug(f"User {user} is adding a new resource")
     form = await request.form()
+
+    # Parse tags from comma-separated string
+    tags_str = form.get("tags", "")
+    tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()] if tags_str else []
+
     try:
         resource = ResourceCreate(
             uri=form["uri"],
@@ -2767,6 +3066,7 @@ async def admin_add_resource(request: Request, db: Session = Depends(get_db), us
             mime_type=form.get("mimeType"),
             template=form.get("template"),  # defaults to None if not provided
             content=form["content"],
+            tags=tags,
         )
         await resource_service.register_resource(db, resource)
         return JSONResponse(
@@ -2792,7 +3092,7 @@ async def admin_edit_resource(
     request: Request,
     db: Session = Depends(get_db),
     user: str = Depends(require_auth),
-) -> RedirectResponse:
+) -> JSONResponse:
     """
     Edit a resource via the admin UI.
 
@@ -2809,7 +3109,7 @@ async def admin_edit_resource(
         user: Authenticated user.
 
     Returns:
-        RedirectResponse: A redirect response to the admin dashboard.
+        JSONResponse: A JSON response indicating success or failure of the resource update operation.
 
     Examples:
         >>> import asyncio
@@ -2833,45 +3133,80 @@ async def admin_edit_resource(
         >>> original_update_resource = resource_service.update_resource
         >>> resource_service.update_resource = AsyncMock()
         >>>
+        >>> # Test successful update
         >>> async def test_admin_edit_resource():
         ...     response = await admin_edit_resource("test://resource1", mock_request, mock_db, mock_user)
-        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        ...     return isinstance(response, JSONResponse) and response.status_code == 200 and response.body == b'{"message":"Resource updated successfully!","success":true}'
         >>>
-        >>> import asyncio; asyncio.run(test_admin_edit_resource())
+        >>> asyncio.run(test_admin_edit_resource())
         True
         >>>
-        >>> # Test with inactive checkbox checked
-        >>> form_data_inactive = FormData([
-        ...     ("name", "Updated Resource"),
-        ...     ("description", "Updated description"),
-        ...     ("mimeType", "text/plain"),
-        ...     ("content", "Updated content"),
-        ...     ("is_inactive_checked", "true")
+        >>> # Test validation error
+        >>> from pydantic import ValidationError
+        >>> validation_error = ValidationError.from_exception_data("Resource validation error", [
+        ...     {"loc": ("name",), "msg": "Field required", "type": "missing"}
         ... ])
-        >>> mock_request.form = AsyncMock(return_value=form_data_inactive)
-        >>>
-        >>> async def test_admin_edit_resource_inactive():
+        >>> resource_service.update_resource = AsyncMock(side_effect=validation_error)
+        >>> async def test_admin_edit_resource_validation():
         ...     response = await admin_edit_resource("test://resource1", mock_request, mock_db, mock_user)
-        ...     return isinstance(response, RedirectResponse) and "include_inactive=true" in response.headers["location"]
+        ...     return isinstance(response, JSONResponse) and response.status_code == 422
         >>>
-        >>> asyncio.run(test_admin_edit_resource_inactive())
+        >>> asyncio.run(test_admin_edit_resource_validation())
         True
+        >>>
+        >>> # Test integrity error (e.g., duplicate resource)
+        >>> from sqlalchemy.exc import IntegrityError
+        >>> integrity_error = IntegrityError("Duplicate entry", None, None)
+        >>> resource_service.update_resource = AsyncMock(side_effect=integrity_error)
+        >>> async def test_admin_edit_resource_integrity():
+        ...     response = await admin_edit_resource("test://resource1", mock_request, mock_db, mock_user)
+        ...     return isinstance(response, JSONResponse) and response.status_code == 409
+        >>>
+        >>> asyncio.run(test_admin_edit_resource_integrity())
+        True
+        >>>
+        >>> # Test unknown error
+        >>> resource_service.update_resource = AsyncMock(side_effect=Exception("Unknown error"))
+        >>> async def test_admin_edit_resource_unknown():
+        ...     response = await admin_edit_resource("test://resource1", mock_request, mock_db, mock_user)
+        ...     return isinstance(response, JSONResponse) and response.status_code == 500 and b'Unknown error' in response.body
+        >>>
+        >>> asyncio.run(test_admin_edit_resource_unknown())
+        True
+        >>>
+        >>> # Reset mock
         >>> resource_service.update_resource = original_update_resource
     """
     logger.debug(f"User {user} is editing resource URI {uri}")
     form = await request.form()
-    resource = ResourceUpdate(
-        name=form["name"],
-        description=form.get("description"),
-        mime_type=form.get("mimeType"),
-        content=form["content"],
-    )
-    await resource_service.update_resource(db, uri, resource)
-    root_path = request.scope.get("root_path", "")
-    is_inactive_checked = form.get("is_inactive_checked", "false")
-    if is_inactive_checked.lower() == "true":
-        return RedirectResponse(f"{root_path}/admin/?include_inactive=true#resources", status_code=303)
-    return RedirectResponse(f"{root_path}/admin#resources", status_code=303)
+
+    # Parse tags from comma-separated string
+    tags_str = form.get("tags", "")
+    tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()] if tags_str else []
+
+    try:
+        resource = ResourceUpdate(
+            name=form["name"],
+            description=form.get("description"),
+            mime_type=form.get("mimeType"),
+            content=form["content"],
+            tags=tags,
+        )
+        await resource_service.update_resource(db, uri, resource)
+        return JSONResponse(
+            content={"message": "Resource updated successfully!", "success": True},
+            status_code=200,
+        )
+    except Exception as ex:
+        if isinstance(ex, ValidationError):
+            logger.error(f"ValidationError in admin_edit_resource: {ErrorFormatter.format_validation_error(ex)}")
+            return JSONResponse(content=ErrorFormatter.format_validation_error(ex), status_code=422)
+        if isinstance(ex, IntegrityError):
+            error_message = ErrorFormatter.format_database_error(ex)
+            logger.error(f"IntegrityError in admin_edit_resource: {error_message}")
+            return JSONResponse(status_code=409, content=error_message)
+        logger.error(f"Error in admin_edit_resource: {ex}")
+        return JSONResponse(content={"message": str(ex), "success": False}, status_code=500)
 
 
 @admin_router.post("/resources/{uri:path}/delete")
@@ -3098,7 +3433,8 @@ async def admin_get_prompt(name: str, db: Session = Depends(get_db), user: str =
         ...     "created_at": datetime.now(timezone.utc),
         ...     "updated_at": datetime.now(timezone.utc),
         ...     "is_active": True,
-        ...     "metrics": mock_metrics
+        ...     "metrics": mock_metrics,
+        ...     "tags": []
         ... }
         >>>
         >>> original_get_prompt_details = prompt_service.get_prompt_details
@@ -3200,6 +3536,11 @@ async def admin_add_prompt(request: Request, db: Session = Depends(get_db), user
     """
     logger.debug(f"User {user} is adding a new prompt")
     form = await request.form()
+
+    # Parse tags from comma-separated string
+    tags_str = form.get("tags", "")
+    tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()] if tags_str else []
+
     try:
         args_json = form.get("arguments") or "[]"
         arguments = json.loads(args_json)
@@ -3208,6 +3549,7 @@ async def admin_add_prompt(request: Request, db: Session = Depends(get_db), user
             description=form.get("description"),
             template=form["template"],
             arguments=arguments,
+            tags=tags,
         )
         await prompt_service.register_prompt(db, prompt)
         return JSONResponse(
@@ -3232,7 +3574,7 @@ async def admin_edit_prompt(
     request: Request,
     db: Session = Depends(get_db),
     user: str = Depends(require_auth),
-) -> RedirectResponse:
+) -> JSONResponse:
     """Edit a prompt via the admin UI.
 
     Expects form fields:
@@ -3248,7 +3590,7 @@ async def admin_edit_prompt(
         user: Authenticated user.
 
     Returns:
-        A redirect response to the admin dashboard.
+         JSONResponse: A JSON response indicating success or failure of the server update operation.
 
     Examples:
         >>> import asyncio
@@ -3276,7 +3618,7 @@ async def admin_edit_prompt(
         >>>
         >>> async def test_admin_edit_prompt():
         ...     response = await admin_edit_prompt(prompt_name, mock_request, mock_db, mock_user)
-        ...     return isinstance(response, JSONResponse) and response.status_code == 200 and response.body == b'{"message":"Prompt update successfully!","success":true}'
+        ...     return isinstance(response, JSONResponse) and response.status_code == 200 and response.body == b'{"message":"Prompt updated successfully!","success":true}'
         >>>
         >>> asyncio.run(test_admin_edit_prompt())
         True
@@ -3300,6 +3642,11 @@ async def admin_edit_prompt(
     """
     logger.debug(f"User {user} is editing prompt name {name}")
     form = await request.form()
+
+    # Parse tags from comma-separated string
+    tags_str = form.get("tags", "")
+    tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()] if tags_str else []
+
     args_json = form.get("arguments") or "[]"
     arguments = json.loads(args_json)
     try:
@@ -3308,6 +3655,7 @@ async def admin_edit_prompt(
             description=form.get("description"),
             template=form["template"],
             arguments=arguments,
+            tags=tags,
         )
         await prompt_service.update_prompt(db, name, prompt)
 
@@ -3318,18 +3666,18 @@ async def admin_edit_prompt(
             return RedirectResponse(f"{root_path}/admin/?include_inactive=true#prompts", status_code=303)
         # return RedirectResponse(f"{root_path}/admin#prompts", status_code=303)
         return JSONResponse(
-            content={"message": "Prompt update successfully!", "success": True},
+            content={"message": "Prompt updated successfully!", "success": True},
             status_code=200,
         )
     except Exception as ex:
         if isinstance(ex, ValidationError):
-            logger.error(f"ValidationError in admin_add_prompt: {ErrorFormatter.format_validation_error(ex)}")
+            logger.error(f"ValidationError in admin_edit_prompt: {ErrorFormatter.format_validation_error(ex)}")
             return JSONResponse(content=ErrorFormatter.format_validation_error(ex), status_code=422)
         if isinstance(ex, IntegrityError):
             error_message = ErrorFormatter.format_database_error(ex)
-            logger.error(f"IntegrityError in admin_add_prompt: {error_message}")
+            logger.error(f"IntegrityError in admin_edit_prompt: {error_message}")
             return JSONResponse(status_code=409, content=error_message)
-        logger.error(f"Error in admin_add_prompt: {ex}")
+        logger.error(f"Error in admin_edit_prompt: {ex}")
         return JSONResponse(content={"message": str(ex), "success": False}, status_code=500)
 
 
@@ -3627,118 +3975,81 @@ async def admin_delete_root(uri: str, request: Request, user: str = Depends(requ
 MetricsDict = Dict[str, Union[ToolMetrics, ResourceMetrics, ServerMetrics, PromptMetrics]]
 
 
-@admin_router.get("/metrics", response_model=MetricsDict)
-async def admin_get_metrics(
-    db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
-) -> MetricsDict:
-    """
-    Retrieve aggregate metrics for all entity types via the admin UI.
+# @admin_router.get("/metrics", response_model=MetricsDict)
+# async def admin_get_metrics(
+#     db: Session = Depends(get_db),
+#     user: str = Depends(require_auth),
+# ) -> MetricsDict:
+#     """
+#     Retrieve aggregate metrics for all entity types via the admin UI.
 
-    This endpoint collects and returns usage metrics for tools, resources, servers,
-    and prompts. The metrics are retrieved by calling the aggregate_metrics method
-    on each respective service, which compiles statistics about usage patterns,
-    success rates, and other relevant metrics for administrative monitoring
-    and analysis purposes.
+#     This endpoint collects and returns usage metrics for tools, resources, servers,
+#     and prompts. The metrics are retrieved by calling the aggregate_metrics method
+#     on each respective service, which compiles statistics about usage patterns,
+#     success rates, and other relevant metrics for administrative monitoring
+#     and analysis purposes.
+
+#     Args:
+#         db (Session): Database session dependency.
+#         user (str): Authenticated user dependency.
+
+#     Returns:
+#         MetricsDict: A dictionary containing the aggregated metrics for tools,
+#         resources, servers, and prompts. Each value is a Pydantic model instance
+#         specific to the entity type.
+#     """
+#     logger.debug(f"User {user} requested aggregate metrics")
+#     tool_metrics = await tool_service.aggregate_metrics(db)
+#     resource_metrics = await resource_service.aggregate_metrics(db)
+#     server_metrics = await server_service.aggregate_metrics(db)
+#     prompt_metrics = await prompt_service.aggregate_metrics(db)
+
+#     # Return actual Pydantic model instances
+#     return {
+#         "tools": tool_metrics,
+#         "resources": resource_metrics,
+#         "servers": server_metrics,
+#         "prompts": prompt_metrics,
+#     }
+
+
+@admin_router.get("/metrics")
+async def get_aggregated_metrics(
+    db: Session = Depends(get_db),
+    _user: str = Depends(require_auth),
+) -> Dict[str, Any]:
+    """Retrieve aggregated metrics and top performers for all entity types.
+
+    This endpoint collects usage metrics and top-performing entities for tools,
+    resources, prompts, and servers by calling the respective service methods.
+    The results are compiled into a dictionary for administrative monitoring.
 
     Args:
-        db (Session): Database session dependency.
-        user (str): Authenticated user dependency.
+        db (Session): Database session dependency for querying metrics.
 
     Returns:
-        MetricsDict: A dictionary containing the aggregated metrics for tools,
-        resources, servers, and prompts. Each value is a Pydantic model instance
-        specific to the entity type.
-
-    Examples:
-        >>> import asyncio
-        >>> from unittest.mock import AsyncMock, MagicMock
-        >>> from mcpgateway.schemas import ToolMetrics, ResourceMetrics, ServerMetrics, PromptMetrics
-        >>>
-        >>> mock_db = MagicMock()
-        >>> mock_user = "test_user"
-        >>>
-        >>> mock_tool_metrics = ToolMetrics(
-        ...     total_executions=10,
-        ...     successful_executions=9,
-        ...     failed_executions=1,
-        ...     failure_rate=0.1,
-        ...     min_response_time=0.05,
-        ...     max_response_time=1.0,
-        ...     avg_response_time=0.3,
-        ...     last_execution_time=None
-        ... )
-        >>> mock_resource_metrics = ResourceMetrics(
-        ...     total_executions=5,
-        ...     successful_executions=5,
-        ...     failed_executions=0,
-        ...     failure_rate=0.0,
-        ...     min_response_time=0.1,
-        ...     max_response_time=0.5,
-        ...     avg_response_time=0.2,
-        ...     last_execution_time=None
-        ... )
-        >>> mock_server_metrics = ServerMetrics(
-        ...     total_executions=7,
-        ...     successful_executions=7,
-        ...     failed_executions=0,
-        ...     failure_rate=0.0,
-        ...     min_response_time=0.2,
-        ...     max_response_time=0.7,
-        ...     avg_response_time=0.4,
-        ...     last_execution_time=None
-        ... )
-        >>> mock_prompt_metrics = PromptMetrics(
-        ...     total_executions=3,
-        ...     successful_executions=3,
-        ...     failed_executions=0,
-        ...     failure_rate=0.0,
-        ...     min_response_time=0.15,
-        ...     max_response_time=0.6,
-        ...     avg_response_time=0.35,
-        ...     last_execution_time=None
-        ... )
-        >>>
-        >>> original_aggregate_metrics_tool = tool_service.aggregate_metrics
-        >>> original_aggregate_metrics_resource = resource_service.aggregate_metrics
-        >>> original_aggregate_metrics_server = server_service.aggregate_metrics
-        >>> original_aggregate_metrics_prompt = prompt_service.aggregate_metrics
-        >>>
-        >>> tool_service.aggregate_metrics = AsyncMock(return_value=mock_tool_metrics)
-        >>> resource_service.aggregate_metrics = AsyncMock(return_value=mock_resource_metrics)
-        >>> server_service.aggregate_metrics = AsyncMock(return_value=mock_server_metrics)
-        >>> prompt_service.aggregate_metrics = AsyncMock(return_value=mock_prompt_metrics)
-        >>>
-        >>> async def test_admin_get_metrics():
-        ...     result = await admin_get_metrics(mock_db, mock_user)
-        ...     return (
-        ...         isinstance(result, dict) and
-        ...         result.get("tools") == mock_tool_metrics and
-        ...         result.get("resources") == mock_resource_metrics and
-        ...         result.get("servers") == mock_server_metrics and
-        ...         result.get("prompts") == mock_prompt_metrics
-        ...     )
-        >>>
-        >>> import asyncio; asyncio.run(test_admin_get_metrics())
-        True
-        >>>
-        >>> tool_service.aggregate_metrics = original_aggregate_metrics_tool
-        >>> resource_service.aggregate_metrics = original_aggregate_metrics_resource
-        >>> server_service.aggregate_metrics = original_aggregate_metrics_server
-        >>> prompt_service.aggregate_metrics = original_aggregate_metrics_prompt
+        Dict[str, Any]: A dictionary containing aggregated metrics and top performers
+            for tools, resources, prompts, and servers. The structure includes:
+            - 'tools': Metrics for tools.
+            - 'resources': Metrics for resources.
+            - 'prompts': Metrics for prompts.
+            - 'servers': Metrics for servers.
+            - 'topPerformers': A nested dictionary with top 5 tools, resources, prompts,
+              and servers.
     """
-    logger.debug(f"User {user} requested aggregate metrics")
-    tool_metrics = await tool_service.aggregate_metrics(db)
-    resource_metrics = await resource_service.aggregate_metrics(db)
-    server_metrics = await server_service.aggregate_metrics(db)
-    prompt_metrics = await prompt_service.aggregate_metrics(db)
-
-    return {
-        "tools": tool_metrics,
-        "resources": resource_metrics,
-        "servers": server_metrics,
-        "prompts": prompt_metrics,
+    metrics = {
+        "tools": await tool_service.aggregate_metrics(db),
+        "resources": await resource_service.aggregate_metrics(db),
+        "prompts": await prompt_service.aggregate_metrics(db),
+        "servers": await server_service.aggregate_metrics(db),
+        "topPerformers": {
+            "tools": await tool_service.get_top_tools(db, limit=5),
+            "resources": await resource_service.get_top_resources(db, limit=5),
+            "prompts": await prompt_service.get_top_prompts(db, limit=5),
+            "servers": await server_service.get_top_servers(db, limit=5),
+        },
     }
+    return metrics
 
 
 @admin_router.post("/metrics/reset", response_model=Dict[str, object])
@@ -3949,3 +4260,87 @@ async def admin_test_gateway(request: GatewayTestRequest, user: str = Depends(re
         logger.warning(f"Gateway test failed: {e}")
         latency_ms = int((time.monotonic() - start_time) * 1000)
         return GatewayTestResponse(status_code=502, latency_ms=latency_ms, body={"error": "Request failed", "details": str(e)})
+
+
+####################
+# Admin Tag Routes #
+####################
+
+
+@admin_router.get("/tags", response_model=List[Dict[str, Any]])
+async def admin_list_tags(
+    entity_types: Optional[str] = None,
+    include_entities: bool = False,
+    db: Session = Depends(get_db),
+    user: str = Depends(require_auth),
+) -> List[Dict[str, Any]]:
+    """
+    List all unique tags with statistics for the admin UI.
+
+    Args:
+        entity_types: Comma-separated list of entity types to filter by
+                     (e.g., "tools,resources,prompts,servers,gateways").
+                     If not provided, returns tags from all entity types.
+        include_entities: Whether to include the list of entities that have each tag
+        db: Database session
+        user: Authenticated user
+
+    Returns:
+        List of tag information with statistics
+
+    Raises:
+        HTTPException: If tag retrieval fails
+
+    Examples:
+        >>> # Test function exists and has correct name
+        >>> from mcpgateway.admin import admin_list_tags
+        >>> admin_list_tags.__name__
+        'admin_list_tags'
+        >>> # Test it's a coroutine function
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(admin_list_tags)
+        True
+    """
+    tag_service = TagService()
+
+    # Parse entity types parameter if provided
+    entity_types_list = None
+    if entity_types:
+        entity_types_list = [et.strip().lower() for et in entity_types.split(",") if et.strip()]
+
+    logger.debug(f"Admin user {user} is retrieving tags for entity types: {entity_types_list}, include_entities: {include_entities}")
+
+    try:
+        tags = await tag_service.get_all_tags(db, entity_types=entity_types_list, include_entities=include_entities)
+
+        # Convert to list of dicts for admin UI
+        result = []
+        for tag in tags:
+            tag_dict = {
+                "name": tag.name,
+                "tools": tag.stats.tools,
+                "resources": tag.stats.resources,
+                "prompts": tag.stats.prompts,
+                "servers": tag.stats.servers,
+                "gateways": tag.stats.gateways,
+                "total": tag.stats.total,
+            }
+
+            # Include entities if requested
+            if include_entities and tag.entities:
+                tag_dict["entities"] = [
+                    {
+                        "id": entity.id,
+                        "name": entity.name,
+                        "type": entity.type,
+                        "description": entity.description,
+                    }
+                    for entity in tag.entities
+                ]
+
+            result.append(tag_dict)
+
+        return result
+    except Exception as e:
+        logger.error(f"Failed to retrieve tags for admin: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve tags: {str(e)}")

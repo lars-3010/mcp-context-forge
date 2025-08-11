@@ -1,3 +1,10 @@
+CLAUDE.local.md
+.aider*
+.scannerwork
+llms-full.txt
+aider*
+.aider*
+todo/
 *.sarif
 devskim-results.sarif
 debug_login_page.png

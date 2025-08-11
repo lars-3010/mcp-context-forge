@@ -13,6 +13,7 @@ include Containerfile.lite
 include __init__
 include alembic.ini
 include tox.ini
+include alembic/README
 
 # 2️⃣  Top-level config, examples and helper scripts
 include *.py
@@ -26,6 +27,8 @@ include *.yml
 include *.json
 include *.sh
 include *.txt
+recursive-include async_testing *.py
+recursive-include async_testing *.yaml
 
 # 3️⃣  Tooling/lint configuration dot-files (explicit so they're not lost)
 include .env.make
@@ -56,6 +59,9 @@ recursive-include alembic *.md
 recursive-include alembic *.py
 # recursive-include deployment *
 # recursive-include mcp-servers *
+recursive-include plugins *.py
+recursive-include plugins *.yaml
+recursive-include plugins *.md
 
 # 5️⃣  (Optional) include MKDocs-based docs in the sdist
 # graft docs
@@ -69,7 +75,8 @@ prune *.egg-info
 prune charts
 prune k8s
 prune .devcontainer
-
+exclude CLAUDE.*
+exclude llms-full.txt
 
 # Exclude deployment, mcp-servers and agent_runtimes
 prune deployment

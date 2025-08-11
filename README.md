@@ -120,13 +120,13 @@ ContextForge MCP Gateway is a feature-rich gateway, proxy and MCP Registry that 
 
 **ContextForge MCP Gateway** is a gateway, registry, and proxy that sits in front of any [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server or REST API-exposing a unified endpoint for all your AI clients.
 
-**⚠️ Caution**: The current release (0.4.0) is considered alpha / early beta. It is not production-ready and should only be used for local development, testing, or experimentation. Features, APIs, and behaviors are subject to change without notice. **Do not** deploy in production environments without thorough security review, validation and additional security mechanisms.  Many of the features required for secure, large-scale, or multi-tenant production deployments are still on the [project roadmap](https://ibm.github.io/mcp-context-forge/architecture/roadmap/) - which is itself evolving.
+**⚠️ Caution**: The current release (0.5.0) is considered alpha / early beta. It is not production-ready and should only be used for local development, testing, or experimentation. Features, APIs, and behaviors are subject to change without notice. **Do not** deploy in production environments without thorough security review, validation and additional security mechanisms.  Many of the features required for secure, large-scale, or multi-tenant production deployments are still on the [project roadmap](https://ibm.github.io/mcp-context-forge/architecture/roadmap/) - which is itself evolving.
 
 It currently supports:
 
 * Federation across multiple MCP and REST services
 * Virtualization of legacy APIs as MCP-compliant tools and servers
-* Transport over HTTP, JSON-RPC, WebSocket, SSE, stdio and streamable-HTTP
+* Transport over HTTP, JSON-RPC, WebSocket, SSE (with configurable keepalive), stdio and streamable-HTTP
 * An Admin UI for real-time management and configuration
 * Built-in auth, observability, retries, and rate-limiting
 * Scalable deployments via Docker or PyPI, Redis-backed caching, and multi-cluster federation
@@ -386,13 +386,13 @@ docker run -d --name mcpgateway \
   -e BASIC_AUTH_PASSWORD=changeme \
   -e AUTH_REQUIRED=true \
   -e DATABASE_URL=sqlite:///./mcp.db \
-  ghcr.io/ibm/mcp-context-forge:0.4.0
+  ghcr.io/ibm/mcp-context-forge:0.5.0
 
 # Tail logs (Ctrl+C to quit)
 docker logs -f mcpgateway
 
 # Generating an API key
-docker run --rm -it ghcr.io/ibm/mcp-context-forge:0.4.0 \
+docker run --rm -it ghcr.io/ibm/mcp-context-forge:0.5.0 \
   python3 -m mcpgateway.utils.create_jwt_token --username admin --exp 0 --secret my-test-key
 ```
 
@@ -420,7 +420,7 @@ docker run -d --name mcpgateway \
   -e JWT_SECRET_KEY=my-test-key \
   -e BASIC_AUTH_USER=admin \
   -e BASIC_AUTH_PASSWORD=changeme \
-  ghcr.io/ibm/mcp-context-forge:0.4.0
+  ghcr.io/ibm/mcp-context-forge:0.5.0
 ```
 
 SQLite now lives on the host at `./data/mcp.db`.
@@ -444,7 +444,7 @@ docker run -d --name mcpgateway \
   -e PORT=4444 \
   -e DATABASE_URL=sqlite:////data/mcp.db \
   -v $(pwd)/data:/data \
-  ghcr.io/ibm/mcp-context-forge:0.4.0
+  ghcr.io/ibm/mcp-context-forge:0.5.0
 ```
 
 Using `--network=host` allows Docker to access the local network, allowing you to add MCP servers running on your host. See [Docker Host network driver documentation](https://docs.docker.com/engine/network/drivers/host/) for more details.
@@ -460,7 +460,7 @@ podman run -d --name mcpgateway \
   -p 4444:4444 \
   -e HOST=0.0.0.0 \
   -e DATABASE_URL=sqlite:///./mcp.db \
-  ghcr.io/ibm/mcp-context-forge:0.4.0
+  ghcr.io/ibm/mcp-context-forge:0.5.0
 ```
 
 #### 2 - Persist SQLite
@@ -479,7 +479,7 @@ podman run -d --name mcpgateway \
   -p 4444:4444 \
   -v $(pwd)/data:/data \
   -e DATABASE_URL=sqlite:////data/mcp.db \
-  ghcr.io/ibm/mcp-context-forge:0.4.0
+  ghcr.io/ibm/mcp-context-forge:0.5.0
 ```
 
 #### 3 - Host networking (rootless)
@@ -497,7 +497,7 @@ podman run -d --name mcpgateway \
   --network=host \
   -v $(pwd)/data:/data \
   -e DATABASE_URL=sqlite:////data/mcp.db \
-  ghcr.io/ibm/mcp-context-forge:0.4.0
+  ghcr.io/ibm/mcp-context-forge:0.5.0
 ```
 
 ---
@@ -506,7 +506,7 @@ podman run -d --name mcpgateway \
 <summary><strong>✏️ Docker/Podman tips</strong></summary>
 
 * **.env files** - Put all the `-e FOO=` lines into a file and replace them with `--env-file .env`. See the provided [.env.example](.env.example) for reference.
-* **Pinned tags** - Use an explicit version (e.g. `v0.4.0`) instead of `latest` for reproducible builds.
+* **Pinned tags** - Use an explicit version (e.g. `v0.5.0`) instead of `latest` for reproducible builds.
 * **JWT tokens** - Generate one in the running container:
 
   ```bash
@@ -552,7 +552,7 @@ docker run --rm -i \
   -e MCP_SERVER_CATALOG_URLS=http://host.docker.internal:4444/servers/UUID_OF_SERVER_1 \
   -e MCP_TOOL_CALL_TIMEOUT=120 \
   -e MCP_WRAPPER_LOG_LEVEL=DEBUG \
-  ghcr.io/ibm/mcp-context-forge:0.4.0 \
+  ghcr.io/ibm/mcp-context-forge:0.5.0 \
   python3 -m mcpgateway.wrapper
 ```
 
@@ -600,7 +600,7 @@ python3 -m mcpgateway.wrapper
 <summary><strong>Expected responses from mcpgateway.wrapper</strong></summary>
 
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26","capabilities":{"experimental":{},"prompts":{"listChanged":false},"resources":{"subscribe":false,"listChanged":false},"tools":{"listChanged":false}},"serverInfo":{"name":"mcpgateway-wrapper","version":"0.4.0"}}}
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26","capabilities":{"experimental":{},"prompts":{"listChanged":false},"resources":{"subscribe":false,"listChanged":false},"tools":{"listChanged":false}},"serverInfo":{"name":"mcpgateway-wrapper","version":"0.5.0"}}}
 
 # When there's no tools
 {"jsonrpc":"2.0","id":2,"result":{"tools":[]}}
@@ -632,7 +632,7 @@ docker run -i --rm \
   -e MCP_SERVER_CATALOG_URLS=http://localhost:4444/servers/UUID_OF_SERVER_1 \
   -e MCP_AUTH_TOKEN=${MCPGATEWAY_BEARER_TOKEN} \
   -e MCP_TOOL_CALL_TIMEOUT=120 \
-  ghcr.io/ibm/mcp-context-forge:0.4.0 \
+  ghcr.io/ibm/mcp-context-forge:0.5.0 \
   python3 -m mcpgateway.wrapper
 ```
 
@@ -1016,11 +1016,53 @@ You can get started by copying the provided [.env.example](.env.example) to `.en
 
 ### Logging
 
-| Setting      | Description       | Default | Options            |
-| ------------ | ----------------- | ------- | ------------------ |
-| `LOG_LEVEL`  | Minimum log level | `INFO`  | `DEBUG`...`CRITICAL` |
-| `LOG_FORMAT` | Log format        | `json`  | `json`, `text`     |
-| `LOG_FILE`   | Log output file   | (none)  | path or empty      |
+MCP Gateway provides flexible logging with **stdout/stderr output by default** and **optional file-based logging**. When file logging is enabled, it provides JSON formatting for structured logs and text formatting for console output.
+
+| Setting                 | Description                        | Default           | Options                    |
+| ----------------------- | ---------------------------------- | ----------------- | -------------------------- |
+| `LOG_LEVEL`             | Minimum log level                  | `INFO`            | `DEBUG`...`CRITICAL`       |
+| `LOG_FORMAT`            | Console log format                 | `json`            | `json`, `text`             |
+| `LOG_TO_FILE`           | **Enable file logging**            | **`false`**       | **`true`, `false`**        |
+| `LOG_FILE`              | Log filename (when enabled)        | `null`            | `mcpgateway.log`           |
+| `LOG_FOLDER`            | Directory for log files            | `null`            | `logs`, `/var/log/gateway` |
+| `LOG_FILEMODE`          | File write mode                    | `a+`              | `a+` (append), `w` (overwrite)|
+| `LOG_ROTATION_ENABLED`  | **Enable log file rotation**       | **`false`**       | **`true`, `false`**        |
+| `LOG_MAX_SIZE_MB`       | Max file size before rotation (MB) | `1`               | Any positive integer       |
+| `LOG_BACKUP_COUNT`      | Number of backup files to keep     | `5`               | Any non-negative integer   |
+
+**Logging Behavior:**
+- **Default**: Logs only to **stdout/stderr** with human-readable text format
+- **File Logging**: When `LOG_TO_FILE=true`, logs to **both** file (JSON format) and console (text format)
+- **Log Rotation**: When `LOG_ROTATION_ENABLED=true`, files rotate at `LOG_MAX_SIZE_MB` with `LOG_BACKUP_COUNT` backup files (e.g., `.log.1`, `.log.2`)
+- **Directory Creation**: Log folder is automatically created if it doesn't exist
+- **Centralized Service**: All modules use the unified `LoggingService` for consistent formatting
+
+**Example Configurations:**
+
+```bash
+# Default: stdout/stderr only (recommended for containers)
+LOG_LEVEL=INFO
+# No additional config needed - logs to stdout/stderr
+
+# Optional: Enable file logging (no rotation)
+LOG_TO_FILE=true
+LOG_FOLDER=/var/log/mcpgateway
+LOG_FILE=gateway.log
+LOG_FILEMODE=a+
+
+# Optional: Enable file logging with rotation
+LOG_TO_FILE=true
+LOG_ROTATION_ENABLED=true
+LOG_MAX_SIZE_MB=10
+LOG_BACKUP_COUNT=3
+LOG_FOLDER=/var/log/mcpgateway
+LOG_FILE=gateway.log
+```
+
+**Default Behavior:**
+- Logs are written **only to stdout/stderr** in human-readable text format
+- File logging is **disabled by default** (no files created)
+- Set `LOG_TO_FILE=true` to enable optional file logging with JSON format
 
 ### Transport
 
@@ -1029,8 +1071,12 @@ You can get started by copying the provided [.env.example](.env.example) to `.en
 | `TRANSPORT_TYPE`          | Enabled transports                 | `all`   | `http`,`ws`,`sse`,`stdio`,`all` |
 | `WEBSOCKET_PING_INTERVAL` | WebSocket ping (secs)              | `30`    | int > 0                         |
 | `SSE_RETRY_TIMEOUT`       | SSE retry timeout (ms)             | `5000`  | int > 0                         |
+| `SSE_KEEPALIVE_ENABLED`   | Enable SSE keepalive events        | `true`  | bool                            |
+| `SSE_KEEPALIVE_INTERVAL`  | SSE keepalive interval (secs)      | `30`    | int > 0                         |
 | `USE_STATEFUL_SESSIONS`   | streamable http config             | `false` | bool                            |
 | `JSON_RESPONSE_ENABLED`   | json/sse streams (streamable http) | `true`  | bool                            |
+
+> **💡 SSE Keepalive Events**: The gateway sends periodic keepalive events to prevent connection timeouts with proxies and load balancers. Disable with `SSE_KEEPALIVE_ENABLED=false` if your client doesn't handle unknown event types. Common intervals: 30s (default), 60s (AWS ALB), 240s (Azure).
 
 ### Federation
 
@@ -1112,7 +1158,13 @@ MCP Gateway uses Alembic for database migrations. Common commands:
 
 #### Troubleshooting
 
-If you see "No 'script_location' key found", ensure you're running from the project root directory.
+**Common Issues:**
+
+- **"No 'script_location' key found"**: Ensure you're running from the project root directory.
+
+- **"Unknown SSE event: keepalive" warnings**: Some MCP clients don't recognize keepalive events. These warnings are harmless and don't affect functionality. To disable: `SSE_KEEPALIVE_ENABLED=false`
+
+- **Connection timeouts with proxies/load balancers**: If experiencing timeouts, adjust keepalive interval to match your infrastructure: `SSE_KEEPALIVE_INTERVAL=60` (AWS ALB) or `240` (Azure).
 
 ### Development
 

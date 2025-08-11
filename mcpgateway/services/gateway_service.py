@@ -71,13 +71,17 @@ from mcpgateway.db import Gateway as DbGateway
 from mcpgateway.db import SessionLocal
 from mcpgateway.db import Tool as DbTool
 from mcpgateway.schemas import GatewayCreate, GatewayRead, GatewayUpdate, ToolCreate
+
+# logging.getLogger("httpx").setLevel(logging.WARNING)  # Disables httpx logs for regular health checks
+from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.tool_service import ToolService
 from mcpgateway.utils.create_slug import slugify
 from mcpgateway.utils.retry_manager import ResilientHttpClient
-from mcpgateway.utils.services_auth import decode_auth
+from mcpgateway.utils.services_auth import decode_auth, encode_auth
 
-# logging.getLogger("httpx").setLevel(logging.WARNING)  # Disables httpx logs for regular health checks
-logger = logging.getLogger(__name__)
+# Initialize logging service first
+logging_service = LoggingService()
+logger = logging_service.get_logger(__name__)
 
 
 GW_FAILURE_THRESHOLD = settings.unhealthy_threshold
@@ -390,7 +394,12 @@ class GatewayService:
                 )
 
             auth_type = getattr(gateway, "auth_type", None)
+            # Support multiple custom headers
             auth_value = getattr(gateway, "auth_value", {})
+            if hasattr(gateway, "auth_headers") and gateway.auth_headers:
+                # Convert list of {key, value} to dict
+                header_dict = {h["key"]: h["value"] for h in gateway.auth_headers if h.get("key")}
+                auth_value = encode_auth(header_dict)  # Encode the dict for consistency
 
             capabilities, tools = await self._initialize_gateway(gateway.url, auth_value, gateway.transport)
 
@@ -400,7 +409,7 @@ class GatewayService:
                     original_name_slug=slugify(tool.name),
                     url=gateway.url,
                     description=tool.description,
-                    integration_type=tool.integration_type,
+                    integration_type="MCP",  # Gateway-discovered tools are MCP type
                     request_type=tool.request_type,
                     headers=tool.headers,
                     input_schema=tool.input_schema,
@@ -418,6 +427,7 @@ class GatewayService:
                 slug=slugify(gateway.name),
                 url=gateway.url,
                 description=gateway.description,
+                tags=gateway.tags,
                 transport=gateway.transport,
                 capabilities=capabilities,
                 last_seen=datetime.now(timezone.utc),
@@ -561,6 +571,8 @@ class GatewayService:
                     gateway.description = gateway_update.description
                 if gateway_update.transport is not None:
                     gateway.transport = gateway_update.transport
+                if gateway_update.tags is not None:
+                    gateway.tags = gateway_update.tags
 
                 if getattr(gateway, "auth_type", None) is not None:
                     gateway.auth_type = gateway_update.auth_type
@@ -570,15 +582,19 @@ class GatewayService:
                         gateway.auth_value = ""
 
                     # if auth_type is not None and only then check auth_value
-                    if getattr(gateway, "auth_value", "") != "":
-                        token = gateway_update.auth_token
-                        password = gateway_update.auth_password
-                        header_value = gateway_update.auth_header_value
+                if getattr(gateway, "auth_value", "") != "":
+                    token = gateway_update.auth_token
+                    password = gateway_update.auth_password
+                    header_value = gateway_update.auth_header_value
 
-                        if settings.masked_auth_value not in (token, password, header_value):
-                            # Check if values differ from existing ones
-                            if gateway.auth_value != gateway_update.auth_value:
-                                gateway.auth_value = gateway_update.auth_value
+                    # Support multiple custom headers on update
+                    if hasattr(gateway_update, "auth_headers") and gateway_update.auth_headers:
+                        header_dict = {h["key"]: h["value"] for h in gateway_update.auth_headers if h.get("key")}
+                        gateway.auth_value = encode_auth(header_dict)  # Encode the dict for consistency
+                    elif settings.masked_auth_value not in (token, password, header_value):
+                        # Check if values differ from existing ones
+                        if gateway.auth_value != gateway_update.auth_value:
+                            gateway.auth_value = gateway_update.auth_value
 
                 # Try to reinitialize connection if URL changed
                 if gateway_update.url is not None:
@@ -595,7 +611,7 @@ class GatewayService:
                                         original_name_slug=slugify(tool.name),
                                         url=gateway.url,
                                         description=tool.description,
-                                        integration_type=tool.integration_type,
+                                        integration_type="MCP",  # Gateway-discovered tools are MCP type
                                         request_type=tool.request_type,
                                         headers=tool.headers,
                                         input_schema=tool.input_schema,
@@ -614,6 +630,10 @@ class GatewayService:
                     except Exception as e:
                         logger.warning(f"Failed to initialize updated gateway: {e}")
 
+                # Update tags if provided
+                if gateway_update.tags is not None:
+                    gateway.tags = gateway_update.tags
+
                 gateway.updated_at = datetime.now(timezone.utc)
                 db.commit()
                 db.refresh(gateway)
@@ -627,6 +647,9 @@ class GatewayService:
         except GatewayNameConflictError as ge:
             logger.error(f"GatewayNameConflictError in group: {ge}")
             raise ge
+        except GatewayNotFoundError as gnfe:
+            logger.error(f"GatewayNotFoundError: {gnfe}")
+            raise gnfe
         except IntegrityError as ie:
             logger.error(f"IntegrityErrors in group: {ie}")
             raise ie
@@ -742,7 +765,7 @@ class GatewayService:
                                         original_name_slug=slugify(tool.name),
                                         url=gateway.url,
                                         description=tool.description,
-                                        integration_type=tool.integration_type,
+                                        integration_type="MCP",  # Gateway-discovered tools are MCP type
                                         request_type=tool.request_type,
                                         headers=tool.headers,
                                         input_schema=tool.input_schema,
@@ -1262,26 +1285,23 @@ class GatewayService:
                     authentication = {}
                 # Store the context managers so they stay alive
                 decoded_auth = decode_auth(authentication)
-                if await self._validate_gateway_url(url=server_url, headers=decoded_auth, transport_type="STREAMABLEHTTP"):
-                    # Use async with for both streamablehttp_client and ClientSession
-                    async with streamablehttp_client(url=server_url, headers=decoded_auth) as (read_stream, write_stream, _get_session_id):
-                        async with ClientSession(read_stream, write_stream) as session:
-                            # Initialize the session
-                            response = await session.initialize()
-                            # if get_session_id:
-                            #     session_id = get_session_id()
-                            #     if session_id:
-                            #         print(f"Session ID: {session_id}")
-                            capabilities = response.capabilities.model_dump(by_alias=True, exclude_none=True)
-                            response = await session.list_tools()
-                            tools = response.tools
-                            tools = [tool.model_dump(by_alias=True, exclude_none=True) for tool in tools]
-                            tools = [ToolCreate.model_validate(tool) for tool in tools]
-                            for tool in tools:
-                                tool.request_type = "STREAMABLEHTTP"
+                # The _validate_gateway_url logic is flawed for streamablehttp, so we bypass it
+                # and go straight to the client connection. The outer try/except in
+                # _initialize_gateway will handle any connection errors.
+                async with streamablehttp_client(url=server_url, headers=decoded_auth) as (read_stream, write_stream, _get_session_id):
+                    async with ClientSession(read_stream, write_stream) as session:
+                        # Initialize the session
+                        response = await session.initialize()
+                        capabilities = response.capabilities.model_dump(by_alias=True, exclude_none=True)
 
-                    return capabilities, tools
-                raise GatewayConnectionError(f"Failed to initialize gateway at {url}")
+                        response = await session.list_tools()
+                        tools = response.tools
+                        tools = [tool.model_dump(by_alias=True, exclude_none=True) for tool in tools]
+
+                        tools = [ToolCreate.model_validate(tool) for tool in tools]
+                        for tool in tools:
+                            tool.request_type = "STREAMABLEHTTP"
+                return capabilities, tools
 
             capabilities = {}
             tools = []

@@ -43,28 +43,24 @@ Examples:
 # Standard
 from base64 import b64decode
 import binascii
-import logging
 from typing import Optional
 
 # Third-Party
 from fastapi import Cookie, Depends, HTTPException, status
-from fastapi.security import (
-    HTTPAuthorizationCredentials,
-    HTTPBasic,
-    HTTPBasicCredentials,
-    HTTPBearer,
-)
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBasic, HTTPBasicCredentials, HTTPBearer
 from fastapi.security.utils import get_authorization_scheme_param
 import jwt
 
 # First-Party
 from mcpgateway.config import settings
+from mcpgateway.services.logging_service import LoggingService
 
 basic_security = HTTPBasic(auto_error=False)
 security = HTTPBearer(auto_error=False)
 
-# Standard
-logger = logging.getLogger(__name__)
+# Initialize logging service first
+logging_service = LoggingService()
+logger = logging_service.get_logger(__name__)
 
 
 async def verify_jwt_token(token: str) -> dict:
@@ -471,7 +467,6 @@ async def require_docs_basic_auth(auth_header: str) -> str:
     """
     scheme, param = get_authorization_scheme_param(auth_header)
     if scheme.lower() == "basic" and param and settings.docs_allow_basic_auth:
-
         try:
             data = b64decode(param).decode("ascii")
             username, separator, password = data.partition(":")

@@ -9,7 +9,7 @@ The MCP Gateway Plugin Framework provides a standardized way to extend gateway f
 
 - **Content Filtering** - PII detection and masking
 - **AI Safety** - Integration with LLMGuard, OpenAI Moderation
-- **Security** - Input validation and output sanitization  
+- **Security** - Input validation and output sanitization
 - **Policy Enforcement** - Business rules and compliance
 - **Transformation** - Request/response modification
 - **Auditing** - Logging and monitoring
@@ -46,6 +46,10 @@ PLUGIN_CONFIG_FILE=plugins/config.yaml
 
 ### 2. Plugin Configuration
 
+The plugin configuration file is used to configure a set of plugins to run a
+set of hook points throughout the MCP Context Forge.  An example configuration
+is below.  It contains two main sections: `plugins` and `plugin_settings`.
+
 Create or modify `plugins/config.yaml`:
 
 ```yaml
@@ -78,6 +82,35 @@ plugin_settings:
   plugin_health_check_interval: 60
 ```
 
+The `plugins` section lists the set of configured plugins that will be loaded
+by the Context Forge at startup.  Each plugin contains a set of standard configurations,
+and then a `config` section designed for plugin specific configurations. The attributes
+are defined as follows:
+
+| Attribute | Description | Example Value |
+|-----------|-------------|---------------|
+| **name**  | A unique name for the plugin. | MyFirstPlugin |
+| **kind**  | A fully qualified string representing the plugin python object. | plugins.native.content_filter.ContentFilterPlugin |
+| **description** | The description of the plugin configuration. | A plugin for replacing bad words. |
+| **version** | The version of the plugin configuration. | 0.1 |
+| **author** | The team that wrote the plugin. | MCP Context Forge |
+| **hooks** | A list of hooks for which the plugin will be executed. Supported hooks: "prompt_pre_fetch", "prompt_post_fetch", "tool_pre_invoke", "tool_post_invoke"  | ["prompt_pre_fetch", "prompt_post_fetch", "tool_pre_invoke", "tool_post_invoke"] |
+| **tags** | Descriptive keywords that make the configuration searchable. | ["security", "filter"] |
+| **mode** | Mode of operation of the plugin. - enforce (stops during a violation), permissive (audits a violation but doesn't stop), disabled (disabled) | permissive |
+| **priority** | The priority in which the plugin will run - 0 is higher priority | 100 |
+| **conditions** | A list of conditions under which a plugin is run. See section on conditions.|  |
+| **config** | Plugin specific configuration.  This is a dictionary and is passed to the plugin on initialization. |   |
+
+The `plugin_settings` are as follows:
+
+| Attribute | Description | Example Value |
+|-----------|-------------|---------------|
+| **parallel_execution_within_band** | Plugins in the same band are run in parallel (currently not implemented). | true or false |
+| **plugin_timeout** | The time in seconds before stopping plugin execution (not implemented). | 30 |
+| **fail_on_plugin_error** | Cause the execution of the task to fail if the plugin errors. | true or false |
+| **plugin_health_check_interval** | Health check interval in seconds (not implemented). | 60 |
+
+
 ### 3. Execution Modes
 
 Each plugin can operate in one of three modes:
@@ -97,18 +130,30 @@ Plugins execute in priority order (ascending):
 plugins:
   - name: "Authentication"
     priority: 10      # Runs first
-    
-  - name: "RateLimiter"  
+
+  - name: "RateLimiter"
     priority: 50      # Runs second
-    
+
   - name: "ContentFilter"
     priority: 100     # Runs third
-    
+
   - name: "Logger"
     priority: 200     # Runs last
 ```
 
 Plugins with the same priority may execute in parallel if `parallel_execution_within_band` is enabled.
+
+### 5. Conditions of Execution
+
+Users may only want plugins to be invoked on specific servers, tools, and prompts. To address this, a set of conditionals can be applied to a plugin. The attributes in a conditional combine together in as a set of `and` operations, while each attribute list item is `ored` with other items in the list.  The attributes are defined as follows:
+
+| Attribute | Description
+|-----------|------------|
+| **server_ids** | The list of MCP servers on which the plugin will trigger |
+| **tools** | The list of tools on which the plugin will be applied. |
+| **prompts** | The list of prompts on which the plugin will be applied. |
+| **user_patterns** | The list of users on which the plugin will be applied. |
+| **content_types** | The list of content types on which the plugin will trigger. |
 
 ## Available Hooks
 
@@ -118,10 +163,25 @@ Currently implemented hooks:
 |------|-------------|-----------|
 | `prompt_pre_fetch` | Before prompt retrieval | Validate/modify prompt arguments |
 | `prompt_post_fetch` | After prompt rendering | Filter/transform rendered prompts |
+| `tool_pre_invoke` | Before tool invocation | Validate/modify tool arguments, block dangerous operations |
+| `tool_post_invoke` | After tool execution | Filter/transform tool results, audit tool usage |
+
+### Tool Hooks Details
+
+The tool hooks enable plugins to intercept and modify tool invocations:
+
+- **`tool_pre_invoke`**: Receives the tool name and arguments before execution. Can modify arguments or block the invocation entirely.
+- **`tool_post_invoke`**: Receives the tool result after execution. Can modify the result or block it from being returned.
+
+Example use cases:
+- PII detection and masking in tool inputs/outputs
+- Rate limiting specific tools
+- Audit logging of tool usage
+- Input validation and sanitization
+- Output filtering and transformation
 
 Planned hooks (not yet implemented):
 
-- `tool_pre_invoke` / `tool_post_invoke` - Tool execution guardrails
 - `resource_pre_fetch` / `resource_post_fetch` - Resource content filtering
 - `server_pre_register` / `server_post_register` - Server validation
 - `auth_pre_check` / `auth_post_check` - Custom authentication
@@ -134,33 +194,37 @@ Planned hooks (not yet implemented):
 ```python
 from mcpgateway.plugins.framework.base import Plugin
 from mcpgateway.plugins.framework.models import PluginConfig
-from mcpgateway.plugins.framework.types import (
+from mcpgateway.plugins.framework.plugin_types import (
     PluginContext,
     PromptPrehookPayload,
     PromptPrehookResult,
     PromptPosthookPayload,
-    PromptPosthookResult
+    PromptPosthookResult,
+    ToolPreInvokePayload,
+    ToolPreInvokeResult,
+    ToolPostInvokePayload,
+    ToolPostInvokeResult
 )
 
 class MyPlugin(Plugin):
     """Example plugin implementation."""
-    
+
     def __init__(self, config: PluginConfig):
         super().__init__(config)
         # Initialize plugin-specific configuration
         self.my_setting = config.config.get("my_setting", "default")
-    
+
     async def prompt_pre_fetch(
-        self, 
-        payload: PromptPrehookPayload, 
+        self,
+        payload: PromptPrehookPayload,
         context: PluginContext
     ) -> PromptPrehookResult:
         """Process prompt before retrieval."""
-        
+
         # Access prompt name and arguments
         prompt_name = payload.name
         args = payload.args
-        
+
         # Example: Block requests with forbidden words
         if "forbidden" in str(args.values()).lower():
             return PromptPrehookResult(
@@ -172,40 +236,96 @@ class MyPlugin(Plugin):
                     details={"found_in": "arguments"}
                 )
             )
-        
+
         # Example: Modify arguments
         if "transform_me" in args:
             args["transform_me"] = args["transform_me"].upper()
             return PromptPrehookResult(
                 modified_payload=PromptPrehookPayload(prompt_name, args)
             )
-        
-        # Allow request to continue unchanged
+
+        # Allow request to continue unmodified
         return PromptPrehookResult()
-    
+
     async def prompt_post_fetch(
         self,
         payload: PromptPosthookPayload,
         context: PluginContext
     ) -> PromptPosthookResult:
         """Process prompt after rendering."""
-        
+
         # Access rendered prompt
         prompt_result = payload.result
-        
+
         # Example: Add metadata to context
         context.metadata["processed_by"] = self.name
-        
+
         # Example: Modify response
         for message in prompt_result.messages:
             message.content.text = message.content.text.replace(
                 "old_text", "new_text"
             )
-        
+
         return PromptPosthookResult(
             modified_payload=payload
         )
-    
+
+    async def tool_pre_invoke(
+        self,
+        payload: ToolPreInvokePayload,
+        context: PluginContext
+    ) -> ToolPreInvokeResult:
+        """Process tool before invocation."""
+
+        # Access tool name and arguments
+        tool_name = payload.name
+        args = payload.args
+
+        # Example: Block dangerous operations
+        if tool_name == "file_delete" and "system" in str(args):
+            return ToolPreInvokeResult(
+                continue_processing=False,
+                violation=PluginViolation(
+                    plugin_name=self.name,
+                    description="Dangerous operation blocked",
+                    violation_code="DANGEROUS_OP",
+                    details={"tool": tool_name}
+                )
+            )
+
+        # Example: Modify arguments
+        if "sanitize_me" in args:
+            args["sanitize_me"] = self.sanitize_input(args["sanitize_me"])
+            return ToolPreInvokeResult(
+                modified_payload=ToolPreInvokePayload(tool_name, args)
+            )
+
+        return ToolPreInvokeResult()
+
+    async def tool_post_invoke(
+        self,
+        payload: ToolPostInvokePayload,
+        context: PluginContext
+    ) -> ToolPostInvokeResult:
+        """Process tool after invocation."""
+
+        # Access tool result
+        tool_name = payload.name
+        result = payload.result
+
+        # Example: Filter sensitive data from results
+        if isinstance(result, dict) and "sensitive_data" in result:
+            result["sensitive_data"] = "[REDACTED]"
+            return ToolPostInvokeResult(
+                modified_payload=ToolPostInvokePayload(tool_name, result)
+            )
+
+        # Example: Add audit metadata
+        context.metadata["tool_executed"] = tool_name
+        context.metadata["execution_time"] = time.time()
+
+        return ToolPostInvokeResult()
+
     async def shutdown(self):
         """Cleanup when plugin shuts down."""
         # Close connections, save state, etc.
@@ -221,17 +341,17 @@ async def prompt_pre_fetch(self, payload, context):
     # Store state for later use
     context.set_state("request_time", time.time())
     context.set_state("original_args", payload.args.copy())
-    
+
     return PromptPrehookResult()
 
 async def prompt_post_fetch(self, payload, context):
     # Retrieve state from pre-hook
     elapsed = time.time() - context.get_state("request_time", 0)
     original = context.get_state("original_args", {})
-    
+
     # Add timing metadata
     context.metadata["processing_time_ms"] = elapsed * 1000
-    
+
     return PromptPosthookResult()
 ```
 
@@ -240,13 +360,13 @@ async def prompt_post_fetch(self, payload, context):
 ```python
 class LLMGuardPlugin(Plugin):
     """Example external service integration."""
-    
+
     def __init__(self, config: PluginConfig):
         super().__init__(config)
         self.service_url = config.config.get("service_url")
         self.api_key = config.config.get("api_key")
         self.timeout = config.config.get("timeout", 30)
-    
+
     async def prompt_pre_fetch(self, payload, context):
         # Call external service
         async with httpx.AsyncClient() as client:
@@ -262,9 +382,9 @@ class LLMGuardPlugin(Plugin):
                     },
                     timeout=self.timeout
                 )
-                
+
                 result = response.json()
-                
+
                 if result.get("blocked", False):
                     return PromptPrehookResult(
                         continue_processing=False,
@@ -275,7 +395,7 @@ class LLMGuardPlugin(Plugin):
                             details=result
                         )
                     )
-                    
+
             except Exception as e:
                 # Handle errors based on plugin settings
                 if self.config.mode == PluginMode.ENFORCE:
@@ -288,7 +408,7 @@ class LLMGuardPlugin(Plugin):
                             details={"error": str(e)}
                         )
                     )
-        
+
         return PromptPrehookResult()
 ```
 
@@ -357,9 +477,9 @@ async def test_my_plugin():
         hooks=["prompt_pre_fetch"],
         config={"setting_one": "test_value"}
     )
-    
+
     plugin = MyPlugin(config)
-    
+
     # Test your plugin logic
     result = await plugin.prompt_pre_fetch(payload, context)
     assert result.continue_processing
@@ -378,11 +498,11 @@ async def prompt_pre_fetch(self, payload, context):
         pass
     except Exception as e:
         logger.error(f"Plugin {self.name} error: {e}")
-        
+
         # In permissive mode, log and continue
         if self.mode == PluginMode.PERMISSIVE:
             return PromptPrehookResult()
-        
+
         # In enforce mode, block the request
         return PromptPrehookResult(
             continue_processing=False,
@@ -408,17 +528,17 @@ class CachedPlugin(Plugin):
         super().__init__(config)
         self._cache = {}
         self._cache_ttl = config.config.get("cache_ttl", 300)
-    
+
     async def expensive_operation(self, key):
         # Check cache first
         if key in self._cache:
             cached_value, timestamp = self._cache[key]
             if time.time() - timestamp < self._cache_ttl:
                 return cached_value
-        
+
         # Perform expensive operation
         result = await self._do_expensive_work(key)
-        
+
         # Cache result
         self._cache[key] = (result, time.time())
         return result
