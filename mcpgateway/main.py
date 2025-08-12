@@ -65,7 +65,7 @@ from mcpgateway.admin import admin_router
 from mcpgateway.bootstrap_db import main as bootstrap_db
 from mcpgateway.cache import ResourceCache, SessionRegistry
 from mcpgateway.config import jsonpath_modifier, settings
-from mcpgateway.db import refresh_slugs_on_startup, SessionLocal
+from mcpgateway.db import refresh_slugs_on_startup, SessionLocal, get_db
 from mcpgateway.handlers.sampling import SamplingHandler
 from mcpgateway.models import (
     InitializeRequest,
@@ -560,38 +560,38 @@ tag_router = APIRouter(prefix="/tags", tags=["Tags"])
 # Basic Auth setup
 
 
-# Database dependency
-def get_db():
-    """
-    Dependency function to provide a database session.
+# # Database dependency
+# def get_db():
+#     """
+#     Dependency function to provide a database session.
 
-    Yields:
-        Session: A SQLAlchemy session object for interacting with the database.
+#     Yields:
+#         Session: A SQLAlchemy session object for interacting with the database.
 
-    Ensures:
-        The database session is closed after the request completes, even in the case of an exception.
+#     Ensures:
+#         The database session is closed after the request completes, even in the case of an exception.
 
-    Examples:
-        >>> # Test that get_db returns a generator
-        >>> db_gen = get_db()
-        >>> hasattr(db_gen, '__next__')
-        True
-        >>> # Test cleanup happens
-        >>> try:
-        ...     db = next(db_gen)
-        ...     type(db).__name__
-        ... finally:
-        ...     try:
-        ...         next(db_gen)
-        ...     except StopIteration:
-        ...         pass  # Expected - generator cleanup
-        'Session'
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+#     Examples:
+#         >>> # Test that get_db returns a generator
+#         >>> db_gen = get_db()
+#         >>> hasattr(db_gen, '__next__')
+#         True
+#         >>> # Test cleanup happens
+#         >>> try:
+#         ...     db = next(db_gen)
+#         ...     type(db).__name__
+#         ... finally:
+#         ...     try:
+#         ...         next(db_gen)
+#         ...     except StopIteration:
+#         ...         pass  # Expected - generator cleanup
+#         'Session'
+#     """
+#     db = SessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
 
 
 def require_api_key(api_key: str) -> None:

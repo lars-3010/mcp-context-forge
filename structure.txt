@@ -1,0 +1,118 @@
+.
+├── CHANGELOG.md
+├── CLAUDE.md
+├── CODE_OF_CONDUCT.md
+├── CONTRIBUTING.md
+├── Containerfile
+├── Containerfile.lite
+├── DCO.txt
+├── DEVELOPING.md
+├── LICENSE
+├── MANIFEST.in
+├── Makefile
+├── README.md
+├── SECURITY.md
+├── TESTING.md
+├── __init__
+├── __pycache__
+│   └── gunicorn.config.cpython-312.pyc
+├── agent_runtimes
+│   └── langchain_agent
+├── build
+│   ├── bdist.linux-x86_64
+│   └── lib
+├── charts
+│   ├── README.md
+│   └── mcp-stack
+├── deployment
+│   ├── CHARTS.md
+│   ├── README.md
+│   ├── WORK_IN_PROGRESS
+│   ├── ansible
+│   ├── k8s
+│   └── terraform
+├── docker-compose.yml
+├── docs
+│   ├── Makefile
+│   ├── base.yml
+│   ├── docs
+│   ├── mkdocs.yml
+│   ├── requirements.txt
+│   └── theme
+├── fly.toml
+├── gunicorn.config.py
+├── mcp-servers
+│   └── go
+├── mcp.db
+├── mcp_contextforge_gateway.egg-info
+│   ├── PKG-INFO
+│   ├── SOURCES.txt
+│   ├── dependency_links.txt
+│   ├── entry_points.txt
+│   ├── requires.txt
+│   └── top_level.txt
+├── mcpgateway
+│   ├── __init__.py
+│   ├── __pycache__
+│   ├── admin.py
+│   ├── alembic
+│   ├── alembic.ini
+│   ├── bootstrap_db.py
+│   ├── cache
+│   ├── cli.py
+│   ├── config.py
+│   ├── db.py
+│   ├── federation
+│   ├── handlers
+│   ├── main.py
+│   ├── models.py
+│   ├── plugin_framework
+│   ├── plugins
+│   ├── py.typed
+│   ├── schemas.py
+│   ├── services
+│   ├── static
+│   ├── templates
+│   ├── translate.py
+│   ├── transports
+│   ├── utils
+│   ├── validation
+│   ├── validators.py
+│   ├── version.py
+│   └── wrapper.py
+├── migration_add_annotations.py
+├── os_deps.sh
+├── package-lock.json
+├── package.json
+├── playwright.config.py
+├── plugins
+│   ├── README.md
+│   ├── config.yaml
+│   ├── deny_filter
+│   ├── pii_filter
+│   └── regex_filter
+├── podman-compose-sonarqube.yaml
+├── pyproject.toml
+├── run-gunicorn.sh
+├── run.sh
+├── semgrep.yml
+├── smoketest.py
+├── sonar-code.properties
+├── structure.txt
+├── tests
+│   ├── README.md
+│   ├── __init__.py
+│   ├── __pycache__
+│   ├── conftest.py
+│   ├── e2e
+│   ├── hey
+│   ├── integration
+│   ├── playwright
+│   ├── security
+│   ├── test_readme.py
+│   └── unit
+├── tox.ini
+├── uv.lock
+└── whitesource.config
+
+45 directories, 71 files
