@@ -26,55 +26,21 @@ Structure:
 """
 
 # Standard
-import asyncio
-from contextlib import asynccontextmanager
-import json
-import logging
-from typing import Any, AsyncIterator, Dict, List, Optional, Union
-from urllib.parse import urlparse, urlunparse
+from typing import Any, Optional, List, Dict
 
 # Third-Party
 from fastapi import (
     APIRouter,
     Body,
     Depends,
-    FastAPI,
     HTTPException,
-    Request,
     status,
-    WebSocket,
-    WebSocketDisconnect,
 )
-from fastapi.background import BackgroundTasks
-from fastapi.exception_handlers import request_validation_exception_handler as fastapi_default_validation_handler
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from pydantic import ValidationError
-from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from starlette.middleware.base import BaseHTTPMiddleware
-from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 # First-Party
-from mcpgateway import __version__
-from mcpgateway.admin import admin_router
-from mcpgateway.bootstrap_db import main as bootstrap_db
-from mcpgateway.cache import ResourceCache, SessionRegistry
-from mcpgateway.config import jsonpath_modifier, settings
-from mcpgateway.db import refresh_slugs_on_startup, SessionLocal, get_db
-from mcpgateway.handlers.sampling import SamplingHandler
-from mcpgateway.models import (
-    InitializeRequest,
-    InitializeResult,
-    ListResourceTemplatesResult,
-    LogLevel,
-    ResourceContent,
-    Root,
-)
+from mcpgateway.db import get_db
 from mcpgateway.plugins import PluginViolationError
 from mcpgateway.schemas import (
     PromptCreate,
@@ -89,28 +55,20 @@ from mcpgateway.services.prompt_service import (
     PromptNotFoundError,
     PromptService,
 )
-from mcpgateway.transports.streamablehttp_transport import (
-    SessionManagerWrapper,
-    streamable_http_auth,
-)
-from mcpgateway.utils.db_isready import wait_for_db_ready
-from mcpgateway.utils.error_formatter import ErrorFormatter
-from mcpgateway.utils.redis_isready import wait_for_redis_ready
-from mcpgateway.utils.retry_manager import ResilientHttpClient
-from mcpgateway.utils.verify_credentials import require_auth, require_auth_override
-from mcpgateway.validation.jsonrpc import (
-    JSONRPCError,
-)
+from mcpgateway.utils.verify_credentials import require_auth
 
 # Import the admin routes from the new module
 from mcpgateway.version import router as version_router
+
+# Import dependency injection functions
+from mcpgateway.dependencies import get_prompt_service
 
 # Initialize logging service first
 logging_service = LoggingService()
 logger = logging_service.get_logger("prompt routes")
 
 # Initialize service
-prompt_service = PromptService()
+prompt_service = get_prompt_service()
 
 # Create API router
 prompt_router = APIRouter(prefix="/prompts", tags=["Prompts"])

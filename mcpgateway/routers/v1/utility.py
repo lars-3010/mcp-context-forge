@@ -4,44 +4,52 @@ Copyright 2025
 SPDX-License-Identifier: Apache-2.0
 Authors: Mihai Criveti
 
-MCP Gateway - Main FastAPI Application.
+MCP Gateway - Utility API Router.
 
-This module defines the core FastAPI application for the Model Context Protocol (MCP) Gateway.
-It serves as the entry point for handling all HTTP and WebSocket traffic.
+This module provides utility endpoints for the MCP Gateway including JSON-RPC handling,
+WebSocket connections, and protocol detection utilities. It serves as a bridge between
+different transport protocols and the core MCP functionality.
 
 Features and Responsibilities:
-- Initializes and orchestrates services for tools, resources, prompts, servers, gateways, and roots.
-- Supports full MCP protocol operations: initialize, ping, notify, complete, and sample.
-- Integrates authentication (JWT and basic), CORS, caching, and middleware.
-- Serves a rich Admin UI for managing gateway entities via HTMX-based frontend.
-- Exposes routes for JSON-RPC, SSE, and WebSocket transports.
-- Manages application lifecycle including startup and graceful shutdown of all services.
+- JSON-RPC 2.0 compliant request/response handling
+- WebSocket endpoint for real-time bidirectional communication
+- Protocol detection for proxy scenarios (HTTP/HTTPS)
+- URL construction with proper scheme handling
+- Multi-service integration (tools, resources, prompts, gateways, etc.)
+- Request forwarding and method routing
+- Comprehensive error handling with JSON-RPC error responses
 
-Structure:
-- Declares routers for MCP protocol operations and administration.
-- Registers dependencies (e.g., DB sessions, auth handlers).
-- Applies middleware including custom documentation protection.
-- Configures resource caching and session registry using pluggable backends.
-- Provides OpenAPI metadata and redirect handling depending on UI feature flags.
+Endpoints:
+- POST /rpc: Handle JSON-RPC requests with method routing
+- WebSocket /ws: Real-time JSON-RPC over WebSocket
+
+Utility Functions:
+- get_protocol_from_request: Detect HTTP/HTTPS from headers
+- update_url_protocol: Construct URLs with correct protocol
+
+Parameters:
+- All endpoints require authentication via JWT Bearer token or Basic Auth
+- JSON-RPC requests must follow 2.0 specification format
+- WebSocket connections support continuous bidirectional messaging
+- Protocol detection handles X-Forwarded-Proto headers for reverse proxies
+
+Returns:
+- RPC endpoint returns JSON-RPC 2.0 compliant responses
+- WebSocket endpoint maintains persistent connection for real-time communication
+- Error responses follow JSON-RPC error format with appropriate codes
 """
 
 # Standard
 import asyncio
-from contextlib import asynccontextmanager
 import json
-import logging
-from typing import Any, AsyncIterator, Dict, List, Optional, Union
 from urllib.parse import urlparse, urlunparse
 
 # Third-Party
 from fastapi import (
     APIRouter,
-    Body,
     Depends,
-    FastAPI,
     HTTPException,
     Request,
-    status,
     WebSocket,
     WebSocketDisconnect,
 )
@@ -50,49 +58,49 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 # First-Party
-from mcpgateway import __version__
-from mcpgateway.bootstrap_db import main as bootstrap_db
 from mcpgateway.config import  settings
-from mcpgateway.db import SessionLocal, get_db
-from mcpgateway.handlers.sampling import SamplingHandler
+from mcpgateway.db import get_db
 from mcpgateway.models import (
     InitializeRequest,
     LogLevel,
 
 )
 from mcpgateway.schemas import RPCRequest
-from mcpgateway.services.completion_service import CompletionService
 from mcpgateway.services.gateway_service import GatewayService
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.prompt_service import PromptService
 from mcpgateway.services.resource_service import ResourceService
-
 from mcpgateway.services.root_service import RootService
-from mcpgateway.services.server_service import ServerService
-from mcpgateway.services.tag_service import TagService
 from mcpgateway.services.tool_service import ToolService
 from mcpgateway.transports.sse_transport import SSETransport
-from mcpgateway.transports.streamablehttp_transport import (
-    SessionManagerWrapper,
-    streamable_http_auth,
-)
-from mcpgateway.utils.db_isready import wait_for_db_ready
-from mcpgateway.utils.error_formatter import ErrorFormatter
-from mcpgateway.utils.redis_isready import wait_for_redis_ready
 from mcpgateway.utils.retry_manager import ResilientHttpClient
-from mcpgateway.utils.verify_credentials import require_auth, require_auth_override
-from mcpgateway.validation.jsonrpc import (
-    JSONRPCError,
-)
+from mcpgateway.utils.verify_credentials import require_auth
+from mcpgateway.validation.jsonrpc import JSONRPCError
 from mcpgateway.registry import session_registry
 from mcpgateway.routers.v1.protocol import initialize
 
-# Import the admin routes from the new module
-from mcpgateway.version import router as version_router
+# Import dependency injection functions
+from mcpgateway.dependencies import (
+    get_gateway_service,
+    get_prompt_service,
+    get_resource_service,
+    get_root_service,
+    get_tool_service,
+)
 
 # Initialize logging service first
 logging_service = LoggingService()
 logger = logging_service.get_logger("utility routes")
+
+# Initialize service
+tool_service = get_tool_service()
+resource_service = get_resource_service()
+prompt_service = get_prompt_service()
+gateway_service = get_gateway_service()
+root_service = get_root_service()
+
+# Create API router
+utility_router = APIRouter(tags=["Utilities"])
 
 def get_protocol_from_request(request: Request) -> str:
     """
@@ -128,21 +136,6 @@ def update_url_protocol(request: Request) -> str:
     # urlunparse keeps netloc and path intact
     return urlunparse(new_parsed).rstrip("/")
 
-
-
-# Initialize service
-tool_service = ToolService()
-resource_service = ResourceService()
-prompt_service = PromptService()
-gateway_service = GatewayService()
-root_service = RootService()
-completion_service = CompletionService()
-sampling_handler = SamplingHandler()
-server_service = ServerService()
-tag_service = TagService()
-
-# Create API router
-utility_router = APIRouter(tags=["Utilities"])
 
 @utility_router.post("/rpc/")
 @utility_router.post("/rpc")

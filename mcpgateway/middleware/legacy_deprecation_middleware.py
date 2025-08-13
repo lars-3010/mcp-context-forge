@@ -35,11 +35,14 @@ def is_legacy_path(path: str) -> bool:
         return False
 
     # Could add further checks for /admin, /static, etc. as needed
-        return True
+    return True
 
 class LegacyDeprecationMiddleware(BaseHTTPMiddleware):
 
-    async def __call__(self, request: Request, call_next):
+    def __init__(self, app):
+        super().__init__(app)
+
+    async def dispatch(self, request: Request, call_next):
         if is_legacy_path(request.url.path):
             # LOUD deprecation warnings
             logger.warning(f"DEPRECATED: {request.url.path} -> /v1{request.url.path}")

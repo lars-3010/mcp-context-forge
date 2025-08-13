@@ -5,7 +5,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from mcpgateway.main import app, require_auth
+from mcpgateway.main import app
+from mcpgateway.utils.verify_credentials import require_auth
 from mcpgateway.schemas import TaggedEntity, TagInfo, TagStats
 
 

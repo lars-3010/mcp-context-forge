@@ -4,34 +4,39 @@ Copyright 2025
 SPDX-License-Identifier: Apache-2.0
 Authors: Mihai Criveti
 
-MCP Gateway - Main FastAPI Application.
+MCP Gateway - Roots API Router.
 
-This module defines the core FastAPI application for the Model Context Protocol (MCP) Gateway.
-It serves as the entry point for handling all HTTP and WebSocket traffic.
+This module provides REST API endpoints for managing root URIs in the MCP Gateway.
+Roots represent base URIs that serve as entry points for resource discovery and navigation.
 
 Features and Responsibilities:
-- Initializes and orchestrates services for tools, resources, prompts, servers, gateways, and roots.
-- Supports full MCP protocol operations: initialize, ping, notify, complete, and sample.
-- Integrates authentication (JWT and basic), CORS, caching, and middleware.
-- Serves a rich Admin UI for managing gateway entities via HTMX-based frontend.
-- Exposes routes for JSON-RPC, SSE, and WebSocket transports.
-- Manages application lifecycle including startup and graceful shutdown of all services.
+- CRUD operations for root URI management (create, read, delete)
+- Real-time change notifications via Server-Sent Events (SSE)
+- URI-based root addressing with path parameter support
+- Root service integration for centralized management
+- Authentication enforcement for all operations
+- Comprehensive logging for audit and debugging
 
-Structure:
-- Declares routers for MCP protocol operations and administration.
-- Registers dependencies (e.g., DB sessions, auth handlers).
-- Applies middleware including custom documentation protection.
-- Configures resource caching and session registry using pluggable backends.
-- Provides OpenAPI metadata and redirect handling depending on UI feature flags.
+Endpoints:
+- GET /roots: List all registered root URIs
+- POST /roots: Add new root URI with name
+- DELETE /roots/{uri:path}: Remove root by URI
+- GET /roots/changes: Subscribe to real-time root changes via SSE
+
+Parameters:
+- All endpoints require authentication via JWT Bearer token or Basic Auth
+- URI paths support nested addressing for hierarchical roots
+- SSE endpoint provides continuous streaming of change events
+
+Returns:
+- List endpoint returns array of Root objects with URI and name
+- Add endpoint returns the newly created Root object
+- Delete endpoint returns success status message
+- Changes endpoint returns StreamingResponse with event-stream media type
 """
 
 # Standard
-import asyncio
-from contextlib import asynccontextmanager
-import json
-import logging
-from typing import Any, AsyncIterator, Dict, List, Optional, Union
-from urllib.parse import urlparse, urlunparse
+from typing import Dict, List
 
 # Third-Party
 from fastapi import (
@@ -41,39 +46,23 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 
 # First-Party
-from mcpgateway import __version__
-from mcpgateway.admin import admin_router
-from mcpgateway.bootstrap_db import main as bootstrap_db
-from mcpgateway.cache import ResourceCache, SessionRegistry
-from mcpgateway.config import jsonpath_modifier, settings
-from mcpgateway.db import refresh_slugs_on_startup, SessionLocal, get_db
-from mcpgateway.handlers.sampling import SamplingHandler
 from mcpgateway.models import (
     Root,
 )
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.root_service import RootService
-from mcpgateway.transports.sse_transport import SSETransport
-from mcpgateway.transports.streamablehttp_transport import (
-    SessionManagerWrapper,
-    streamable_http_auth,
-)
-from mcpgateway.utils.db_isready import wait_for_db_ready
-from mcpgateway.utils.error_formatter import ErrorFormatter
-from mcpgateway.utils.redis_isready import wait_for_redis_ready
-from mcpgateway.utils.retry_manager import ResilientHttpClient
-from mcpgateway.utils.verify_credentials import require_auth, require_auth_override
+from mcpgateway.utils.verify_credentials import require_auth
 
+# Import dependency injection functions
+from mcpgateway.dependencies import get_root_service
 
-# Import the admin routes from the new module
-from mcpgateway.version import router as version_router
 
 # Initialize logging service first
 logging_service = LoggingService()
 logger = logging_service.get_logger("root routers")
 
 # Initialize services
-root_service = RootService()
+root_service = get_root_service()
 
 # Create API router
 root_router = APIRouter(prefix="/roots", tags=["Roots"])

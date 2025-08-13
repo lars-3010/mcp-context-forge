@@ -1,5 +1,45 @@
+"""
+Copyright 2025
+SPDX-License-Identifier: Apache-2.0
+Authors: Mihai Criveti
+
+MCP Gateway - Tools API Router.
+
+This module provides REST API endpoints for managing tools in the MCP Gateway.
+Tools are executable functions that can be invoked by MCP clients with input validation,
+retry logic, and comprehensive error handling.
+
+Features and Responsibilities:
+- CRUD operations for tool management (create, read, update, delete)
+- Tool invocation with parameter validation and timeout handling
+- Status management (activate/deactivate tools)
+- JSONPath filtering and response transformation
+- Tag-based filtering and pagination support
+- Conflict resolution for duplicate tool names
+- Comprehensive error handling with proper HTTP status codes
+
+Endpoints:
+- GET /tools: List all tools with optional filtering and JSONPath transformation
+- POST /tools: Create new tool with validation
+- GET /tools/{id}: Retrieve specific tool with optional JSONPath filtering
+- PUT /tools/{id}: Update existing tool
+- DELETE /tools/{id}: Permanently delete tool
+- POST /tools/{id}/toggle: Activate/deactivate tool
+
+Parameters:
+- All endpoints require authentication via JWT Bearer token or Basic Auth
+- JSONPath modifiers enable response filtering and transformation
+- Tag filtering supports comma-separated lists
+- Status toggles support activation state and reachability flags
+
+Returns:
+- List endpoints return arrays of ToolRead objects or JSONPath-transformed data
+- CRUD operations return individual ToolRead objects
+- Delete operations return success confirmation messages
+- Toggle operations return status with updated tool data
+"""
+
 # Standard
-import logging
 from typing import Any, Dict, List, Optional, Union
 
 # First-Party
@@ -15,14 +55,13 @@ from mcpgateway.schemas import (
     ToolRead,
     ToolUpdate,
 )
-from mcpgateway.config import jsonpath_modifier, settings
+from mcpgateway.config import jsonpath_modifier
 from mcpgateway.utils.verify_credentials import require_auth
 
 # Third-Party
 from fastapi import (
     APIRouter,)
 
-from fastapi.exception_handlers import request_validation_exception_handler as fastapi_default_validation_handler
 from sqlalchemy.orm import Session
 from fastapi import (
     APIRouter,
@@ -32,12 +71,15 @@ from fastapi import (
     status,
 )
 
+# Import dependency injection functions
+from mcpgateway.dependencies import get_tool_service
+
 # Initialize logging service first
 logging_service = LoggingService()
 logger = logging_service.get_logger("tool routes")
 
 # Initialize services
-tool_service = ToolService()
+tool_service = get_tool_service()
 
 # Create API router
 tool_router = APIRouter(prefix="/tools", tags=["Tools"])

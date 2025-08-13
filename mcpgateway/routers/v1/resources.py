@@ -4,29 +4,44 @@ Copyright 2025
 SPDX-License-Identifier: Apache-2.0
 Authors: Mihai Criveti
 
-MCP Gateway - Main FastAPI Application.
+MCP Gateway - Resources API Router.
 
-This module defines the core FastAPI application for the Model Context Protocol (MCP) Gateway.
-It serves as the entry point for handling all HTTP and WebSocket traffic.
+This module provides REST API endpoints for managing resources in the MCP Gateway.
+Resources are URI-addressable content items with MIME type detection and caching.
 
 Features and Responsibilities:
-- Initializes and orchestrates services for tools, resources, prompts, servers, gateways, and roots.
-- Supports full MCP protocol operations: initialize, ping, notify, complete, and sample.
-- Integrates authentication (JWT and basic), CORS, caching, and middleware.
-- Serves a rich Admin UI for managing gateway entities via HTMX-based frontend.
-- Exposes routes for JSON-RPC, SSE, and WebSocket transports.
-- Manages application lifecycle including startup and graceful shutdown of all services.
+- CRUD operations for resource management (create, read, update, delete)
+- URI-based resource addressing with path parameter support
+- Resource template listing and management
+- Status management (activate/deactivate resources)
+- LRU caching with configurable TTL for performance optimization
+- Tag-based filtering and pagination support
+- MIME type detection and content streaming
+- Comprehensive error handling with proper HTTP status codes
 
-Structure:
-- Declares routers for MCP protocol operations and administration.
-- Registers dependencies (e.g., DB sessions, auth handlers).
-- Applies middleware including custom documentation protection.
-- Configures resource caching and session registry using pluggable backends.
-- Provides OpenAPI metadata and redirect handling depending on UI feature flags.
+Endpoints:
+- GET /resources: List all resources with optional filtering
+- POST /resources: Create new resource
+- GET /resources/templates/list: List available resource templates
+- GET /resources/{uri:path}: Read resource content by URI
+- PUT /resources/{uri:path}: Update existing resource
+- DELETE /resources/{uri:path}: Delete resource
+- POST /resources/{id}/toggle: Activate/deactivate resource
+
+Parameters:
+- All endpoints require authentication via JWT Bearer token or Basic Auth
+- URI paths support nested resource addressing
+- Caching can be invalidated per-resource or globally
+- Supports cursor-based pagination and tag filtering
+
+Returns:
+- List endpoints return arrays of ResourceRead objects
+- CRUD operations return individual ResourceRead objects
+- Content endpoints return StreamingResponse with appropriate MIME types
+- Template endpoints return ListResourceTemplatesResult with pagination
 """
 
 # Standard
-import logging
 from typing import Any, Dict, List, Optional
 
 # Third-Party
@@ -42,13 +57,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 # First-Party
-from mcpgateway import __version__
-from mcpgateway.admin import admin_router
-from mcpgateway.bootstrap_db import main as bootstrap_db
-from mcpgateway.cache import ResourceCache, SessionRegistry
+from mcpgateway.cache import ResourceCache
 from mcpgateway.config import settings
-from mcpgateway.db import SessionLocal, get_db
-from mcpgateway.handlers.sampling import SamplingHandler
+from mcpgateway.db import get_db
 from mcpgateway.models import (
     ListResourceTemplatesResult,
     ResourceContent,
@@ -73,15 +84,22 @@ from mcpgateway.utils.verify_credentials import require_auth
 # Import the admin routes from the new module
 from mcpgateway.version import router as version_router
 
+
+# Import dependency injection functions
+from mcpgateway.dependencies import (
+    get_resource_service,
+    get_resource_cache
+)
+
 # Initialize logging service first
 logging_service = LoggingService()
 logger = logging_service.get_logger("resource routes")
 
 # Initialize services
-resource_service = ResourceService()
+resource_service = get_resource_service()
 
 # Initialize cache
-resource_cache = ResourceCache(max_size=settings.resource_cache_size, ttl=settings.resource_cache_ttl)
+resource_cache = get_resource_cache()
 
 # Create API router
 resource_router = APIRouter(prefix="/resources", tags=["Resources"])

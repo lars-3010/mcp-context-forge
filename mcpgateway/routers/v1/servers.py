@@ -4,25 +4,45 @@ Copyright 2025
 SPDX-License-Identifier: Apache-2.0
 Authors: Mihai Criveti
 
-MCP Gateway - Main FastAPI Application.
+MCP Gateway - Servers API Router.
 
-This module defines the core FastAPI application for the Model Context Protocol (MCP) Gateway.
-It serves as the entry point for handling all HTTP and WebSocket traffic.
+This module provides REST API endpoints for managing virtual MCP servers in the gateway.
+Servers represent collections of tools, resources, and prompts that can be accessed via
+multiple transport protocols (SSE, WebSocket, HTTP).
 
 Features and Responsibilities:
-- Initializes and orchestrates services for tools, resources, prompts, servers, gateways, and roots.
-- Supports full MCP protocol operations: initialize, ping, notify, complete, and sample.
-- Integrates authentication (JWT and basic), CORS, caching, and middleware.
-- Serves a rich Admin UI for managing gateway entities via HTMX-based frontend.
-- Exposes routes for JSON-RPC, SSE, and WebSocket transports.
-- Manages application lifecycle including startup and graceful shutdown of all services.
+- CRUD operations for virtual server management (create, read, update, delete)
+- Server catalog listing with filtering and pagination
+- Multi-transport protocol support (SSE, WebSocket, HTTP)
+- Associated entity management (tools, resources, prompts)
+- Protocol detection and URL construction for proxy scenarios
+- Status management and health monitoring
+- Tag-based filtering and search capabilities
+- Comprehensive error handling with proper HTTP status codes
 
-Structure:
-- Declares routers for MCP protocol operations and administration.
-- Registers dependencies (e.g., DB sessions, auth handlers).
-- Applies middleware including custom documentation protection.
-- Configures resource caching and session registry using pluggable backends.
-- Provides OpenAPI metadata and redirect handling depending on UI feature flags.
+Endpoints:
+- GET /servers: List all servers with optional filtering
+- GET /servers/{id}: Retrieve specific server details
+- POST /servers: Create new virtual server
+- PUT /servers/{id}: Update existing server
+- DELETE /servers/{id}: Remove server
+- GET /servers/{id}/sse: SSE transport endpoint
+- GET /servers/{id}/ws: WebSocket transport endpoint
+- GET /servers/{id}/tools: List server's tools
+- GET /servers/{id}/resources: List server's resources
+- GET /servers/{id}/prompts: List server's prompts
+
+Parameters:
+- All endpoints require authentication via JWT Bearer token or Basic Auth
+- Server IDs can be UUIDs or custom identifiers
+- Protocol detection handles X-Forwarded-Proto headers for proxy setups
+- Tag filtering supports comma-separated lists
+
+Returns:
+- List endpoints return arrays of ServerRead objects
+- CRUD operations return individual ServerRead objects
+- Transport endpoints return streaming responses or WebSocket connections
+- Entity endpoints return arrays of associated tools/resources/prompts
 """
 
 # Standard
@@ -47,14 +67,7 @@ from sqlalchemy.orm import Session
 
 
 # First-Party
-from mcpgateway import __version__
-from mcpgateway.admin import admin_router
-from mcpgateway.bootstrap_db import main as bootstrap_db
-from mcpgateway.cache import ResourceCache, SessionRegistry
-from mcpgateway.config import jsonpath_modifier, settings
-from mcpgateway.db import refresh_slugs_on_startup, SessionLocal, get_db
-from mcpgateway.handlers.sampling import SamplingHandler
-
+from mcpgateway.db import get_db
 from mcpgateway.schemas import (
     PromptRead,
     ResourceRead,
@@ -65,41 +78,77 @@ from mcpgateway.schemas import (
 )
 
 from mcpgateway.services.logging_service import LoggingService
-
-
-from mcpgateway.services.root_service import RootService
 from mcpgateway.services.server_service import (
     ServerError,
     ServerNameConflictError,
     ServerNotFoundError,
     ServerService,
 )
+from mcpgateway.services.prompt_service import PromptService
+from mcpgateway.services.tool_service import ToolService
+from mcpgateway.services.resource_service import ResourceService
 
 from mcpgateway.transports.sse_transport import SSETransport
-from mcpgateway.transports.streamablehttp_transport import (
-    streamable_http_auth,
-)
-from mcpgateway.utils.db_isready import wait_for_db_ready
 from mcpgateway.utils.error_formatter import ErrorFormatter
-from mcpgateway.utils.redis_isready import wait_for_redis_ready
-from mcpgateway.utils.retry_manager import ResilientHttpClient
-from mcpgateway.utils.verify_credentials import require_auth, require_auth_override
+from mcpgateway.utils.verify_credentials import require_auth
 from mcpgateway.registry import session_registry
 
-
-# Import the admin routes from the new module
-from mcpgateway.version import router as version_router
-
+# Import dependency injection functions
+from mcpgateway.dependencies import (
+    get_prompt_service,
+    get_resource_service,
+    get_tool_service,
+    get_server_service
+)
 
 # Initialize logging service first
 logging_service = LoggingService()
 logger = logging_service.get_logger("server routes")
 
 # Initialize services
-server_service = ServerService()
+server_service = get_server_service()
+tool_service = get_tool_service()
+prompt_service = get_prompt_service()
+resource_service = get_resource_service()
+
 
 # Create API router
 server_router = APIRouter(prefix="/servers", tags=["Servers"])
+
+def get_protocol_from_request(request: Request) -> str:
+    """
+    Return "https" or "http" based on:
+     1) X-Forwarded-Proto (if set by a proxy)
+     2) request.url.scheme  (e.g. when Gunicorn/Uvicorn is terminating TLS)
+
+    Args:
+        request (Request): The FastAPI request object.
+
+    Returns:
+        str: The protocol used for the request, either "http" or "https".
+    """
+    forwarded = request.headers.get("x-forwarded-proto")
+    if forwarded:
+        # may be a comma-separated list; take the first
+        return forwarded.split(",")[0].strip()
+    return request.url.scheme
+
+def update_url_protocol(request: Request) -> str:
+    """
+    Update the base URL protocol based on the request's scheme or forwarded headers.
+
+    Args:
+        request (Request): The FastAPI request object.
+
+    Returns:
+        str: The base URL with the correct protocol.
+    """
+    parsed = urlparse(str(request.base_url))
+    proto = get_protocol_from_request(request)
+    new_parsed = parsed._replace(scheme=proto)
+    # urlunparse keeps netloc and path intact
+    return urlunparse(new_parsed).rstrip("/")
+
 
 # APIs
 @server_router.get("", response_model=List[ServerRead])

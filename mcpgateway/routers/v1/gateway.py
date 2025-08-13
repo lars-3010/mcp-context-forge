@@ -4,144 +4,72 @@ Copyright 2025
 SPDX-License-Identifier: Apache-2.0
 Authors: Mihai Criveti
 
-MCP Gateway - Main FastAPI Application.
+MCP Gateway - Gateways API Router.
 
-This module defines the core FastAPI application for the Model Context Protocol (MCP) Gateway.
-It serves as the entry point for handling all HTTP and WebSocket traffic.
+This module provides REST API endpoints for managing peer gateways in the MCP Gateway federation.
+Gateways represent remote MCP Gateway instances that can be federated for distributed operations
+and resource sharing across multiple gateway nodes.
 
 Features and Responsibilities:
-- Initializes and orchestrates services for tools, resources, prompts, servers, gateways, and roots.
-- Supports full MCP protocol operations: initialize, ping, notify, complete, and sample.
-- Integrates authentication (JWT and basic), CORS, caching, and middleware.
-- Serves a rich Admin UI for managing gateway entities via HTMX-based frontend.
-- Exposes routes for JSON-RPC, SSE, and WebSocket transports.
-- Manages application lifecycle including startup and graceful shutdown of all services.
+- CRUD operations for gateway management (create, read, update, delete)
+- Gateway registration and discovery for federation
+- Status management (activate/deactivate gateways)
+- Connection validation and health monitoring
+- Federation support for distributed MCP networks
+- Comprehensive error handling with proper HTTP status codes
+- Authentication enforcement for all operations
 
-Structure:
-- Declares routers for MCP protocol operations and administration.
-- Registers dependencies (e.g., DB sessions, auth handlers).
-- Applies middleware including custom documentation protection.
-- Configures resource caching and session registry using pluggable backends.
-- Provides OpenAPI metadata and redirect handling depending on UI feature flags.
+Endpoints:
+- GET /gateways: List all registered gateways with optional filtering
+- POST /gateways: Register new gateway for federation
+- GET /gateways/{id}: Retrieve specific gateway details
+- PUT /gateways/{id}: Update existing gateway configuration
+- DELETE /gateways/{id}: Remove gateway from federation
+- POST /gateways/{id}/toggle: Activate/deactivate gateway
+
+Parameters:
+- All endpoints require authentication via JWT Bearer token or Basic Auth
+- Gateway IDs can be UUIDs or custom identifiers
+- Status toggles support activation state management
+- Connection validation ensures gateway reachability
+
+Returns:
+- List endpoints return arrays of GatewayRead objects
+- CRUD operations return individual GatewayRead objects
+- Delete operations return success confirmation messages
+- Toggle operations return status with updated gateway data
 """
 
 # Standard
-import asyncio
-from contextlib import asynccontextmanager
-import json
-import logging
-from typing import Any, AsyncIterator, Dict, List, Optional, Union
-from urllib.parse import urlparse, urlunparse
+from typing import Any, Dict, List
 
 # Third-Party
 from fastapi import (
     APIRouter,
-    Body,
     Depends,
-    FastAPI,
     HTTPException,
-    Request,
     status,
-    WebSocket,
-    WebSocketDisconnect,
 )
-from fastapi.background import BackgroundTasks
-from fastapi.exception_handlers import request_validation_exception_handler as fastapi_default_validation_handler
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
-from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from starlette.middleware.base import BaseHTTPMiddleware
-from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 # First-Party
-from mcpgateway import __version__
-from mcpgateway.admin import admin_router
-from mcpgateway.bootstrap_db import main as bootstrap_db
-from mcpgateway.cache import ResourceCache, SessionRegistry
-from mcpgateway.config import jsonpath_modifier, settings
-from mcpgateway.db import refresh_slugs_on_startup, SessionLocal, get_db
-from mcpgateway.handlers.sampling import SamplingHandler
-from mcpgateway.models import (
-    InitializeRequest,
-    InitializeResult,
-    ListResourceTemplatesResult,
-    LogLevel,
-    ResourceContent,
-    Root,
-)
-from mcpgateway.plugins import PluginManager, PluginViolationError
+from mcpgateway.db import get_db
 from mcpgateway.schemas import (
     GatewayCreate,
     GatewayRead,
     GatewayUpdate,
-    JsonPathModifier,
-    PromptCreate,
-    PromptExecuteArgs,
-    PromptRead,
-    PromptUpdate,
-    ResourceCreate,
-    ResourceRead,
-    ResourceUpdate,
-    RPCRequest,
-    ServerCreate,
-    ServerRead,
-    ServerUpdate,
-    TaggedEntity,
-    TagInfo,
-    ToolCreate,
-    ToolRead,
-    ToolUpdate,
 )
-from mcpgateway.services.completion_service import CompletionService
 from mcpgateway.services.gateway_service import GatewayConnectionError, GatewayNameConflictError, GatewayService
 from mcpgateway.services.logging_service import LoggingService
-from mcpgateway.services.prompt_service import (
-    PromptError,
-    PromptNameConflictError,
-    PromptNotFoundError,
-    PromptService,
-)
-from mcpgateway.services.resource_service import (
-    ResourceError,
-    ResourceNotFoundError,
-    ResourceService,
-    ResourceURIConflictError,
-)
-from mcpgateway.services.root_service import RootService
-from mcpgateway.services.server_service import (
-    ServerError,
-    ServerNameConflictError,
-    ServerNotFoundError,
-    ServerService,
-)
-from mcpgateway.services.tag_service import TagService
-from mcpgateway.services.tool_service import (
-    ToolError,
-    ToolNameConflictError,
-    ToolService,
-)
-from mcpgateway.transports.sse_transport import SSETransport
-from mcpgateway.transports.streamablehttp_transport import (
-    SessionManagerWrapper,
-    streamable_http_auth,
-)
-from mcpgateway.utils.db_isready import wait_for_db_ready
 from mcpgateway.utils.error_formatter import ErrorFormatter
-from mcpgateway.utils.redis_isready import wait_for_redis_ready
-from mcpgateway.utils.retry_manager import ResilientHttpClient
-from mcpgateway.utils.verify_credentials import require_auth, require_auth_override
-from mcpgateway.validation.jsonrpc import (
-    JSONRPCError,
-)
+from mcpgateway.utils.verify_credentials import require_auth
 
-# Import the admin routes from the new module
-from mcpgateway.version import router as version_router
+
+# Import dependency injection functions
+from mcpgateway.dependencies import get_gateway_service
 
 # Initialize logging service first
 logging_service = LoggingService()
@@ -149,7 +77,7 @@ logger = logging_service.get_logger("gateway routes")
 
 
 # Initialize services
-gateway_service = GatewayService()
+gateway_service = get_gateway_service()
 
 # Create API router
 gateway_router = APIRouter(prefix="/gateways", tags=["Gateways"])

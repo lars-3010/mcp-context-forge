@@ -4,34 +4,41 @@ Copyright 2025
 SPDX-License-Identifier: Apache-2.0
 Authors: Mihai Criveti
 
-MCP Gateway - Main FastAPI Application.
+MCP Gateway - Protocol API Router.
 
-This module defines the core FastAPI application for the Model Context Protocol (MCP) Gateway.
-It serves as the entry point for handling all HTTP and WebSocket traffic.
+This module implements core Model Context Protocol (MCP) operations as REST endpoints.
+It handles protocol initialization, ping/pong, notifications, completion, and sampling.
 
 Features and Responsibilities:
-- Initializes and orchestrates services for tools, resources, prompts, servers, gateways, and roots.
-- Supports full MCP protocol operations: initialize, ping, notify, complete, and sample.
-- Integrates authentication (JWT and basic), CORS, caching, and middleware.
-- Serves a rich Admin UI for managing gateway entities via HTMX-based frontend.
-- Exposes routes for JSON-RPC, SSE, and WebSocket transports.
-- Manages application lifecycle including startup and graceful shutdown of all services.
+- Protocol initialization and session management
+- Ping/pong health check mechanism per MCP specification
+- Client notification handling (initialized, cancelled, message)
+- Completion service integration for task completion
+- Sampling handler for message creation and processing
+- JSON-RPC compliant request/response handling
+- Comprehensive error handling with proper status codes
 
-Structure:
-- Declares routers for MCP protocol operations and administration.
-- Registers dependencies (e.g., DB sessions, auth handlers).
-- Applies middleware including custom documentation protection.
-- Configures resource caching and session registry using pluggable backends.
-- Provides OpenAPI metadata and redirect handling depending on UI feature flags.
+Endpoints:
+- POST /protocol/initialize: Initialize MCP protocol session
+- POST /protocol/ping: Handle ping requests with empty result response
+- POST /protocol/notifications: Process client notifications
+- POST /protocol/completion/complete: Handle task completion requests
+- POST /protocol/sampling/createMessage: Create sampling messages
+
+Parameters:
+- All endpoints require authentication via JWT Bearer token or Basic Auth
+- Request bodies must be valid JSON following JSON-RPC 2.0 specification
+- Session registry manages protocol state across requests
+
+Returns:
+- Initialize returns InitializeResult with protocol capabilities
+- Ping returns JSON-RPC response with empty result object
+- Notifications return void (no response body)
+- Completion and sampling return service-specific results
 """
 
 # Standard
-import asyncio
-from contextlib import asynccontextmanager
 import json
-import logging
-from typing import Any, AsyncIterator, Dict, List, Optional, Union
-from urllib.parse import urlparse, urlunparse
 
 # Third-Party
 from fastapi import (
@@ -45,10 +52,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 # First-Party
-from mcpgateway import __version__
-from mcpgateway.bootstrap_db import main as bootstrap_db
-from mcpgateway.config import jsonpath_modifier, settings
-from mcpgateway.db import refresh_slugs_on_startup, SessionLocal, get_db
+from mcpgateway.db import get_db
+from mcpgateway.registry import session_registry
 from mcpgateway.models import (
     InitializeResult,
     LogLevel,
@@ -58,17 +63,14 @@ from mcpgateway.handlers.sampling import SamplingHandler
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.utils.verify_credentials import require_auth
 
-
-# Import the admin routes from the new module
-from mcpgateway.version import router as version_router
+# Dependencies imports
+from mcpgateway.dependencies import get_completion_service, get_sampling_handler
 
 # Initialize logging service first
 logging_service = LoggingService()
 logger = logging_service.get_logger("protocol routes")
 
-
-completion_service = CompletionService()
-sampling_handler = SamplingHandler()
+sampling_handler = get_sampling_handler()
 
 # Create API router
 protocol_router = APIRouter(prefix="/protocol", tags=["Protocol"])
@@ -172,7 +174,10 @@ async def handle_notification(request: Request, user: str = Depends(require_auth
 
 
 @protocol_router.post("/completion/complete")
-async def handle_completion(request: Request, db: Session = Depends(get_db), user: str = Depends(require_auth)):
+async def handle_completion(request: Request, 
+    db: Session = Depends(get_db), 
+    user: str = Depends(require_auth),
+    completion_service: CompletionService = Depends(get_completion_service)):
     """
     Handles the completion of tasks by processing a completion request.
 
@@ -187,6 +192,7 @@ async def handle_completion(request: Request, db: Session = Depends(get_db), use
     body = await request.json()
     logger.debug(f"User {user} sent a completion request")
     return await completion_service.handle_completion(db, body)
+
 
 
 @protocol_router.post("/sampling/createMessage")

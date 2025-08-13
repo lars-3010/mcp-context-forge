@@ -31,7 +31,8 @@ from fastapi.testclient import TestClient
 import pytest
 
 # First-Party
-from mcpgateway.main import app, require_auth
+from mcpgateway.main import app
+from mcpgateway.utils.verify_credentials import require_auth
 from mcpgateway.models import InitializeResult, ResourceContent, ServerCapabilities
 from mcpgateway.schemas import ResourceRead, ServerRead, ToolMetrics, ToolRead
 
