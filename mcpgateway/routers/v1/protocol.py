@@ -53,18 +53,17 @@ from sqlalchemy.orm import Session
 
 # First-Party
 from mcpgateway.db import get_db
-from mcpgateway.registry import session_registry
+
+# Dependencies imports
+from mcpgateway.dependencies import get_completion_service, get_sampling_handler
 from mcpgateway.models import (
     InitializeResult,
     LogLevel,
 )
+from mcpgateway.registry import session_registry
 from mcpgateway.services.completion_service import CompletionService
-from mcpgateway.handlers.sampling import SamplingHandler
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.utils.verify_credentials import require_auth
-
-# Dependencies imports
-from mcpgateway.dependencies import get_completion_service, get_sampling_handler
 
 # Initialize logging service first
 logging_service = LoggingService()
@@ -174,10 +173,7 @@ async def handle_notification(request: Request, user: str = Depends(require_auth
 
 
 @protocol_router.post("/completion/complete")
-async def handle_completion(request: Request, 
-    db: Session = Depends(get_db), 
-    user: str = Depends(require_auth),
-    completion_service: CompletionService = Depends(get_completion_service)):
+async def handle_completion(request: Request, db: Session = Depends(get_db), user: str = Depends(require_auth), completion_service: CompletionService = Depends(get_completion_service)):
     """
     Handles the completion of tasks by processing a completion request.
 
@@ -192,7 +188,6 @@ async def handle_completion(request: Request,
     body = await request.json()
     logger.debug(f"User {user} sent a completion request")
     return await completion_service.handle_completion(db, body)
-
 
 
 @protocol_router.post("/sampling/createMessage")

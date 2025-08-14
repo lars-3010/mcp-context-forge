@@ -44,22 +44,20 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-
 # First-Party
 from mcpgateway.db import get_db
+
+# Import dependency injection functions
+from mcpgateway.dependencies import get_tag_service
 from mcpgateway.schemas import (
     TaggedEntity,
     TagInfo,
 )
 from mcpgateway.services.logging_service import LoggingService
-from mcpgateway.services.tag_service import TagService
 from mcpgateway.utils.verify_credentials import require_auth
 
 # Import the admin routes from the new module
-from mcpgateway.version import router as version_router
 
-# Import dependency injection functions
-from mcpgateway.dependencies import get_tag_service
 
 # Initialize logging service first
 logging_service = LoggingService()
@@ -71,6 +69,7 @@ tag_service = get_tag_service()
 
 # Create API router
 tag_router = APIRouter(prefix="/tags", tags=["Tags"])
+
 
 # APIs
 @tag_router.get("", response_model=List[TagInfo])

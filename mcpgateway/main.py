@@ -55,12 +55,11 @@ from typing import AsyncIterator
 
 # Third-Party
 from fastapi import (
+    APIRouter,
     Depends,
     FastAPI,
     Request,
-    APIRouter,
 )
-
 from fastapi.exception_handlers import request_validation_exception_handler as fastapi_default_validation_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -78,44 +77,41 @@ from mcpgateway import __version__
 from mcpgateway.admin import admin_router
 from mcpgateway.bootstrap_db import main as bootstrap_db
 from mcpgateway.config import settings
-from mcpgateway.db import refresh_slugs_on_startup, get_db
-from mcpgateway.plugins import PluginManager
-from mcpgateway.services.logging_service import LoggingService
-from mcpgateway.utils.db_isready import wait_for_db_ready
-from mcpgateway.utils.error_formatter import ErrorFormatter
-from mcpgateway.utils.redis_isready import wait_for_redis_ready
-
+from mcpgateway.db import get_db, refresh_slugs_on_startup
 
 # Import dependency injection functions
 from mcpgateway.dependencies import (
     get_completion_service,
     get_gateway_service,
     get_prompt_service,
+    get_resource_cache,
     get_resource_service,
     get_root_service,
-    get_tool_service,
     get_sampling_handler,
-    get_resource_cache,
     get_streamable_http_session,
+    get_tool_service,
 )
-from mcpgateway.handlers.sampling import SamplingHandler
-from mcpgateway.routers.v1.protocol import handle_notification, initialize
 
 # middleware imports
 from mcpgateway.middleware.docs_auth_middleware import DocsAuthMiddleware
-from mcpgateway.middleware.mcp_path_rewrite_middleware import MCPPathRewriteMiddleware
-from mcpgateway.middleware.legacy_deprecation_middleware import LegacyDeprecationMiddleware
 from mcpgateway.middleware.experimental_access import ExperimentalAccessMiddleware
-
-# Import the admin routes from the new module
-from mcpgateway.version import router as version_router
+from mcpgateway.middleware.legacy_deprecation_middleware import LegacyDeprecationMiddleware
+from mcpgateway.middleware.mcp_path_rewrite_middleware import MCPPathRewriteMiddleware
+from mcpgateway.plugins import PluginManager
 
 # from v1 routes
 from mcpgateway.routers.setup_routes import (
-    setup_v1_routes,
     setup_experimental_routes,
+    setup_version_routes,
     setup_legacy_deprecation_routes,
+    setup_v1_routes,
 )
+from mcpgateway.services.logging_service import LoggingService
+from mcpgateway.utils.db_isready import wait_for_db_ready
+from mcpgateway.utils.error_formatter import ErrorFormatter
+from mcpgateway.utils.redis_isready import wait_for_redis_ready
+
+# Import the admin routes from the new module
 
 
 # Initialize logging service first
@@ -176,7 +172,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         if plugin_manager:
             await plugin_manager.initialize()
             logger.info(f"Plugin manager initialized with {plugin_manager.plugin_count} plugins")
-        
+
         # Get service instances via dependency injection
         tool_service = get_tool_service()
         resource_service = get_resource_service()
@@ -186,7 +182,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         completion_service = get_completion_service()
         sampling_handler = get_sampling_handler()
         resource_cache = get_resource_cache()
-        
+
         # Initialize all services
         await tool_service.initialize()
         await resource_service.initialize()
@@ -214,7 +210,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
             except Exception as e:
                 logger.error(f"Error shutting down plugin manager: {str(e)}")
         logger.info("Shutting down MCP Gateway services")
-        
+
         # Get service instances for shutdown
         tool_service = get_tool_service()
         resource_service = get_resource_service()
@@ -224,7 +220,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         completion_service = get_completion_service()
         sampling_handler = get_sampling_handler()
         resource_cache = get_resource_cache()
-        
+
         for service in [resource_cache, sampling_handler, logging_service, completion_service, root_service, gateway_service, prompt_service, resource_service, tool_service, streamable_http_session]:
             try:
                 await service.shutdown()
@@ -232,10 +228,11 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
                 logger.error(f"Error shutting down {service.__class__.__name__}: {str(e)}")
         logger.info("Shutdown complete")
 
+
 # Create the FastAPI application instance
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application.
-    
+
     Returns:
         FastAPI: Configured FastAPI application instance
     """
@@ -250,22 +247,22 @@ def create_app() -> FastAPI:
 
     # Configure middleware (order matters - last added is executed first)
     configure_middleware(app)
-    
+
     # Configure exception handlers
     configure_exception_handlers(app)
-    
+
     # Configure routes
     configure_routes(app)
-    
+
     # Configure static files and UI
     configure_ui(app)
-    
+
     return app
 
 
 def configure_middleware(app: FastAPI) -> None:
     """Configure application middleware stack.
-    
+
     Sets up middleware in reverse order (last added executes first):
     1. CORS - Cross-origin resource sharing with configurable origins
     2. ExperimentalAccess - Control access to experimental API features
@@ -273,28 +270,28 @@ def configure_middleware(app: FastAPI) -> None:
     4. DocsAuth - Authentication protection for API documentation
     5. MCPPathRewrite - Path rewriting for MCP protocol routes
     6. ProxyHeaders - Trust proxy headers for correct client IP detection
-    
+
     Args:
         app: FastAPI application instance to configure
-        
+
     Returns:
         None
     """
     # Trust all proxies (or lock down with a list of host patterns)
     app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
-    
+
     # Add streamable HTTP middleware for /mcp routes
     app.add_middleware(MCPPathRewriteMiddleware)
-    
+
     # Add custom DocsAuthMiddleware
     app.add_middleware(DocsAuthMiddleware)
 
     # Add legacy deprecation middleware
     app.add_middleware(LegacyDeprecationMiddleware)
-    
+
     # Add experimental access middleware
     app.add_middleware(ExperimentalAccessMiddleware)
-    
+
     # Configure CORS
     app.add_middleware(
         CORSMiddleware,
@@ -308,18 +305,19 @@ def configure_middleware(app: FastAPI) -> None:
 
 def configure_exception_handlers(app: FastAPI) -> None:
     """Configure global exception handlers for consistent error responses.
-    
+
     Registers handlers for:
     - ValidationError: Pydantic validation errors (422 status)
     - RequestValidationError: FastAPI request parsing errors (422 status)
     - IntegrityError: Database constraint violations (409 status)
-    
+
     Args:
         app: FastAPI application instance to configure
-        
+
     Returns:
         None
     """
+
     @app.exception_handler(ValidationError)
     async def validation_exception_handler(_request: Request, exc: ValidationError):
         """Handle Pydantic validation errors globally."""
@@ -353,7 +351,7 @@ def configure_exception_handlers(app: FastAPI) -> None:
 
 def configure_routes(app: FastAPI) -> None:
     """Configure application routes and API endpoints.
-    
+
     Sets up:
     - /v1/* - Versioned API routes (tools, resources, prompts, etc.)
     - /experimental/* - Experimental API features
@@ -362,20 +360,26 @@ def configure_routes(app: FastAPI) -> None:
     - /health, /ready - Health check endpoints
     - /rpc, /rpc/ - Root-level RPC endpoints for backward compatibility
     - Legacy deprecation routes with migration guidance
-    
+
     Args:
         app: FastAPI application instance to configure
-        
+
     Returns:
         None
     """
     logger.info("Configuring application routes")
-    
+
     # API version routers
     v1_router = APIRouter()
     setup_v1_routes(v1_router)
     app.include_router(v1_router, prefix="/v1")
     logger.info("V1 routes configured")
+
+    # Version endpoint
+    version_router = APIRouter()
+    setup_version_routes(version_router)
+    app.include_router(version_router, prefix="/version")
+    logger.info("Version routes configured")
 
     exp_router = APIRouter()
     setup_experimental_routes(exp_router)
@@ -400,33 +404,36 @@ def configure_routes(app: FastAPI) -> None:
     # Health endpoints
     configure_health_endpoints(app)
     logger.info("Health endpoints configured")
-    
+
     # Add root-level RPC endpoint for backward compatibility
+    # First-Party
     from mcpgateway.routers.v1.utility import handle_rpc
+
     app.post("/rpc")(handle_rpc)
     app.post("/rpc/")(handle_rpc)
     logger.info("Root-level RPC endpoints configured")
-    
+
     # Log all registered routes for debugging
     logger.info("Registered routes:")
     for route in app.routes:
-        if hasattr(route, 'path'):
+        if hasattr(route, "path"):
             logger.info(f"  {route.methods if hasattr(route, 'methods') else 'MOUNT'} {route.path}")
 
 
 def configure_health_endpoints(app: FastAPI) -> None:
     """Configure health check and readiness endpoints.
-    
+
     Adds:
     - GET /health - Basic database connectivity check
     - GET /ready - Readiness probe for container orchestration
-    
+
     Args:
         app: FastAPI application instance to configure
-        
+
     Returns:
         None
     """
+
     @app.get("/health")
     async def healthcheck(db: Session = Depends(get_db)):
         """Basic health check."""
@@ -450,20 +457,20 @@ def configure_health_endpoints(app: FastAPI) -> None:
 
 def configure_ui(app: FastAPI) -> None:
     """Configure user interface and static file serving.
-    
+
     Sets up:
     - Jinja2 templates for server-side rendering
     - Static file mounting for CSS, JS, images (if UI enabled)
     - Root path routing (redirect to /admin or API info)
     - Admin UI integration with HTMX frontend
-    
+
     Behavior depends on MCPGATEWAY_UI_ENABLED setting:
     - True: Serves admin UI with static files and redirects
     - False: Returns API information at root path
-    
+
     Args:
         app: FastAPI application instance to configure
-        
+
     Returns:
         None
     """
@@ -486,6 +493,7 @@ def configure_ui(app: FastAPI) -> None:
             logger.debug("Redirecting root path to /admin")
             root_path = request.scope.get("root_path", "")
             return RedirectResponse(f"{root_path}/admin", status_code=303)
+
     else:
         # API info at root when UI is disabled
         @app.get("/")
@@ -497,7 +505,7 @@ def configure_ui(app: FastAPI) -> None:
                 "version": __version__,
                 "description": f"{settings.app_name} API - UI is disabled",
                 "ui_enabled": False,
-                "admin_api_enabled": settings.mcpgateway_admin_api_enabled
+                "admin_api_enabled": settings.mcpgateway_admin_api_enabled,
             }
 
 

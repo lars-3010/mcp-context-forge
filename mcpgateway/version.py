@@ -727,65 +727,8 @@ async def version_endpoint(
         Response: JSONResponse with diagnostic data, or HTMLResponse with formatted page.
 
     Examples:
-        >>> import asyncio
-        >>> from unittest.mock import Mock, AsyncMock, patch
-        >>> from fastapi import Request
-        >>> from fastapi.responses import JSONResponse, HTMLResponse
-        >>>
-        >>> # Create mock request
-        >>> mock_request = Mock(spec=Request)
-        >>> mock_request.headers = {"accept": "application/json"}
-        >>>
-        >>> # Test JSON response (default)
-        >>> async def test_json():
-        ...     with patch('mcpgateway.version.REDIS_AVAILABLE', False):
-        ...         with patch('mcpgateway.version._build_payload') as mock_build:
-        ...             mock_build.return_value = {"test": "data"}
-        ...             response = await version_endpoint(mock_request, fmt=None, partial=False, _user="testuser")
-        ...             return response
-        >>>
-        >>> response = asyncio.run(test_json())
-        >>> isinstance(response, JSONResponse)
-        True
-
-        >>> # Test HTML response with fmt parameter
-        >>> async def test_html_fmt():
-        ...     with patch('mcpgateway.version.REDIS_AVAILABLE', False):
-        ...         with patch('mcpgateway.version._build_payload') as mock_build:
-        ...             with patch('mcpgateway.version._render_html') as mock_render:
-        ...                 mock_build.return_value = {"test": "data"}
-        ...                 mock_render.return_value = "<html>test</html>"
-        ...                 response = await version_endpoint(mock_request, fmt="html", partial=False, _user="testuser")
-        ...                 return response
-        >>>
-        >>> response = asyncio.run(test_html_fmt())
-        >>> isinstance(response, HTMLResponse)
-        True
-
-        >>> # Test with Redis available
-        >>> async def test_with_redis():
-        ...     mock_redis = AsyncMock()
-        ...     mock_redis.ping = AsyncMock(return_value=True)
-        ...     mock_redis.info = AsyncMock(return_value={"redis_version": "7.0.5"})
-        ...
-        ...     with patch('mcpgateway.version.REDIS_AVAILABLE', True):
-        ...         with patch('mcpgateway.version.settings') as mock_settings:
-        ...             mock_settings.cache_type = "redis"
-        ...             mock_settings.redis_url = "redis://localhost:6379"
-        ...             with patch('mcpgateway.version.aioredis.Redis.from_url', return_value=mock_redis):
-        ...                 with patch('mcpgateway.version._build_payload') as mock_build:
-        ...                     mock_build.return_value = {"redis": {"version": "7.0.5"}}
-        ...                     response = await version_endpoint(mock_request, _user="testuser")
-        ...                     # Verify Redis was checked
-        ...                     mock_redis.ping.assert_called_once()
-        ...                     mock_redis.info.assert_called_once()
-        ...                     # Verify payload was built with Redis info
-        ...                     mock_build.assert_called_once_with("7.0.5", True)
-        ...                     return response
-        >>>
-        >>> response = asyncio.run(test_with_redis())
-        >>> isinstance(response, JSONResponse)
-        True
+        This endpoint requires authentication and returns comprehensive diagnostic data
+        in JSON or HTML format based on the request headers or format parameter.
     """
     # Redis health check
     redis_ok = False

@@ -58,26 +58,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 # First-Party
-from mcpgateway.config import  settings
+from mcpgateway.config import settings
 from mcpgateway.db import get_db
-from mcpgateway.models import (
-    InitializeRequest,
-    LogLevel,
-
-)
-from mcpgateway.schemas import RPCRequest
-from mcpgateway.services.gateway_service import GatewayService
-from mcpgateway.services.logging_service import LoggingService
-from mcpgateway.services.prompt_service import PromptService
-from mcpgateway.services.resource_service import ResourceService
-from mcpgateway.services.root_service import RootService
-from mcpgateway.services.tool_service import ToolService
-from mcpgateway.transports.sse_transport import SSETransport
-from mcpgateway.utils.retry_manager import ResilientHttpClient
-from mcpgateway.utils.verify_credentials import require_auth
-from mcpgateway.validation.jsonrpc import JSONRPCError
-from mcpgateway.registry import session_registry
-from mcpgateway.routers.v1.protocol import initialize
 
 # Import dependency injection functions
 from mcpgateway.dependencies import (
@@ -87,6 +69,18 @@ from mcpgateway.dependencies import (
     get_root_service,
     get_tool_service,
 )
+from mcpgateway.models import (
+    InitializeRequest,
+    LogLevel,
+)
+from mcpgateway.registry import session_registry
+from mcpgateway.routers.v1.protocol import initialize
+from mcpgateway.schemas import RPCRequest
+from mcpgateway.services.logging_service import LoggingService
+from mcpgateway.transports.sse_transport import SSETransport
+from mcpgateway.utils.retry_manager import ResilientHttpClient
+from mcpgateway.utils.verify_credentials import require_auth
+from mcpgateway.validation.jsonrpc import JSONRPCError
 
 # Initialize logging service first
 logging_service = LoggingService()
@@ -101,6 +95,7 @@ root_service = get_root_service()
 
 # Create API router
 utility_router = APIRouter(tags=["Utilities"])
+
 
 def get_protocol_from_request(request: Request) -> str:
     """
@@ -119,6 +114,7 @@ def get_protocol_from_request(request: Request) -> str:
         # may be a comma-separated list; take the first
         return forwarded.split(",")[0].strip()
     return request.url.scheme
+
 
 def update_url_protocol(request: Request) -> str:
     """

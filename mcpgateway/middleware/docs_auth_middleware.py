@@ -3,11 +3,12 @@ from fastapi import (
     HTTPException,
     Request,
 )
-from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # First-Party
-from mcpgateway.utils.verify_credentials import require_auth, require_auth_override
+from mcpgateway.utils.verify_credentials import require_auth_override
+
 
 class DocsAuthMiddleware(BaseHTTPMiddleware):
     """

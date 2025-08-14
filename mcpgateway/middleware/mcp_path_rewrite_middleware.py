@@ -1,9 +1,12 @@
-from mcpgateway.transports.streamablehttp_transport import  (
+# First-Party
+from mcpgateway.transports.streamablehttp_transport import (
     SessionManagerWrapper,
     streamable_http_auth,
 )
+
 # Initialize session manager for Streamable HTTP transport
 streamable_http_session = SessionManagerWrapper()
+
 
 class MCPPathRewriteMiddleware:
     """
@@ -38,7 +41,7 @@ class MCPPathRewriteMiddleware:
             >>> path = "/servers/123/mcp"
             >>> path.endswith("/mcp") and path != "/mcp"
             True
-            >>> 
+            >>>
             >>> path = "/mcp"
             >>> path.endswith("/mcp") and path != "/mcp"
             False

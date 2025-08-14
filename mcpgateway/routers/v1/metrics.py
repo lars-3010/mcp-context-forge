@@ -38,23 +38,10 @@ from fastapi import (
     Depends,
     HTTPException,
 )
-
 from sqlalchemy.orm import Session
 
 # First-Party
 from mcpgateway.db import get_db
-from mcpgateway.services.logging_service import LoggingService
-from mcpgateway.services.prompt_service import PromptService
-from mcpgateway.services.resource_service import ResourceService
-from mcpgateway.services.server_service import ServerService
-from mcpgateway.services.tool_service import (
-    ToolService,
-)
-from mcpgateway.utils.verify_credentials import require_auth
-
-
-# Import the admin routes from the new module
-from mcpgateway.version import router as version_router
 
 # Import dependency injection functions
 from mcpgateway.dependencies import (
@@ -63,6 +50,11 @@ from mcpgateway.dependencies import (
     get_server_service,
     get_tool_service,
 )
+from mcpgateway.services.logging_service import LoggingService
+from mcpgateway.utils.verify_credentials import require_auth
+
+# Import the admin routes from the new module
+
 
 # Initialize logging service first
 logging_service = LoggingService()

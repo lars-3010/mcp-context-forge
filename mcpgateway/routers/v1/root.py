@@ -46,16 +46,13 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 
 # First-Party
+# Import dependency injection functions
+from mcpgateway.dependencies import get_root_service
 from mcpgateway.models import (
     Root,
 )
 from mcpgateway.services.logging_service import LoggingService
-from mcpgateway.services.root_service import RootService
 from mcpgateway.utils.verify_credentials import require_auth
-
-# Import dependency injection functions
-from mcpgateway.dependencies import get_root_service
-
 
 # Initialize logging service first
 logging_service = LoggingService()

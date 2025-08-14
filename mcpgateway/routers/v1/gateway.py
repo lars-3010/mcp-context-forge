@@ -57,19 +57,18 @@ from sqlalchemy.orm import Session
 
 # First-Party
 from mcpgateway.db import get_db
+
+# Import dependency injection functions
+from mcpgateway.dependencies import get_gateway_service
 from mcpgateway.schemas import (
     GatewayCreate,
     GatewayRead,
     GatewayUpdate,
 )
-from mcpgateway.services.gateway_service import GatewayConnectionError, GatewayNameConflictError, GatewayService
+from mcpgateway.services.gateway_service import GatewayConnectionError, GatewayNameConflictError
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.utils.error_formatter import ErrorFormatter
 from mcpgateway.utils.verify_credentials import require_auth
-
-
-# Import dependency injection functions
-from mcpgateway.dependencies import get_gateway_service
 
 # Initialize logging service first
 logging_service = LoggingService()
@@ -81,6 +80,7 @@ gateway_service = get_gateway_service()
 
 # Create API router
 gateway_router = APIRouter(prefix="/gateways", tags=["Gateways"])
+
 
 @gateway_router.post("/{gateway_id}/toggle")
 async def toggle_gateway_status(

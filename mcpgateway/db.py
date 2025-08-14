@@ -135,43 +135,6 @@ def utc_now() -> datetime:
     """
     return datetime.now(timezone.utc)
 
-# ---------------------------------------------------------------------------
-# 6. Function to return db
-# ---------------------------------------------------------------------------
-# Database dependency
-def get_db():
-    """
-    Dependency function to provide a database session.
-
-    Yields:
-        Session: A SQLAlchemy session object for interacting with the database.
-
-    Ensures:
-        The database session is closed after the request completes, even in the case of an exception.
-
-    Examples:
-        >>> # Test that get_db returns a generator
-        >>> db_gen = get_db()
-        >>> hasattr(db_gen, '__next__')
-        True
-        >>> # Test cleanup happens
-        >>> try:
-        ...     db = next(db_gen)
-        ...     type(db).__name__
-        ... finally:
-        ...     try:
-        ...         next(db_gen)
-        ...     except StopIteration:
-        ...         pass  # Expected - generator cleanup
-        'Session'
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
 
 # Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

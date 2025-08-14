@@ -53,10 +53,10 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 # First-Party
-from mcpgateway.db import Base
+from mcpgateway.db import Base, get_db
 
 # Import the app and dependencies
-from mcpgateway.main import app, get_db
+from mcpgateway.main import app
 
 # pytest.skip("Temporarily disabling this suite", allow_module_level=True)
 
@@ -284,8 +284,10 @@ class TestProtocolAPIs:
     async def test_completion(self, client: AsyncClient):
         """Test POST /protocol/completion/complete."""
         # Mock completion service for this test
-        with patch("mcpgateway.main.completion_service.handle_completion") as mock_complete:
-            mock_complete.return_value = {"completion": "Test completed"}
+        with patch("mcpgateway.dependencies.get_completion_service") as mock_get_completion:
+            mock_completion_service = MagicMock()
+            mock_completion_service.handle_completion.return_value = {"completion": "Test completed"}
+            mock_get_completion.return_value = mock_completion_service
 
             request_body = {"prompt": "Complete this test"}
             response = await client.post("/protocol/completion/complete", json=request_body, headers=TEST_AUTH_HEADER)
@@ -296,8 +298,10 @@ class TestProtocolAPIs:
     async def test_sampling_create_message(self, client: AsyncClient):
         """Test POST /protocol/sampling/createMessage."""
         # Mock sampling handler for this test
-        with patch("mcpgateway.main.sampling_handler.create_message") as mock_sample:
-            mock_sample.return_value = {"messageId": "msg-123", "content": "Sampled message"}
+        with patch("mcpgateway.dependencies.get_sampling_handler") as mock_get_sampling:
+            mock_sampling_handler = MagicMock()
+            mock_sampling_handler.create_message.return_value = {"messageId": "msg-123", "content": "Sampled message"}
+            mock_get_sampling.return_value = mock_sampling_handler
 
             request_body = {"content": "Create a sample message"}
             response = await client.post("/protocol/sampling/createMessage", json=request_body, headers=TEST_AUTH_HEADER)

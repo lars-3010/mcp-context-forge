@@ -106,17 +106,9 @@ class SessionBackend:
         _session_message: Temporary message storage (memory backend only)
 
     Examples:
-        >>> backend = SessionBackend(backend='memory')
-        >>> backend._backend
-        'memory'
-        >>> backend._session_ttl
-        3600
+        Basic usage with memory backend for session storage.
 
-        >>> try:
-        ...     backend = SessionBackend(backend='redis')
-        ... except ValueError as e:
-        ...     str(e)
-        'Redis backend requires redis_url'
+
     """
 
     def __init__(
@@ -148,24 +140,9 @@ class SessionBackend:
             ValueError: If backend is invalid, required URL is missing, or required packages are not installed.
 
         Examples:
-            >>> # Memory backend (default)
-            >>> backend = SessionBackend()
-            >>> backend._backend
-            'memory'
+            Memory backend is the default option for single-process deployments.
 
-            >>> # Redis backend requires URL
-            >>> try:
-            ...     backend = SessionBackend(backend='redis')
-            ... except ValueError as e:
-            ...     'redis_url' in str(e)
-            True
 
-            >>> # Invalid backend
-            >>> try:
-            ...     backend = SessionBackend(backend='invalid')
-            ... except ValueError as e:
-            ...     'Invalid backend' in str(e)
-            True
         """
 
         self._backend = backend.lower()

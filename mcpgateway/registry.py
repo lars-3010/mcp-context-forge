@@ -1,8 +1,12 @@
+"""Global registry initialization module.
+
+This module initializes the global session registry instance used throughout
+the MCP Gateway for managing SSE sessions and inter-process communication.
+"""
+
 # First-Party
-from mcpgateway import __version__
 from mcpgateway.cache import SessionRegistry
 from mcpgateway.config import settings
-
 
 # Initialize session registry
 session_registry = SessionRegistry(

@@ -57,9 +57,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 # First-Party
-from mcpgateway.cache import ResourceCache
-from mcpgateway.config import settings
 from mcpgateway.db import get_db
+
+# Import dependency injection functions
+from mcpgateway.dependencies import get_resource_cache, get_resource_service
 from mcpgateway.models import (
     ListResourceTemplatesResult,
     ResourceContent,
@@ -70,26 +71,16 @@ from mcpgateway.schemas import (
     ResourceUpdate,
 )
 from mcpgateway.services.logging_service import LoggingService
-
 from mcpgateway.services.resource_service import (
     ResourceError,
     ResourceNotFoundError,
-    ResourceService,
     ResourceURIConflictError,
 )
 from mcpgateway.utils.error_formatter import ErrorFormatter
 from mcpgateway.utils.verify_credentials import require_auth
 
-
 # Import the admin routes from the new module
-from mcpgateway.version import router as version_router
 
-
-# Import dependency injection functions
-from mcpgateway.dependencies import (
-    get_resource_service,
-    get_resource_cache
-)
 
 # Initialize logging service first
 logging_service = LoggingService()
@@ -103,6 +94,7 @@ resource_cache = get_resource_cache()
 
 # Create API router
 resource_router = APIRouter(prefix="/resources", tags=["Resources"])
+
 
 async def invalidate_resource_cache(uri: Optional[str] = None) -> None:
     """

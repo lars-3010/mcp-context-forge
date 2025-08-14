@@ -47,8 +47,7 @@ Returns:
 
 # Standard
 import asyncio
-from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Dict, List, Optional, Union
+from typing import Dict, List, Optional
 from urllib.parse import urlparse, urlunparse
 
 # Third-Party
@@ -59,15 +58,17 @@ from fastapi import (
     Request,
 )
 from fastapi.background import BackgroundTasks
-from fastapi.exception_handlers import request_validation_exception_handler as fastapi_default_validation_handler
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-
 # First-Party
 from mcpgateway.db import get_db
+
+# Import dependency injection functions
+from mcpgateway.dependencies import get_prompt_service, get_resource_service, get_server_service, get_tool_service
+from mcpgateway.registry import session_registry
 from mcpgateway.schemas import (
     PromptRead,
     ResourceRead,
@@ -76,30 +77,15 @@ from mcpgateway.schemas import (
     ServerUpdate,
     ToolRead,
 )
-
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.server_service import (
     ServerError,
     ServerNameConflictError,
     ServerNotFoundError,
-    ServerService,
 )
-from mcpgateway.services.prompt_service import PromptService
-from mcpgateway.services.tool_service import ToolService
-from mcpgateway.services.resource_service import ResourceService
-
 from mcpgateway.transports.sse_transport import SSETransport
 from mcpgateway.utils.error_formatter import ErrorFormatter
 from mcpgateway.utils.verify_credentials import require_auth
-from mcpgateway.registry import session_registry
-
-# Import dependency injection functions
-from mcpgateway.dependencies import (
-    get_prompt_service,
-    get_resource_service,
-    get_tool_service,
-    get_server_service
-)
 
 # Initialize logging service first
 logging_service = LoggingService()
@@ -114,6 +100,7 @@ resource_service = get_resource_service()
 
 # Create API router
 server_router = APIRouter(prefix="/servers", tags=["Servers"])
+
 
 def get_protocol_from_request(request: Request) -> str:
     """
@@ -132,6 +119,7 @@ def get_protocol_from_request(request: Request) -> str:
         # may be a comma-separated list; take the first
         return forwarded.split(",")[0].strip()
     return request.url.scheme
+
 
 def update_url_protocol(request: Request) -> str:
     """

@@ -42,27 +42,7 @@ Returns:
 # Standard
 from typing import Any, Dict, List, Optional, Union
 
-# First-Party
-from mcpgateway.services.tool_service import (
-    ToolError,
-    ToolNameConflictError,
-    ToolService,)
-from mcpgateway.services.logging_service import LoggingService
-from mcpgateway.db import get_db
-from mcpgateway.schemas import (
-    JsonPathModifier,
-    ToolCreate,
-    ToolRead,
-    ToolUpdate,
-)
-from mcpgateway.config import jsonpath_modifier
-from mcpgateway.utils.verify_credentials import require_auth
-
 # Third-Party
-from fastapi import (
-    APIRouter,)
-
-from sqlalchemy.orm import Session
 from fastapi import (
     APIRouter,
     Body,
@@ -70,9 +50,26 @@ from fastapi import (
     HTTPException,
     status,
 )
+from sqlalchemy.orm import Session
+
+# First-Party
+from mcpgateway.config import jsonpath_modifier
+from mcpgateway.db import get_db
 
 # Import dependency injection functions
 from mcpgateway.dependencies import get_tool_service
+from mcpgateway.schemas import (
+    JsonPathModifier,
+    ToolCreate,
+    ToolRead,
+    ToolUpdate,
+)
+from mcpgateway.services.logging_service import LoggingService
+from mcpgateway.services.tool_service import (
+    ToolError,
+    ToolNameConflictError,
+)
+from mcpgateway.utils.verify_credentials import require_auth
 
 # Initialize logging service first
 logging_service = LoggingService()
@@ -84,6 +81,7 @@ tool_service = get_tool_service()
 # Create API router
 tool_router = APIRouter(prefix="/tools", tags=["Tools"])
 
+
 @tool_router.get("", response_model=Union[List[ToolRead], List[Dict], Dict, List])
 @tool_router.get("/", response_model=Union[List[ToolRead], List[Dict], Dict, List])
 async def list_tools(
@@ -93,7 +91,7 @@ async def list_tools(
     db: Session = Depends(get_db),
     apijsonpath: JsonPathModifier = Body(None),
     _: str = Depends(require_auth),
-) -> Union[List[ToolRead], List[Dict], Dict]: 
+) -> Union[List[ToolRead], List[Dict], Dict]:
     """List all registered tools with pagination support.
 
     Args:
@@ -107,7 +105,6 @@ async def list_tools(
     Returns:
         List of tools or modified result based on jsonpath
     """
-    print(f"v1 tools")
 
     # Parse tags parameter if provided
     tags_list = None
@@ -142,7 +139,7 @@ async def create_tool(tool: ToolCreate, db: Session = Depends(get_db), user: str
     Raises:
         HTTPException: If the tool name already exists or other validation errors occur.
     """
-    
+
     try:
         logger.debug(f"User {user} is creating a new tool")
         return await tool_service.register_tool(db, tool)

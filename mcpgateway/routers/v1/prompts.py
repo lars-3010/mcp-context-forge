@@ -26,7 +26,7 @@ Structure:
 """
 
 # Standard
-from typing import Any, Optional, List, Dict
+from typing import Any, Dict, List, Optional
 
 # Third-Party
 from fastapi import (
@@ -41,6 +41,9 @@ from sqlalchemy.orm import Session
 
 # First-Party
 from mcpgateway.db import get_db
+
+# Import dependency injection functions
+from mcpgateway.dependencies import get_prompt_service
 from mcpgateway.plugins import PluginViolationError
 from mcpgateway.schemas import (
     PromptCreate,
@@ -53,15 +56,11 @@ from mcpgateway.services.prompt_service import (
     PromptError,
     PromptNameConflictError,
     PromptNotFoundError,
-    PromptService,
 )
 from mcpgateway.utils.verify_credentials import require_auth
 
 # Import the admin routes from the new module
-from mcpgateway.version import router as version_router
 
-# Import dependency injection functions
-from mcpgateway.dependencies import get_prompt_service
 
 # Initialize logging service first
 logging_service = LoggingService()
@@ -72,6 +71,7 @@ prompt_service = get_prompt_service()
 
 # Create API router
 prompt_router = APIRouter(prefix="/prompts", tags=["Prompts"])
+
 
 @prompt_router.post("/{prompt_id}/toggle")
 async def toggle_prompt_status(
