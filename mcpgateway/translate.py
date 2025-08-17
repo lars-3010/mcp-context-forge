@@ -121,7 +121,7 @@ import logging
 import shlex
 import signal
 import sys
-from typing import Any, AsyncIterator, Dict, List, Optional, Sequence, Tuple
+from typing import Any, AsyncIterator, Dict, List, Optional, Sequence, Tuple, cast
 import uuid
 
 # Third-Party
@@ -135,14 +135,15 @@ try:
     # Third-Party
     import httpx
 except ImportError:
-    httpx = None  # type: ignore[assignment]
+    httpx = None
 
 # Third-Party
 # Third-Party - for streamable HTTP support
 from mcp.server import Server as MCPServer
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.applications import Starlette
-from starlette.routing import Route
+from starlette.routing import Route, ASGIRoute
+from starlette.types import ASGIApp
 
 # First-Party
 from mcpgateway.services.logging_service import LoggingService
@@ -949,7 +950,7 @@ async def _run_stdio_to_sse(
         log_level=log_level,
         lifespan="off",
     )
-    server = uvicorn.Server(config)
+    uvicorn_server = uvicorn.Server(config)
 
     shutting_down = asyncio.Event()  # 🔄 make shutdown idempotent
 
@@ -977,7 +978,7 @@ async def _run_stdio_to_sse(
         shutting_down.set()
         LOGGER.info("Shutting down ...")
         await stdio.stop()
-        await server.shutdown()
+        await uvicorn_server.shutdown()
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -985,7 +986,7 @@ async def _run_stdio_to_sse(
             loop.add_signal_handler(sig, lambda: asyncio.create_task(_shutdown()))
 
     LOGGER.info(f"Bridge ready → http://{host}:{port}{sse_path}")
-    await server.serve()
+    await uvicorn_server.serve()
     await _shutdown()  # final cleanup
 
 
@@ -1154,7 +1155,7 @@ async def _run_sse_to_stdio(url: str, oauth2_bearer: Optional[str] = None, timeo
                             elif current_event.event == "message":
                                 # Forward JSON-RPC responses to stdio
                                 if process.stdin:
-                                    await process.stdin.write((current_event.data + "\n").encode())
+                                    process.stdin.write((current_event.data + "\n").encode())
                                     await process.stdin.drain()
                                     LOGGER.debug(f"→ stdio: {current_event.data}")
 
@@ -1259,31 +1260,37 @@ async def _run_stdio_to_streamable_http(
     )
 
     # Create Starlette app to host the streamable HTTP endpoint
-    async def handle_mcp(request) -> None:
+    async def handle_mcp(scope: Dict[str, Any], receive: Any, send: Any) -> None:
         """Handle MCP requests via streamable HTTP.
 
         Args:
-            request: The incoming HTTP request from Starlette.
+            scope: The ASGI scope.
+            receive: The ASGI receive callable.
+            send: The ASGI send callable.
 
         Examples:
-            >>> async def test_handle():
-            ...     # Mock request handling
-            ...     class MockRequest:
-            ...         scope = {"type": "http"}
-            ...         async def receive(self): return {}
-            ...         async def send(self, msg): return None
-            ...     req = MockRequest()
-            ...     # Would handle the request via session manager
-            ...     return req is not None
             >>> import asyncio
+            >>> async def test_handle():
+            ...     # Mock ASGI handling
+            ...     scope = {"type": "http"}
+            ...     async def receive(): return {}
+            ...     async def send(msg): return None
+            ...     # Would handle the request via session manager
+            ...     return True
             >>> asyncio.run(test_handle())
             True
         """
         # The session manager handles all the protocol details
-        await session_manager.handle_request(request.scope, request.receive, request.send)
+        await session_manager.handle_request(scope, receive, send)
+
+    class MCPEndpoint:
+        """ASGI endpoint for MCP handling."""
+
+        async def __call__(self, scope: Dict[str, Any], receive: Any, send: Any) -> None:
+            await handle_mcp(scope, receive, send)
 
     routes = [
-        Route("/mcp", handle_mcp, methods=["GET", "POST"]),
+        ASGIRoute("/mcp", MCPEndpoint(), methods=["GET", "POST"]),
         Route("/healthz", lambda request: PlainTextResponse("ok"), methods=["GET"]),
     ]
 
@@ -1311,7 +1318,7 @@ async def _run_stdio_to_streamable_http(
         log_level=log_level,
         lifespan="off",
     )
-    server = uvicorn.Server(config)
+    uvicorn_server = uvicorn.Server(config)
 
     shutting_down = asyncio.Event()
 
@@ -1325,7 +1332,7 @@ async def _run_stdio_to_streamable_http(
             process.terminate()
             with suppress(asyncio.TimeoutError):
                 await asyncio.wait_for(process.wait(), 5)
-        await server.shutdown()
+        await uvicorn_server.shutdown()
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -1344,6 +1351,9 @@ async def _run_stdio_to_streamable_http(
             >>> asyncio.run(test())
             True
         """
+        if not process.stdout:
+            raise RuntimeError("Process stdout not available")
+
         while True:
             try:
                 line = await process.stdout.readline()
@@ -1372,6 +1382,8 @@ async def _run_stdio_to_streamable_http(
             >>> asyncio.run(test_pump())
             True
         """
+        if not process.stdin:
+            raise RuntimeError("Process stdin not available")
         process.stdin.write(data.encode() + b"\n")
         await process.stdin.drain()
 
@@ -1383,7 +1395,7 @@ async def _run_stdio_to_streamable_http(
 
     try:
         LOGGER.info(f"Streamable HTTP bridge ready → http://{host}:{port}/mcp")
-        await server.serve()
+        await uvicorn_server.serve()
     finally:
         pump_task.cancel()
         await _shutdown()
@@ -1475,7 +1487,7 @@ async def _run_streamable_http_to_stdio(
                     # Handle JSON response
                     response_data = response.text
                     if response_data and process.stdin:
-                        await process.stdin.write((response_data + "\n").encode())
+                        process.stdin.write((response_data + "\n").encode())
                         await process.stdin.drain()
                         LOGGER.debug(f"→ stdio: {response_data}")
                 else:
@@ -1514,7 +1526,7 @@ async def _run_streamable_http_to_stdio(
                         if line.startswith("data: "):
                             data = line[6:]  # Remove "data: " prefix
                             if data and process.stdin:
-                                await process.stdin.write((data + "\n").encode())
+                                process.stdin.write((data + "\n").encode())
                                 await process.stdin.drain()
                                 LOGGER.debug(f"→ stdio: {data}")
 
@@ -1634,10 +1646,14 @@ async def _run_multi_protocol_server(  # pylint: disable=too-many-positional-arg
     LOGGER.info(f"Protocols: SSE={expose_sse}, StreamableHTTP={expose_streamable_http}")
 
     # Create a shared pubsub whenever either protocol needs stdout observations
-    pubsub = _PubSub() if (expose_sse or expose_streamable_http) else None
+    pubsub: Optional[_PubSub] = _PubSub() if (expose_sse or expose_streamable_http) else None
 
     # Create the stdio endpoint
-    stdio = StdIOEndpoint(cmd, pubsub) if (expose_sse or expose_streamable_http) else None
+    stdio: Optional[StdIOEndpoint] = None
+    if expose_sse or expose_streamable_http:
+        if pubsub is None:
+            raise RuntimeError("pubsub should not be None when protocols are enabled")
+        stdio = StdIOEndpoint(cmd, pubsub)
 
     # Create fastapi app and middleware
     app = FastAPI()
@@ -1806,6 +1822,8 @@ async def _run_multi_protocol_server(  # pylint: disable=too-many-positional-arg
                 return PlainTextResponse(f"Invalid JSON payload: {exc}", status_code=status.HTTP_400_BAD_REQUEST)
 
             # Forward raw newline-delimited JSON to stdio
+            if stdio is None:
+                return PlainTextResponse("stdio endpoint not available", status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
             await stdio.send(body.decode().rstrip() + "\n")
 
             # If it's a request (has an id) -> attempt to correlate response from stdio
@@ -1848,7 +1866,7 @@ async def _run_multi_protocol_server(  # pylint: disable=too-many-positional-arg
             return PlainTextResponse("accepted", status_code=status.HTTP_202_ACCEPTED)
 
         # ASGI wrapper to route GET/other /mcp scopes to streamable_manager.handle_request
-        async def mcp_asgi_wrapper(scope, receive, send):
+        async def mcp_asgi_wrapper(scope: Dict[str, Any], receive: Any, send: Any) -> None:
             """
             ASGI middleware that intercepts HTTP requests to the `/mcp` endpoint.
 
@@ -1857,9 +1875,9 @@ async def _run_multi_protocol_server(  # pylint: disable=too-many-positional-arg
             passed to the original FastAPI application.
 
             Args:
-                scope (dict): The ASGI scope dictionary containing request metadata.
-                receive (Callable): An awaitable that yields incoming ASGI events.
-                send (Callable): An awaitable used to send ASGI events.
+                scope (Dict[str, Any]): The ASGI scope dictionary containing request metadata.
+                receive (Any): An awaitable that yields incoming ASGI events.
+                send (Any): An awaitable used to send ASGI events.
             """
             if scope.get("type") == "http" and scope.get("path") == "/mcp" and streamable_manager:
                 # Let StreamableHTTPSessionManager handle session-oriented streaming
@@ -1870,7 +1888,7 @@ async def _run_multi_protocol_server(  # pylint: disable=too-many-positional-arg
                 await original_app(scope, receive, send)
 
         # Replace the app used by uvicorn with the ASGI wrapper
-        app = mcp_asgi_wrapper
+        app = cast(ASGIApp, mcp_asgi_wrapper)
 
     # ---------------------- Server lifecycle ----------------------
     config = uvicorn.Config(
@@ -1880,7 +1898,7 @@ async def _run_multi_protocol_server(  # pylint: disable=too-many-positional-arg
         log_level=log_level,
         lifespan="off",
     )
-    server = uvicorn.Server(config)
+    uvicorn_server = uvicorn.Server(config)
 
     shutting_down = asyncio.Event()
 
@@ -1893,7 +1911,7 @@ async def _run_multi_protocol_server(  # pylint: disable=too-many-positional-arg
         if stdio:
             await stdio.stop()
         # Streamable HTTP cleanup handled by server shutdown
-        await server.shutdown()
+        await uvicorn_server.shutdown()
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -1915,7 +1933,7 @@ async def _run_multi_protocol_server(  # pylint: disable=too-many-positional-arg
     LOGGER.info(f"Multi-protocol server ready → {', '.join(endpoints)}")
 
     try:
-        await server.serve()
+        await uvicorn_server.serve()
     finally:
         await _shutdown()
         # Clean up streamable HTTP context
