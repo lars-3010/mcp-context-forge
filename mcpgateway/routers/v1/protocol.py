@@ -55,7 +55,7 @@ from sqlalchemy.orm import Session
 from mcpgateway.db import get_db
 
 # Dependencies imports
-from mcpgateway.dependencies import get_completion_service, get_sampling_handler
+from mcpgateway.dependencies import get_completion_service, get_logging_service, get_sampling_handler
 from mcpgateway.models import (
     InitializeResult,
     LogLevel,
@@ -66,7 +66,7 @@ from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.utils.verify_credentials import require_auth
 
 # Initialize logging service first
-logging_service = LoggingService()
+logging_service = get_logging_service()
 logger = logging_service.get_logger("protocol routes")
 
 sampling_handler = get_sampling_handler()
@@ -145,7 +145,7 @@ async def ping(request: Request, user: str = Depends(require_auth)) -> JSONRespo
 
 
 @protocol_router.post("/notifications")
-async def handle_notification(request: Request, user: str = Depends(require_auth)) -> None:
+async def handle_notification(request: Request, user: str = Depends(require_auth), logging_service: LoggingService = Depends(get_logging_service)) -> None:
     """
     Handles incoming notifications from clients. Depending on the notification method,
     different actions are taken (e.g., logging initialization, cancellation, or messages).
@@ -153,6 +153,7 @@ async def handle_notification(request: Request, user: str = Depends(require_auth
     Args:
         request (Request): The incoming request containing the notification data.
         user (str): The authenticated user making the request.
+        logging_service (LoggingService): The logging service dependency.
     """
     body = await request.json()
     logger.debug(f"User {user} sent a notification")
@@ -185,9 +186,13 @@ async def handle_completion(request: Request, db: Session = Depends(get_db), use
     Returns:
         The result of the completion process.
     """
-    body = await request.json()
-    logger.debug(f"User {user} sent a completion request")
-    return await completion_service.handle_completion(db, body)
+    try:
+        body = await request.json()
+        logger.debug(f"User {user} sent a completion request")
+        return await completion_service.handle_completion(db, body)
+    except Exception as e:
+        logger.error(f"Completion error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @protocol_router.post("/sampling/createMessage")
@@ -203,6 +208,10 @@ async def handle_sampling(request: Request, db: Session = Depends(get_db), user:
     Returns:
         The result of the message creation process.
     """
-    logger.debug(f"User {user} sent a sampling request")
-    body = await request.json()
-    return await sampling_handler.create_message(db, body)
+    try:
+        logger.debug(f"User {user} sent a sampling request")
+        body = await request.json()
+        return await sampling_handler.create_message(db, body)
+    except Exception as e:
+        logger.error(f"Sampling error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -168,7 +168,7 @@ class TestIntegrationScenarios:
     # --------------------------------------------------------------------- #
     # 2. MCP protocol: initialize ➜ ping                                    #
     # --------------------------------------------------------------------- #
-    @patch("mcpgateway.main.session_registry.handle_initialize_logic", new_callable=AsyncMock)
+    @patch("mcpgateway.registry.session_registry.handle_initialize_logic", new_callable=AsyncMock)
     def test_initialize_and_ping_workflow(
         self,
         mock_init: AsyncMock,

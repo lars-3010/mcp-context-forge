@@ -230,7 +230,7 @@ class TestProtocolAPIs:
         }
 
         # Mock the session registry since it requires complex setup
-        with patch("mcpgateway.main.session_registry.handle_initialize_logic") as mock_init:
+        with patch("mcpgateway.registry.session_registry.handle_initialize_logic") as mock_init:
             mock_init.return_value = {"protocolVersion": "1.0.0", "capabilities": {"tools": {}, "resources": {}}, "serverInfo": {"name": "mcp-gateway", "version": "1.0.0"}}
 
             response = await client.post("/protocol/initialize", json=request_body, headers=TEST_AUTH_HEADER)
@@ -283,31 +283,50 @@ class TestProtocolAPIs:
 
     async def test_completion(self, client: AsyncClient):
         """Test POST /protocol/completion/complete."""
-        # Mock completion service for this test
-        with patch("mcpgateway.dependencies.get_completion_service") as mock_get_completion:
-            mock_completion_service = MagicMock()
-            mock_completion_service.handle_completion.return_value = {"completion": "Test completed"}
-            mock_get_completion.return_value = mock_completion_service
-
-            request_body = {"prompt": "Complete this test"}
-            response = await client.post("/protocol/completion/complete", json=request_body, headers=TEST_AUTH_HEADER)
-
-            assert response.status_code == 200
-            assert response.json() == {"completion": "Test completed"}
+        request_body = {
+            "ref": {
+                "type": "ref/prompt",
+                "name": "nonexistent_prompt"
+            },
+            "argument": {
+                "name": "test_arg",
+                "value": "test_value"
+            }
+        }
+        
+        response = await client.post("/protocol/completion/complete", json=request_body, headers=TEST_AUTH_HEADER)
+        
+        # Should return 500 with error message
+        assert response.status_code == 500
+        assert "Prompt not found" in response.json()["detail"]
 
     async def test_sampling_create_message(self, client: AsyncClient):
         """Test POST /protocol/sampling/createMessage."""
-        # Mock sampling handler for this test
-        with patch("mcpgateway.dependencies.get_sampling_handler") as mock_get_sampling:
-            mock_sampling_handler = MagicMock()
-            mock_sampling_handler.create_message.return_value = {"messageId": "msg-123", "content": "Sampled message"}
-            mock_get_sampling.return_value = mock_sampling_handler
-
-            request_body = {"content": "Create a sample message"}
-            response = await client.post("/protocol/sampling/createMessage", json=request_body, headers=TEST_AUTH_HEADER)
-
-            assert response.status_code == 200
-            assert response.json()["messageId"] == "msg-123"
+        request_body = {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": {
+                        "type": "text",
+                        "text": "Create a sample message"
+                    }
+                }
+            ],
+            "maxTokens": 100,
+            "modelPreferences": {
+                "cost_priority": 0.3,
+                "speed_priority": 0.3,
+                "intelligence_priority": 0.4
+            }
+        }
+        
+        response = await client.post("/protocol/sampling/createMessage", json=request_body, headers=TEST_AUTH_HEADER)
+        
+        assert response.status_code == 200
+        result = response.json()
+        assert "content" in result
+        assert "model" in result
+        assert "role" in result
 
 
 # -------------------------

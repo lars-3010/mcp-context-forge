@@ -90,7 +90,13 @@ from mcpgateway.dependencies import (
     get_sampling_handler,
     get_streamable_http_session,
     get_tool_service,
+    get_server_service,
+    get_tag_service,
+    get_logging_service,
 )
+
+
+from mcpgateway.routers.v1.utility import handle_rpc
 
 # middleware imports
 from mcpgateway.middleware.docs_auth_middleware import DocsAuthMiddleware
@@ -111,11 +117,13 @@ from mcpgateway.utils.db_isready import wait_for_db_ready
 from mcpgateway.utils.error_formatter import ErrorFormatter
 from mcpgateway.utils.redis_isready import wait_for_redis_ready
 
+
 # Import the admin routes from the new module
+from mcpgateway.version import router as version_router
 
 
 # Initialize logging service first
-logging_service = LoggingService()
+logging_service = get_logging_service()
 logger = logging_service.get_logger("mcpgateway")
 
 # Configure root logger level
@@ -137,6 +145,19 @@ else:
 
 # Initialize plugin manager as a singleton.
 plugin_manager: PluginManager | None = PluginManager(settings.plugin_config_file) if settings.plugins_enabled else None
+
+
+# Get service instances via dependency injection
+tool_service = get_tool_service()
+resource_service = get_resource_service()
+prompt_service = get_prompt_service()
+gateway_service = get_gateway_service()
+root_service = get_root_service()
+completion_service = get_completion_service()
+sampling_handler = get_sampling_handler()
+resource_cache = get_resource_cache()
+server_service = get_server_service()
+tag_service = get_tag_service()
 
 # Initialize session manager for Streamable HTTP transport
 streamable_http_session = get_streamable_http_session()
@@ -173,16 +194,6 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
             await plugin_manager.initialize()
             logger.info(f"Plugin manager initialized with {plugin_manager.plugin_count} plugins")
 
-        # Get service instances via dependency injection
-        tool_service = get_tool_service()
-        resource_service = get_resource_service()
-        prompt_service = get_prompt_service()
-        gateway_service = get_gateway_service()
-        root_service = get_root_service()
-        completion_service = get_completion_service()
-        sampling_handler = get_sampling_handler()
-        resource_cache = get_resource_cache()
-
         # Initialize all services
         await tool_service.initialize()
         await resource_service.initialize()
@@ -210,16 +221,6 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
             except Exception as e:
                 logger.error(f"Error shutting down plugin manager: {str(e)}")
         logger.info("Shutting down MCP Gateway services")
-
-        # Get service instances for shutdown
-        tool_service = get_tool_service()
-        resource_service = get_resource_service()
-        prompt_service = get_prompt_service()
-        gateway_service = get_gateway_service()
-        root_service = get_root_service()
-        completion_service = get_completion_service()
-        sampling_handler = get_sampling_handler()
-        resource_cache = get_resource_cache()
 
         for service in [resource_cache, sampling_handler, logging_service, completion_service, root_service, gateway_service, prompt_service, resource_service, tool_service, streamable_http_session]:
             try:
@@ -369,16 +370,18 @@ def configure_routes(app: FastAPI) -> None:
     """
     logger.info("Configuring application routes")
 
+
     # API version routers
     v1_router = APIRouter()
     setup_v1_routes(v1_router)
     app.include_router(v1_router, prefix="/v1")
-    logger.info("V1 routes configured")
+    
+    # Root-level routes for backward compatibility
+    setup_v1_routes(app)
+    logger.info("V1 routes configured at both /v1 and root level")
 
     # Version endpoint
-    version_router = APIRouter()
-    setup_version_routes(version_router)
-    app.include_router(version_router, prefix="/version")
+    app.include_router(version_router)
     logger.info("Version routes configured")
 
     exp_router = APIRouter()
@@ -405,11 +408,6 @@ def configure_routes(app: FastAPI) -> None:
     configure_health_endpoints(app)
     logger.info("Health endpoints configured")
 
-    # Add root-level RPC endpoint for backward compatibility
-    # First-Party
-    from mcpgateway.routers.v1.utility import handle_rpc
-
-    app.post("/rpc")(handle_rpc)
     app.post("/rpc/")(handle_rpc)
     logger.info("Root-level RPC endpoints configured")
 

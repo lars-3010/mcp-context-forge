@@ -167,7 +167,7 @@ def test_client(app):
     accessible without needing to furnish JWTs in every request.
     """
     # First-Party
-    from mcpgateway.main import require_auth
+    from mcpgateway.utils.verify_credentials import require_auth
 
     app.dependency_overrides[require_auth] = lambda: "test_user"
     client = TestClient(app)
@@ -240,7 +240,7 @@ class TestProtocolEndpoints:
     """Tests for MCP protocol operations: initialize, ping, notifications, etc."""
 
     # @patch("mcpgateway.main.validate_request")
-    @patch("mcpgateway.main.session_registry.handle_initialize_logic")
+    @patch("mcpgateway.registry.session_registry.handle_initialize_logic")
     def test_initialize_endpoint(self, mock_handle_initialize, test_client, auth_headers):
         """Test MCP protocol initialization."""
         mock_capabilities = ServerCapabilities(
@@ -942,7 +942,7 @@ class TestRPCEndpoints:
         assert isinstance(body, list)
         mock_list_tools.assert_called_once()
 
-    @patch("mcpgateway.main.RPCRequest")
+    @patch("mcpgateway.schemas.RPCRequest")
     def test_rpc_invalid_request(self, mock_rpc_request, test_client, auth_headers):
         """Test RPC error handling for invalid requests."""
         mock_rpc_request.side_effect = ValueError("Invalid method")
@@ -978,34 +978,34 @@ class TestRPCEndpoints:
 class TestRealtimeEndpoints:
     """Tests for real-time communication: WebSocket, SSE, message handling, etc."""
 
-    @patch("mcpgateway.main.ResilientHttpClient")  # stub network calls
+    @patch("mcpgateway.routers.v1.utility.ResilientHttpClient")
     def test_websocket_endpoint(self, mock_client, test_client):
+        """Test WebSocket connection and message handling."""
         # Standard
         from types import SimpleNamespace
-
-        """Test WebSocket connection and message handling."""
-        # ----- set up async context-manager dummy -----
+        
+        # Mock the HTTP client used by the WebSocket endpoint
         mock_instance = mock_client.return_value
         mock_instance.__aenter__.return_value = mock_instance
         mock_instance.__aexit__.return_value = False
-
-        async def dummy_post(*_args, **_kwargs):
-            # minimal object that looks like an httpx.Response
+        
+        # Mock the post method to return a JSON-RPC response
+        async def dummy_post(*args, **kwargs):
             return SimpleNamespace(text='{"jsonrpc":"2.0","id":1,"result":{}}')
-
+        
         mock_instance.post = dummy_post
-        # ---------------------------------------------
-
+        
+        # Test WebSocket connection
         with test_client.websocket_connect("/ws") as websocket:
             websocket.send_text('{"jsonrpc":"2.0","method":"ping","id":1}')
             data = websocket.receive_text()
             response = json.loads(data)
             assert response == {"jsonrpc": "2.0", "id": 1, "result": {}}
 
-    @patch("mcpgateway.main.update_url_protocol", new=lambda url: url)
-    @patch("mcpgateway.main.session_registry.add_session")
-    @patch("mcpgateway.main.session_registry.respond")
-    @patch("mcpgateway.main.SSETransport")
+    @patch("mcpgateway.utils.url_utils.update_url_protocol", new=lambda url: url)
+    @patch("mcpgateway.registry.session_registry.add_session")
+    @patch("mcpgateway.registry.session_registry.respond")
+    @patch("mcpgateway.routers.v1.servers.SSETransport")
     def test_sse_endpoint(self, mock_transport_class, mock_respond, mock_add_session, test_client, auth_headers):
         """Test SSE connection establishment."""
         mock_transport = MagicMock()
@@ -1019,7 +1019,7 @@ class TestRealtimeEndpoints:
         # The exact assertion will depend on how SSE responses are structured
         mock_transport_class.assert_called_once()
 
-    @patch("mcpgateway.main.session_registry.broadcast")
+    @patch("mcpgateway.registry.session_registry.broadcast")
     def test_message_endpoint(self, mock_broadcast, test_client, auth_headers):
         """Test message broadcasting to SSE sessions."""
         message = {"type": "test", "data": "hello"}

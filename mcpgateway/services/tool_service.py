@@ -31,6 +31,7 @@ from mcp.client.streamable_http import streamablehttp_client
 from sqlalchemy import delete, func, not_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from urllib.parse import urlparse, parse_qs
 
 # First-Party
 from mcpgateway.config import settings
@@ -607,6 +608,7 @@ class ToolService:
 
                 # Handle URL path parameter substitution
                 final_url = tool.url
+
                 if "{" in tool.url and "}" in tool.url:
                     # Extract path parameters from URL template and arguments
                     url_params = re.findall(r"\{(\w+)\}", tool.url)
@@ -618,6 +620,16 @@ class ToolService:
                             final_url = final_url.replace(f"{{{param}}}", str(url_substitutions[param]))
                         else:
                             raise ToolInvocationError(f"Required URL parameter '{param}' not found in arguments")
+
+                
+                # --- Extract query params from URL ---
+                parsed = urlparse(final_url)
+                final_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+
+                query_params = {k: v[0] for k, v in parse_qs(parsed.query).items()}
+
+                # Merge leftover payload + query params
+                payload.update(query_params)
 
                 # Use the tool's request_type rather than defaulting to POST.
                 method = tool.request_type.upper()

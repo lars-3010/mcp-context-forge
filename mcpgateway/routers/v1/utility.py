@@ -42,7 +42,6 @@ Returns:
 # Standard
 import asyncio
 import json
-from urllib.parse import urlparse, urlunparse
 
 # Third-Party
 from fastapi import (
@@ -58,12 +57,15 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 # First-Party
+from mcpgateway.utils.url_utils import update_url_protocol
+
 from mcpgateway.config import settings
 from mcpgateway.db import get_db
 
 # Import dependency injection functions
 from mcpgateway.dependencies import (
     get_gateway_service,
+    get_logging_service,
     get_prompt_service,
     get_resource_service,
     get_root_service,
@@ -83,7 +85,7 @@ from mcpgateway.utils.verify_credentials import require_auth
 from mcpgateway.validation.jsonrpc import JSONRPCError
 
 # Initialize logging service first
-logging_service = LoggingService()
+logging_service = get_logging_service()
 logger = logging_service.get_logger("utility routes")
 
 # Initialize service
@@ -97,43 +99,6 @@ root_service = get_root_service()
 utility_router = APIRouter(tags=["Utilities"])
 
 
-def get_protocol_from_request(request: Request) -> str:
-    """
-    Return "https" or "http" based on:
-     1) X-Forwarded-Proto (if set by a proxy)
-     2) request.url.scheme  (e.g. when Gunicorn/Uvicorn is terminating TLS)
-
-    Args:
-        request (Request): The FastAPI request object.
-
-    Returns:
-        str: The protocol used for the request, either "http" or "https".
-    """
-    forwarded = request.headers.get("x-forwarded-proto")
-    if forwarded:
-        # may be a comma-separated list; take the first
-        return forwarded.split(",")[0].strip()
-    return request.url.scheme
-
-
-def update_url_protocol(request: Request) -> str:
-    """
-    Update the base URL protocol based on the request's scheme or forwarded headers.
-
-    Args:
-        request (Request): The FastAPI request object.
-
-    Returns:
-        str: The base URL with the correct protocol.
-    """
-    parsed = urlparse(str(request.base_url))
-    proto = get_protocol_from_request(request)
-    new_parsed = parsed._replace(scheme=proto)
-    # urlunparse keeps netloc and path intact
-    return urlunparse(new_parsed).rstrip("/")
-
-
-@utility_router.post("/rpc/")
 @utility_router.post("/rpc")
 async def handle_rpc(request: Request, db: Session = Depends(get_db), user: str = Depends(require_auth)):  # revert this back
     """Handle RPC requests.
@@ -149,12 +114,21 @@ async def handle_rpc(request: Request, db: Session = Depends(get_db), user: str 
     try:
         logger.debug(f"User {user} made an RPC request")
         body = await request.json()
+        
+        # Validate required fields first
+        if "method" not in body:
+            raise HTTPException(status_code=422, detail="Method invalid")
+            
         method = body["method"]
         # rpc_id = body.get("id")
         params = body.get("params", {})
         cursor = params.get("cursor")  # Extract cursor parameter
 
-        RPCRequest(jsonrpc="2.0", method=method, params=params)  # Validate the request body against the RPCRequest model
+        # Validate the request body against the RPCRequest model
+        try:
+            RPCRequest(jsonrpc="2.0", method=method, params=params)
+        except Exception:
+            raise HTTPException(status_code=422, detail="Method invalid")
 
         if method == "tools/list":
             tools = await tool_service.list_tools(db, cursor=cursor)
@@ -207,11 +181,15 @@ async def handle_rpc(request: Request, db: Session = Depends(get_db), user: str 
         response = result
         return response
 
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=422, detail="Method invalid")
+    except HTTPException:
+        raise
     except JSONRPCError as e:
         return e.to_dict()
     except Exception as e:
         if isinstance(e, ValueError):
-            return JSONResponse(content={"message": "Method invalid"}, status_code=422)
+            raise HTTPException(status_code=422, detail="Method invalid")
         logger.error(f"RPC error: {str(e)}")
         return {
             "jsonrpc": "2.0",
@@ -351,13 +329,14 @@ async def utility_message_endpoint(request: Request, user: str = Depends(require
 
 
 @utility_router.post("/logging/setLevel")
-async def set_log_level(request: Request, user: str = Depends(require_auth)) -> None:
+async def set_log_level(request: Request, user: str = Depends(require_auth), logging_service: LoggingService = Depends(get_logging_service)) -> None:
     """
     Update the server's log level at runtime.
 
     Args:
         request: HTTP request with log level JSON body.
         user: Authenticated user.
+        logging_service: The logging service dependency.
 
     Returns:
         None
