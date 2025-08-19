@@ -83,20 +83,17 @@ from mcpgateway.db import get_db, refresh_slugs_on_startup
 from mcpgateway.dependencies import (
     get_completion_service,
     get_gateway_service,
+    get_logging_service,
     get_prompt_service,
     get_resource_cache,
     get_resource_service,
     get_root_service,
     get_sampling_handler,
-    get_streamable_http_session,
-    get_tool_service,
     get_server_service,
+    get_streamable_http_session,
     get_tag_service,
-    get_logging_service,
+    get_tool_service,
 )
-
-
-from mcpgateway.routers.v1.utility import handle_rpc
 
 # middleware imports
 from mcpgateway.middleware.docs_auth_middleware import DocsAuthMiddleware
@@ -108,19 +105,16 @@ from mcpgateway.plugins import PluginManager
 # from v1 routes
 from mcpgateway.routers.setup_routes import (
     setup_experimental_routes,
-    setup_version_routes,
     setup_legacy_deprecation_routes,
     setup_v1_routes,
 )
-from mcpgateway.services.logging_service import LoggingService
+from mcpgateway.routers.v1.utility import handle_rpc
 from mcpgateway.utils.db_isready import wait_for_db_ready
 from mcpgateway.utils.error_formatter import ErrorFormatter
 from mcpgateway.utils.redis_isready import wait_for_redis_ready
 
-
 # Import the admin routes from the new module
 from mcpgateway.version import router as version_router
-
 
 # Initialize logging service first
 logging_service = get_logging_service()
@@ -179,10 +173,10 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     shuts them down in reverse order on exit.
 
     Args:
-        _app (FastAPI): FastAPI app
+        _app: FastAPI application instance
 
     Yields:
-        None
+        None: Context manager yields control to application
 
     Raises:
         Exception: Any unhandled error that occurs during service
@@ -261,7 +255,7 @@ def create_app() -> FastAPI:
     return app
 
 
-def configure_middleware(app: FastAPI) -> None:
+def configure_middleware(fastapi_app: FastAPI) -> None:
     """Configure application middleware stack.
 
     Sets up middleware in reverse order (last added executes first):
@@ -273,28 +267,26 @@ def configure_middleware(app: FastAPI) -> None:
     6. ProxyHeaders - Trust proxy headers for correct client IP detection
 
     Args:
-        app: FastAPI application instance to configure
+        fastapi_app: FastAPI application instance to configure
 
-    Returns:
-        None
     """
     # Trust all proxies (or lock down with a list of host patterns)
-    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+    fastapi_app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
     # Add streamable HTTP middleware for /mcp routes
-    app.add_middleware(MCPPathRewriteMiddleware)
+    fastapi_app.add_middleware(MCPPathRewriteMiddleware)
 
     # Add custom DocsAuthMiddleware
-    app.add_middleware(DocsAuthMiddleware)
+    fastapi_app.add_middleware(DocsAuthMiddleware)
 
     # Add legacy deprecation middleware
-    app.add_middleware(LegacyDeprecationMiddleware)
+    fastapi_app.add_middleware(LegacyDeprecationMiddleware)
 
     # Add experimental access middleware
-    app.add_middleware(ExperimentalAccessMiddleware)
+    fastapi_app.add_middleware(ExperimentalAccessMiddleware)
 
     # Configure CORS
-    app.add_middleware(
+    fastapi_app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if not settings.allowed_origins else list(settings.allowed_origins),
         allow_credentials=True,
@@ -304,7 +296,7 @@ def configure_middleware(app: FastAPI) -> None:
     )
 
 
-def configure_exception_handlers(app: FastAPI) -> None:
+def configure_exception_handlers(fastapi_app: FastAPI) -> None:
     """Configure global exception handlers for consistent error responses.
 
     Registers handlers for:
@@ -315,18 +307,32 @@ def configure_exception_handlers(app: FastAPI) -> None:
     Args:
         app: FastAPI application instance to configure
 
-    Returns:
-        None
     """
 
-    @app.exception_handler(ValidationError)
+    @fastapi_app.exception_handler(ValidationError)
     async def validation_exception_handler(_request: Request, exc: ValidationError):
-        """Handle Pydantic validation errors globally."""
+        """Handle Pydantic validation errors globally.
+
+        Args:
+            _request: The HTTP request that caused the validation error
+            exc: The Pydantic validation error
+
+        Returns:
+            JSONResponse: HTTP 422 response with formatted validation error
+        """
         return JSONResponse(status_code=422, content=ErrorFormatter.format_validation_error(exc))
 
-    @app.exception_handler(RequestValidationError)
+    @fastapi_app.exception_handler(RequestValidationError)
     async def request_validation_exception_handler(_request: Request, exc: RequestValidationError):
-        """Handle FastAPI request validation errors."""
+        """Handle FastAPI request validation errors.
+
+        Args:
+            _request: The HTTP request that caused the validation error
+            exc: The FastAPI request validation error
+
+        Returns:
+            JSONResponse: HTTP 422 response with formatted validation error
+        """
         if _request.url.path.startswith("/tools"):
             error_details = []
             for error in exc.errors():
@@ -344,13 +350,21 @@ def configure_exception_handlers(app: FastAPI) -> None:
             return JSONResponse(status_code=422, content={"detail": error_details})
         return await fastapi_default_validation_handler(_request, exc)
 
-    @app.exception_handler(IntegrityError)
+    @fastapi_app.exception_handler(IntegrityError)
     async def database_exception_handler(_request: Request, exc: IntegrityError):
-        """Handle SQLAlchemy database integrity constraint violations."""
+        """Handle SQLAlchemy database integrity constraint violations.
+
+        Args:
+            _request: The HTTP request that caused the database error
+            exc: The SQLAlchemy integrity error
+
+        Returns:
+            JSONResponse: HTTP 409 response with formatted database error
+        """
         return JSONResponse(status_code=409, content=ErrorFormatter.format_database_error(exc))
 
 
-def configure_routes(app: FastAPI) -> None:
+def configure_routes(fastapi_app: FastAPI) -> None:
     """Configure application routes and API endpoints.
 
     Sets up:
@@ -365,60 +379,57 @@ def configure_routes(app: FastAPI) -> None:
     Args:
         app: FastAPI application instance to configure
 
-    Returns:
-        None
     """
     logger.info("Configuring application routes")
-
 
     # API version routers
     v1_router = APIRouter()
     setup_v1_routes(v1_router)
-    app.include_router(v1_router, prefix="/v1")
-    
+    fastapi_app.include_router(v1_router, prefix="/v1")
+
     # Root-level routes for backward compatibility
-    setup_v1_routes(app)
+    setup_v1_routes(fastapi_app)
     logger.info("V1 routes configured at both /v1 and root level")
 
     # Version endpoint
-    app.include_router(version_router)
+    fastapi_app.include_router(version_router)
     logger.info("Version routes configured")
 
     exp_router = APIRouter()
     setup_experimental_routes(exp_router)
-    app.include_router(exp_router, prefix="/experimental")
+    fastapi_app.include_router(exp_router, prefix="/experimental")
     logger.info("Experimental routes configured")
 
     # Legacy deprecation routes
-    setup_legacy_deprecation_routes(app)
+    setup_legacy_deprecation_routes(fastapi_app)
     logger.info("Legacy deprecation routes configured")
 
     # Admin API (conditional)
     if settings.mcpgateway_admin_api_enabled:
         logger.info("Including admin_router - Admin API enabled")
-        app.include_router(admin_router)
+        fastapi_app.include_router(admin_router)
     else:
         logger.warning("Admin API routes not mounted - Admin API disabled")
 
     # Streamable HTTP mount
-    app.mount("/mcp", app=streamable_http_session.handle_streamable_http)
+    fastapi_app.mount("/mcp", app=streamable_http_session.handle_streamable_http)
     logger.info("Streamable HTTP mount configured")
 
     # Health endpoints
-    configure_health_endpoints(app)
+    configure_health_endpoints(fastapi_app)
     logger.info("Health endpoints configured")
 
-    app.post("/rpc/")(handle_rpc)
+    fastapi_app.post("/rpc/")(handle_rpc)
     logger.info("Root-level RPC endpoints configured")
 
     # Log all registered routes for debugging
     logger.info("Registered routes:")
-    for route in app.routes:
+    for route in fastapi_app.routes:
         if hasattr(route, "path"):
             logger.info(f"  {route.methods if hasattr(route, 'methods') else 'MOUNT'} {route.path}")
 
 
-def configure_health_endpoints(app: FastAPI) -> None:
+def configure_health_endpoints(fastapi_app: FastAPI) -> None:
     """Configure health check and readiness endpoints.
 
     Adds:
@@ -428,13 +439,18 @@ def configure_health_endpoints(app: FastAPI) -> None:
     Args:
         app: FastAPI application instance to configure
 
-    Returns:
-        None
     """
 
-    @app.get("/health")
+    @fastapi_app.get("/health")
     async def healthcheck(db: Session = Depends(get_db)):
-        """Basic health check."""
+        """Basic health check.
+
+        Args:
+            db: The database session used to check health.
+
+        Returns:
+            dict: Status dictionary with health information
+        """
         try:
             db.execute(text("SELECT 1"))
             return {"status": "healthy"}
@@ -442,9 +458,16 @@ def configure_health_endpoints(app: FastAPI) -> None:
             logger.error(f"Database connection error: {str(e)}")
             return {"status": "unhealthy", "error": str(e)}
 
-    @app.get("/ready")
+    @fastapi_app.get("/ready")
     async def readiness_check(db: Session = Depends(get_db)):
-        """Readiness check."""
+        """Readiness check.
+
+        Args:
+            db: The database session used to check readiness.
+
+        Returns:
+            JSONResponse: HTTP 200 response if ready, HTTP 503 response if not ready
+        """
         try:
             await asyncio.to_thread(db.execute, text("SELECT 1"))
             return JSONResponse(content={"status": "ready"}, status_code=200)
@@ -453,7 +476,7 @@ def configure_health_endpoints(app: FastAPI) -> None:
             return JSONResponse(content={"status": "not ready", "error": str(e)}, status_code=503)
 
 
-def configure_ui(app: FastAPI) -> None:
+def configure_ui(fastapi_app: FastAPI) -> None:
     """Configure user interface and static file serving.
 
     Sets up:
@@ -469,34 +492,43 @@ def configure_ui(app: FastAPI) -> None:
     Args:
         app: FastAPI application instance to configure
 
-    Returns:
-        None
     """
     # Set up Jinja2 templates
     templates = Jinja2Templates(directory=str(settings.templates_dir))
-    app.state.templates = templates
+    fastapi_app.state.templates = templates
 
     if settings.mcpgateway_ui_enabled:
         # Mount static files
         try:
-            app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
+            fastapi_app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
             logger.info("Static assets served from %s", settings.static_dir)
         except RuntimeError as exc:
             logger.warning("Static dir %s not found - Admin UI disabled (%s)", settings.static_dir, exc)
 
         # Root redirect to admin UI
-        @app.get("/")
+        @fastapi_app.get("/")
         async def root_redirect(request: Request):
-            """Redirect root path to admin UI."""
+            """Redirect root path to admin UI.
+
+            Args:
+                request: The incoming FastAPI request.
+
+            Returns:
+                RedirectResponse: Redirects to /admin path
+            """
             logger.debug("Redirecting root path to /admin")
             root_path = request.scope.get("root_path", "")
             return RedirectResponse(f"{root_path}/admin", status_code=303)
 
     else:
         # API info at root when UI is disabled
-        @app.get("/")
+        @fastapi_app.get("/")
         async def root_info():
-            """Return API information when UI is disabled."""
+            """Return API information when UI is disabled.
+
+            Returns:
+                dict: API information dictionary
+            """
             logger.info("UI disabled, serving API info at root path")
             return {
                 "name": settings.app_name,

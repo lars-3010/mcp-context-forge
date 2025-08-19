@@ -86,8 +86,8 @@ async def initialize(request: Request, user: str = Depends(require_auth)) -> Ini
     the user is authenticated before proceeding.
 
     Args:
-        request (Request): The incoming request object containing the JSON body.
-        user (str): The authenticated user (from `require_auth` dependency).
+        request: The incoming request object containing the JSON body.
+        user: The authenticated user (from `require_auth` dependency).
 
     Returns:
         InitializeResult: The result of the initialization process.
@@ -117,8 +117,8 @@ async def ping(request: Request, user: str = Depends(require_auth)) -> JSONRespo
     with a JSON-RPC response containing an empty result, as required by the protocol.
 
     Args:
-        request (Request): The incoming FastAPI request.
-        user (str): The authenticated user (dependency injection).
+        request: The incoming FastAPI request.
+        user: The authenticated user (dependency injection).
 
     Returns:
         JSONResponse: A JSON-RPC response with an empty result or an error response.
@@ -151,9 +151,11 @@ async def handle_notification(request: Request, user: str = Depends(require_auth
     different actions are taken (e.g., logging initialization, cancellation, or messages).
 
     Args:
-        request (Request): The incoming request containing the notification data.
-        user (str): The authenticated user making the request.
-        logging_service (LoggingService): The logging service dependency.
+        request: The incoming request containing the notification data.
+        user: The authenticated user making the request.
+        logging_service: The logging service dependency.
+
+
     """
     body = await request.json()
     logger.debug(f"User {user} sent a notification")
@@ -179,12 +181,16 @@ async def handle_completion(request: Request, db: Session = Depends(get_db), use
     Handles the completion of tasks by processing a completion request.
 
     Args:
-        request (Request): The incoming request with completion data.
-        db (Session): The database session used to interact with the data store.
-        user (str): The authenticated user making the request.
+        request: The incoming request with completion data.
+        db: The database session used to interact with the data store.
+        user: The authenticated user making the request.
+        completion_service: The completion service dependency.
 
     Returns:
         The result of the completion process.
+
+    Raises:
+        HTTPException: If completion processing fails with 500 status code.
     """
     try:
         body = await request.json()
@@ -201,12 +207,15 @@ async def handle_sampling(request: Request, db: Session = Depends(get_db), user:
     Handles the creation of a new message for sampling.
 
     Args:
-        request (Request): The incoming request with sampling data.
-        db (Session): The database session used to interact with the data store.
-        user (str): The authenticated user making the request.
+        request: The incoming request with sampling data.
+        db: The database session used to interact with the data store.
+        user: The authenticated user making the request.
 
     Returns:
         The result of the message creation process.
+
+    Raises:
+        HTTPException: If sampling processing fails with 500 status code.
     """
     try:
         logger.debug(f"User {user} sent a sampling request")

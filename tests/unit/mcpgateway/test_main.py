@@ -11,10 +11,11 @@ Comprehensive tests for the main API endpoints with full coverage.
 from copy import deepcopy
 import json
 import os
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch, AsyncMock
 
 # Third-Party
 from fastapi.testclient import TestClient
+from fastapi import Response
 import pytest
 
 # First-Party
@@ -942,7 +943,7 @@ class TestRPCEndpoints:
         assert isinstance(body, list)
         mock_list_tools.assert_called_once()
 
-    @patch("mcpgateway.schemas.RPCRequest")
+    @patch("mcpgateway.routers.v1.utility.RPCRequest")
     def test_rpc_invalid_request(self, mock_rpc_request, test_client, auth_headers):
         """Test RPC error handling for invalid requests."""
         mock_rpc_request.side_effect = ValueError("Invalid method")
@@ -952,7 +953,7 @@ class TestRPCEndpoints:
 
         assert response.status_code == 422
         body = response.json()
-        assert "Method invalid" in body.get("message")
+        assert "Method invalid" in body.get("detail")
 
     def test_rpc_invalid_json(self, test_client, auth_headers):
         """Test RPC error handling for malformed JSON."""
@@ -961,7 +962,7 @@ class TestRPCEndpoints:
         response = test_client.post("/rpc/", content="invalid json", headers=headers)
         assert response.status_code == 422  # Returns error response, not HTTP error
         body = response.json()
-        assert "Method invalid" in body.get("message")
+        assert "Method invalid" in body.get("detail", "")
 
     @patch("mcpgateway.main.logging_service.set_level")
     def test_set_log_level_endpoint(self, mock_set_level, test_client, auth_headers):
@@ -977,25 +978,33 @@ class TestRPCEndpoints:
 # ----------------------------------------------------- #
 class TestRealtimeEndpoints:
     """Tests for real-time communication: WebSocket, SSE, message handling, etc."""
-
+    
+    @patch("mcpgateway.config.settings")
     @patch("mcpgateway.routers.v1.utility.ResilientHttpClient")
-    def test_websocket_endpoint(self, mock_client, test_client):
-        """Test WebSocket connection and message handling."""
-        # Standard
+    def test_websocket_endpoint(self, mock_client,mock_settings, test_client):
+        #Standard
         from types import SimpleNamespace
-        
-        # Mock the HTTP client used by the WebSocket endpoint
+
+        """Test WebSocket connection and message handling."""
+        # Configure mock settings for auth disabled
+        mock_settings.mcp_client_auth_enabled = False
+        mock_settings.auth_required = False
+        mock_settings.federation_timeout = 30
+        mock_settings.skip_ssl_verify = False
+        mock_settings.port = 4444
+
+        # ----- set up async context-manager dummy -----
         mock_instance = mock_client.return_value
         mock_instance.__aenter__.return_value = mock_instance
         mock_instance.__aexit__.return_value = False
-        
-        # Mock the post method to return a JSON-RPC response
-        async def dummy_post(*args, **kwargs):
+
+        async def dummy_post(*_args, **_kwargs):
+            # minimal object that looks like an httpx.Response
             return SimpleNamespace(text='{"jsonrpc":"2.0","id":1,"result":{}}')
-        
+
         mock_instance.post = dummy_post
-        
-        # Test WebSocket connection
+        # ---------------------------------------------
+
         with test_client.websocket_connect("/ws") as websocket:
             websocket.send_text('{"jsonrpc":"2.0","method":"ping","id":1}')
             data = websocket.receive_text()
@@ -1013,7 +1022,7 @@ class TestRealtimeEndpoints:
         mock_transport.create_sse_response.return_value = MagicMock()
         mock_transport_class.return_value = mock_transport
 
-        response = test_client.get("/sse", headers=auth_headers)
+        response = test_client.get("/servers/123/sse", headers=auth_headers)
 
         # Note: This test may need adjustment based on actual SSE implementation
         # The exact assertion will depend on how SSE responses are structured

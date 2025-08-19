@@ -49,7 +49,6 @@ Returns:
 import asyncio
 from typing import Dict, List, Optional
 
-
 # Third-Party
 from fastapi import (
     APIRouter,
@@ -64,8 +63,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 # First-Party
-
-from mcpgateway.utils.url_utils import update_url_protocol
 from mcpgateway.db import get_db
 
 # Import dependency injection functions
@@ -87,6 +84,7 @@ from mcpgateway.services.server_service import (
 )
 from mcpgateway.transports.sse_transport import SSETransport
 from mcpgateway.utils.error_formatter import ErrorFormatter
+from mcpgateway.utils.url_utils import update_url_protocol
 from mcpgateway.utils.verify_credentials import require_auth
 
 # Initialize logging service first
@@ -102,6 +100,7 @@ resource_service = get_resource_service()
 
 # Create API router
 server_router = APIRouter(prefix="/servers", tags=["Servers"])
+
 
 # APIs
 @server_router.get("", response_model=List[ServerRead])

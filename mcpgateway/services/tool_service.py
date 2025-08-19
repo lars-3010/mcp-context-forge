@@ -23,6 +23,7 @@ import logging
 import re
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional
+from urllib.parse import parse_qs, urlparse
 
 # Third-Party
 from mcp import ClientSession
@@ -31,7 +32,6 @@ from mcp.client.streamable_http import streamablehttp_client
 from sqlalchemy import delete, func, not_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from urllib.parse import urlparse, parse_qs
 
 # First-Party
 from mcpgateway.config import settings
@@ -621,7 +621,6 @@ class ToolService:
                         else:
                             raise ToolInvocationError(f"Required URL parameter '{param}' not found in arguments")
 
-                
                 # --- Extract query params from URL ---
                 parsed = urlparse(final_url)
                 final_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"

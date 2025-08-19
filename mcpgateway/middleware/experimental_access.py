@@ -77,7 +77,10 @@ class ExperimentalAccessMiddleware(BaseHTTPMiddleware):
             call_next: Next middleware in chain
 
         Returns:
-            Response or raises HTTPException for unauthorized access
+            Response: HTTP response from middleware chain
+
+        Raises:
+            HTTPException: For authentication or authorization failures
         """
         # Skip if middleware disabled or not experimental path
         if not self.enabled or not EXPERIMENTAL_PATH_PATTERN.match(request.url.path):

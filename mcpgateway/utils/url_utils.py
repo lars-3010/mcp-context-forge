@@ -1,7 +1,9 @@
+# Standard
 from urllib.parse import urlparse, urlunparse
 
 # Third-Party
 from fastapi import Request
+
 
 def get_protocol_from_request(request: Request) -> str:
     """

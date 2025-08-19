@@ -57,8 +57,6 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 # First-Party
-from mcpgateway.utils.url_utils import update_url_protocol
-
 from mcpgateway.config import settings
 from mcpgateway.db import get_db
 
@@ -81,6 +79,7 @@ from mcpgateway.schemas import RPCRequest
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.transports.sse_transport import SSETransport
 from mcpgateway.utils.retry_manager import ResilientHttpClient
+from mcpgateway.utils.url_utils import update_url_protocol
 from mcpgateway.utils.verify_credentials import require_auth
 from mcpgateway.validation.jsonrpc import JSONRPCError
 
@@ -110,25 +109,25 @@ async def handle_rpc(request: Request, db: Session = Depends(get_db), user: str 
 
     Returns:
         Response with the RPC result or error.
+
+    Raises:
+        HTTPException: For invalid requests or processing errors.
     """
     try:
         logger.debug(f"User {user} made an RPC request")
         body = await request.json()
-        
+
         # Validate required fields first
         if "method" not in body:
             raise HTTPException(status_code=422, detail="Method invalid")
-            
+
         method = body["method"]
         # rpc_id = body.get("id")
         params = body.get("params", {})
         cursor = params.get("cursor")  # Extract cursor parameter
 
         # Validate the request body against the RPCRequest model
-        try:
-            RPCRequest(jsonrpc="2.0", method=method, params=params)
-        except Exception:
-            raise HTTPException(status_code=422, detail="Method invalid")
+        RPCRequest(jsonrpc="2.0", method=method, params=params)
 
         if method == "tools/list":
             tools = await tool_service.list_tools(db, cursor=cursor)
@@ -187,9 +186,9 @@ async def handle_rpc(request: Request, db: Session = Depends(get_db), user: str 
         raise
     except JSONRPCError as e:
         return e.to_dict()
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Method invalid")
     except Exception as e:
-        if isinstance(e, ValueError):
-            raise HTTPException(status_code=422, detail="Method invalid")
         logger.error(f"RPC error: {str(e)}")
         return {
             "jsonrpc": "2.0",
@@ -211,17 +210,21 @@ async def websocket_endpoint(websocket: WebSocket):
     """
     try:
         await websocket.accept()
+        logger.debug("WebSocket connection accepted")
         while True:
+            logger.debug("Waiting for WebSocket message")
             try:
                 data = await websocket.receive_text()
                 client_args = {"timeout": settings.federation_timeout, "verify": not settings.skip_ssl_verify}
                 async with ResilientHttpClient(client_args=client_args) as client:
+                    logger.debug("Received WebSocket message: %s", data)
                     response = await client.post(
                         f"http://localhost:{settings.port}/rpc",
                         json=json.loads(data),
                         headers={"Content-Type": "application/json"},
                     )
                     await websocket.send_text(response.text)
+                    logger.debug("WebSocket message sent back to client")
             except JSONRPCError as e:
                 await websocket.send_text(json.dumps(e.to_dict()))
             except json.JSONDecodeError:

@@ -40,6 +40,7 @@ def setup_v1_routes(app: FastAPI) -> None:
     app.include_router(metrics_router)
     app.include_router(tag_router)
 
+
 def setup_version_routes(app: FastAPI) -> None:
     """Configure version endpoint.
 
@@ -58,6 +59,7 @@ def setup_experimental_routes(app: FastAPI) -> None:
     # Register experimental routers here
 
 
+
 def setup_legacy_deprecation_routes(app: FastAPI) -> None:
     """Configure legacy route deprecation warnings.
 
@@ -66,4 +68,3 @@ def setup_legacy_deprecation_routes(app: FastAPI) -> None:
     """
 
     # Legacy routes are now handled by middleware instead of conflicting endpoints
-    pass
