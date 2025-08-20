@@ -21,6 +21,7 @@ from mcpgateway.routers.v1.tag import tag_router
 from mcpgateway.routers.v1.tool import tool_router
 from mcpgateway.routers.v1.utility import utility_router
 from mcpgateway.version import router as version_router
+from mcpgateway.routers.v1.admin import admin_router
 
 
 def setup_v1_routes(app: FastAPI) -> None:
