@@ -19,14 +19,14 @@ from fastapi.responses import PlainTextResponse
 
 # First-Party
 from mcpgateway.config import settings
-from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.utils.verify_credentials import require_auth
+from mcpgateway.dependencies import get_logging_service
 
 # Get logger instance
-logging_service = LoggingService()
+logging_service = get_logging_service()
 logger = logging_service.get_logger(__name__)
 
-router = APIRouter(tags=["well-known"])
+well_known_router = APIRouter(tags=["well-known"])
 
 # Well-known URI registry with validation
 WELL_KNOWN_REGISTRY = {
@@ -74,7 +74,7 @@ def validate_security_txt(content: str) -> Optional[str]:
     return "\n".join(validated)
 
 
-@router.get("/.well-known/{filename:path}", include_in_schema=False)
+@well_known_router.get("/.well-known/{filename:path}", include_in_schema=False)
 async def get_well_known_file(filename: str, response: Response, request: Request):
     """
     Serve well-known URI files.
@@ -140,7 +140,7 @@ async def get_well_known_file(filename: str, response: Response, request: Reques
             raise HTTPException(status_code=404, detail="Not found")
 
 
-@router.get("/admin/well-known", response_model=dict)
+@well_known_router.get("/admin/well-known", response_model=dict)
 async def get_well_known_status(user: str = Depends(require_auth)):
     """
     Get status of well-known URI configuration.

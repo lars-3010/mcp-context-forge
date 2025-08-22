@@ -4,7 +4,7 @@
 Tests the new MCP_CLIENT_AUTH_ENABLED and proxy authentication features.
 """
 
-import asyncio
+import os
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from fastapi import HTTPException, Request
@@ -12,6 +12,8 @@ from fastapi.security import HTTPAuthorizationCredentials
 
 from mcpgateway.utils import verify_credentials as vc
 
+# API version 
+API_VERSION = os.getenv("API_VERSION", "v1")
 
 class TestProxyAuthentication:
     """Test cases for proxy authentication functionality."""
@@ -164,7 +166,7 @@ class TestWebSocketAuthentication:
             mock_settings.trust_proxy_auth = False
 
             # Import and call the websocket_endpoint function
-            from mcpgateway.main import websocket_endpoint
+            from mcpgateway.routers.current import websocket_endpoint
 
             # Should close connection due to missing auth
             await websocket_endpoint(websocket)
@@ -186,14 +188,14 @@ class TestWebSocketAuthentication:
         websocket.receive_text = AsyncMock(side_effect=Exception("Test complete"))
 
         # Mock settings
-        with patch('mcpgateway.main.settings') as mock_settings:
+        with patch(f'mcpgateway.routers.{API_VERSION}.utility.settings') as mock_settings:
             mock_settings.mcp_client_auth_enabled = True
             mock_settings.auth_required = True
             mock_settings.port = 8000
 
             # Mock verify_jwt_token to succeed
-            with patch('mcpgateway.main.verify_jwt_token', new=AsyncMock(return_value={'sub': 'test-user'})):
-                from mcpgateway.main import websocket_endpoint
+            with patch(f'mcpgateway.routers.{API_VERSION}.utility.verify_jwt_token', new=AsyncMock(return_value={'sub': 'test-user'})):
+                from mcpgateway.routers.current import websocket_endpoint
 
                 try:
                     await websocket_endpoint(websocket)
@@ -218,14 +220,14 @@ class TestWebSocketAuthentication:
         websocket.receive_text = AsyncMock(side_effect=Exception("Test complete"))
 
         # Mock settings for proxy auth
-        with patch('mcpgateway.main.settings') as mock_settings:
+        with patch(f'mcpgateway.routers.{API_VERSION}.utility.settings') as mock_settings:
             mock_settings.mcp_client_auth_enabled = False
             mock_settings.trust_proxy_auth = True
             mock_settings.proxy_user_header = 'X-Authenticated-User'
             mock_settings.auth_required = False
             mock_settings.port = 8000
 
-            from mcpgateway.main import websocket_endpoint
+            from mcpgateway.routers.current import websocket_endpoint
 
             try:
                 await websocket_endpoint(websocket)
