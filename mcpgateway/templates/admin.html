@@ -207,7 +207,7 @@
                   >
                   <select
                     id="log-level-filter"
-                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600"
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600 text-gray-800 dark:text-gray-200"
                   >
                     <option value="">All Levels</option>
                     <option value="debug">Debug</option>
@@ -225,7 +225,7 @@
                   >
                   <select
                     id="log-entity-filter"
-                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600"
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600 text-gray-800 dark:text-gray-200"
                   >
                     <option value="">All Types</option>
                     <option value="tool">Tool</option>
@@ -287,7 +287,7 @@
               <!-- Log Stats -->
               <div
                 id="log-stats"
-                class="mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded"
+                class="mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200"
               >
                 <span class="text-sm text-gray-600 dark:text-gray-300"
                   >Loading stats...</span
@@ -949,26 +949,35 @@
                     {{ server.description }}
                   </td>
                   <td
-                    class="px-6 py-4 max-w-xs break-words text-sm text-gray-500 dark:text-gray-300"
+                    class="px-6 py-4 max-w-xs whitespace-nowrap break-words text-sm text-gray-500 dark:text-gray-300"
                   >
-                    {% if server.associatedTools %} {{ server.associatedTools |
-                    map('string') | join(', ') }} {% else %}
+                    {% if server.associatedTools %}
+                      {% for tool in server.associatedTools %}
+                        {{ tool }}<br>
+                      {% endfor %}
+                    {% else %}
                     <span class="text-gray-500 dark:text-gray-300">N/A</span>
                     {% endif %}
                   </td>
                   <td
-                    class="px-6 py-4 max-w-xs break-words text-sm text-gray-500 dark:text-gray-300"
+                    class="px-6 py-4 max-w-xs whitespace-nowrap break-words text-sm text-gray-500 dark:text-gray-300"
                   >
-                    {% if server.associatedResources %} {{
-                    server.associatedResources | join(', ') }} {% else %}
+                    {% if server.associatedResources %}
+                      {% for resource in server.associatedResources %}
+                        {{ resource }}<br>
+                      {% endfor %}
+                    {% else %}
                     <span class="text-gray-500 dark:text-gray-300">N/A</span>
                     {% endif %}
                   </td>
                   <td
-                    class="px-6 py-4 max-w-xs break-words text-sm text-gray-500 dark:text-gray-300"
+                    class="px-6 py-4 max-w-xs whitespace-nowrap break-words text-sm text-gray-500 dark:text-gray-300"
                   >
-                    {% if server.associatedPrompts %} {{
-                    server.associatedPrompts | join(', ') }} {% else %}
+                    {% if server.associatedPrompts %}
+                      {% for prompt in server.associatedPrompts %}
+                        {{ prompt }}<br>
+                      {% endfor %}
+                    {% else %}
                     <span class="text-gray-500 dark:text-gray-300">N/A</span>
                     {% endif %}
                   </td>
@@ -1393,7 +1402,7 @@
                     {{ loop.index }}
                   </td>
                   <td
-                    class="px-2 py-4 whitespace-normal break-words text-sm text-gray-500 dark:text-gray-300 w-36"
+                    class="px-2 py-4 whitespace-nowrap break-words text-sm text-gray-500 dark:text-gray-300 w-36"
                   >
                     {{ tool.gatewaySlug }}
                   </td>
@@ -1418,13 +1427,13 @@
                     {{ tool.requestType }}
                   </td>
                   <td
-                    class="px-2 py-4 whitespace-normal break-words text-sm text-gray-500 dark:text-gray-300"
+                    class="px-6 py-4 max-w-lg whitespace-normal break-words text-sm text-gray-500 dark:text-gray-300"
                   >
                     {% set clean_desc = (tool.description or "") | replace('\n',
                     ' ') | replace('\r', ' ') %} {% set refactor_desc =
                     clean_desc | striptags | trim | escape %} {% if
-                    refactor_desc | length is greaterthan 120 %} {{
-                    refactor_desc[:120] }}... {% else %} {{ refactor_desc }} {%
+                    refactor_desc | length is greaterthan 512 %} {{
+                    refactor_desc[:512] }}... {% else %} {{ refactor_desc }} {%
                     endif %}
                   </td>
                   <td class="px-2 py-4 whitespace-nowrap">
@@ -1967,7 +1976,7 @@
               </div>
               <div id="auth-basic-fields" style="display: none">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700"
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-400"
                     >Username</label
                   >
                   <input
@@ -1977,7 +1986,7 @@
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700"
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-400"
                     >Password</label
                   >
                   <input
@@ -1989,7 +1998,7 @@
               </div>
               <div id="auth-bearer-fields" style="display: none">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700"
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-400"
                     >Token</label
                   >
                   <input
@@ -2003,7 +2012,7 @@
                 <div class="space-y-3">
                   <div class="flex items-center justify-between">
                     <label
-                      class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                      class="block text-sm font-medium text-gray-700 dark:text-gray-400"
                     >
                       Custom Headers
                     </label>
@@ -2297,12 +2306,12 @@
                     {{ resource.name }}
                   </td>
                   <td
-                    class="px-6 py-4 whitespace-normal break-words text-sm font-medium text-gray-900 dark:text-gray-100"
+                    class="px-6 py-4 max-w-lg whitespace-normal break-words text-sm font-medium text-gray-600 dark:text-gray-400"
                   >
                     {{ resource.description or "N/A" }}
                   </td>
                   <td
-                    class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-500"
+                    class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400"
                   >
                     {{ resource.mimeType or "N/A" }}
                   </td>
@@ -2603,7 +2612,7 @@
                     {{ prompt.name }}
                   </td>
                   <td
-                    class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300"
+                    class="px-6 py-4 max-w-lg whitespace-normal break-words text-sm text-gray-500 dark:text-gray-300"
                   >
                     {{ prompt.description }}
                   </td>
@@ -3179,7 +3188,7 @@
               </div>
               <div id="auth-basic-fields-gw" style="display: none">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700"
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-400"
                     >Username</label
                   >
                   <input
@@ -3189,7 +3198,7 @@
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700"
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-400"
                     >Password</label
                   >
                   <input
@@ -3201,7 +3210,7 @@
               </div>
               <div id="auth-bearer-fields-gw" style="display: none">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700"
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-400"
                     >Token</label
                   >
                   <input
@@ -3886,15 +3895,15 @@
                   <td
                     class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100"
                   >
-                    {{ root.id }}
+                    {{ loop.index }}
                   </td>
                   <td
-                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100s"
+                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
                     {{ root.uri }}
                   </td>
                   <td
-                    class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-500"
+                    class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100"
                   >
                     {{ root.name }}
                   </td>
@@ -4428,7 +4437,7 @@
                     <button
                       type="button"
                       onclick="closeModal('tool-edit-modal')"
-                      class="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:text-gray-300"
+                      class="px-4 py-2 border border-gray-500 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:text-gray-300"
                     >
                       Cancel
                     </button>
@@ -4510,7 +4519,7 @@
                 <form id="edit-resource-form" method="POST">
                   <div class="grid grid-cols-1 gap-6">
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >URI</label
                       >
                       <!-- URI is read-only -->
@@ -4520,11 +4529,11 @@
                         required
                         id="edit-resource-uri"
                         readonly
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       />
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Name</label
                       >
                       <input
@@ -4532,39 +4541,39 @@
                         name="name"
                         required
                         id="edit-resource-name"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       />
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Description</label
                       >
                       <textarea
                         name="description"
                         id="edit-resource-description"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       ></textarea>
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >MIME Type</label
                       >
                       <input
                         type="text"
                         name="mimeType"
                         id="edit-resource-mime-type"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       />
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Content</label
                       >
                       <!-- Remove required attribute to avoid browser validation issues -->
                       <textarea
                         name="content"
                         id="edit-resource-content"
-                        class="mt-1 block w-full h-48 rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        class="mt-1 block w-full h-48 rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                       ></textarea>
                     </div>
                     <!-- Tags Section -->
@@ -4592,7 +4601,7 @@
                     <button
                       type="button"
                       onclick="closeModal('resource-edit-modal')"
-                      class="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:text-gray-300"
+                      class="px-4 py-2 border border-gray-500 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:text-gray-300"
                     >
                       Cancel
                     </button>
@@ -4671,7 +4680,7 @@
                 <form id="edit-prompt-form" method="POST">
                   <div class="grid grid-cols-1 gap-6">
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Name</label
                       >
                       <input
@@ -4679,37 +4688,37 @@
                         name="name"
                         required
                         id="edit-prompt-name"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       />
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Description</label
                       >
                       <textarea
                         name="description"
                         id="edit-prompt-description"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       ></textarea>
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Template</label
                       >
                       <textarea
                         name="template"
                         id="edit-prompt-template"
-                        class="mt-1 block w-full h-48 rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        class="mt-1 block w-full h-48 rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                       ></textarea>
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Arguments (JSON)</label
                       >
                       <textarea
                         name="arguments"
                         id="edit-prompt-arguments"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       ></textarea>
                     </div>
                     <!-- Tags Section -->
@@ -4737,7 +4746,7 @@
                     <button
                       type="button"
                       onclick="closeModal('prompt-edit-modal')"
-                      class="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:text-gray-300"
+                      class="px-4 py-2 border border-gray-500 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:text-gray-300"
                     >
                       Cancel
                     </button>
@@ -4944,7 +4953,7 @@
                 <form id="edit-gateway-form" method="POST">
                   <div class="grid grid-cols-1 gap-6">
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Name</label
                       >
                       <input
@@ -4952,11 +4961,11 @@
                         name="name"
                         required
                         id="edit-gateway-name"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       />
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >URL</label
                       >
                       <input
@@ -4964,21 +4973,21 @@
                         name="url"
                         required
                         id="edit-gateway-url"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       />
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Description</label
                       >
                       <textarea
                         name="description"
                         id="edit-gateway-description"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       ></textarea>
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Tags</label
                       >
                       <input
@@ -4986,34 +4995,34 @@
                         name="tags"
                         id="edit-gateway-tags"
                         placeholder="e.g., production,external,api-gateway (comma-separated)"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       />
-                      <p class="mt-1 text-sm text-gray-500">
+                      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                         Separate multiple tags with commas. Tags will be
                         automatically normalized.
                       </p>
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Transport Type</label
                       >
                       <select
                         name="transport"
                         id="edit-gateway-transport"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       >
                         <option value="SSE" selected>SSE</option>
                         <option value="STREAMABLEHTTP">Streamable HTTP</option>
                       </select>
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700"
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Authentication Type</label
                       >
                       <select
                         name="auth_type"
                         id="auth-type-gw-edit"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       >
                         <option value="">None</option>
                         <option value="basic">Basic</option>
@@ -5024,35 +5033,35 @@
                     </div>
                     <div id="auth-basic-fields-gw-edit" style="display: none">
                       <div>
-                        <label class="block text-sm font-medium text-gray-700"
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                           >Username</label
                         >
                         <input
                           type="text"
                           name="auth_username"
-                          class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                          class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                         />
                       </div>
                       <div>
-                        <label class="block text-sm font-medium text-gray-700"
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                           >Password</label
                         >
                         <input
                           type="password"
                           name="auth_password"
-                          class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                          class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                         />
                       </div>
                     </div>
                     <div id="auth-bearer-fields-gw-edit" style="display: none">
                       <div>
-                        <label class="block text-sm font-medium text-gray-700"
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                           >Token</label
                         >
                         <input
                           type="password"
                           name="auth_token"
-                          class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                          class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                         />
                       </div>
                     </div>
@@ -5255,7 +5264,7 @@
                         name="passthrough_headers"
                         id="edit-gateway-passthrough-headers"
                         placeholder="Authorization, X-Tenant-Id, X-Trace-Id"
-                        class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       />
                     </div>
                   </div>
@@ -5265,7 +5274,7 @@
                     <button
                       type="button"
                       onclick="closeModal('gateway-edit-modal')"
-                      class="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:text-gray-300"
+                      class="px-4 py-2 border border-gray-500 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:text-gray-300"
                     >
                       Cancel
                     </button>
@@ -5354,7 +5363,7 @@
                         name="name"
                         required
                         id="edit-server-name"
-                        class="mt-1 block w-full rounded-md border border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       />
                     </div>
                     <div>
@@ -5365,7 +5374,7 @@
                       <textarea
                         name="description"
                         id="edit-server-description"
-                        class="mt-1 block w-full rounded-md border border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       ></textarea>
                     </div>
                     <div>
@@ -5377,7 +5386,7 @@
                         type="url"
                         name="icon"
                         id="edit-server-icon"
-                        class="mt-1 block w-full rounded-md border border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                       />
                     </div>
 
@@ -5401,7 +5410,7 @@
                     </div>
 
                     <div
-                      class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-600"
+                      class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-400 dark:border-gray-600"
                     >
                       <label
                         for="edit-server-tools"
@@ -5411,7 +5420,7 @@
                       </label>
                       <div
                         id="edit-server-tools"
-                        class="max-h-60 overflow-y-auto rounded-md border border-gray-600 shadow-sm p-3 bg-gray-50 dark:bg-gray-900"
+                        class="max-h-60 overflow-y-auto rounded-md border bborder-gray-300 dark:border-gray-600 shadow-sm p-3 bg-gray-50 dark:bg-gray-900"
                       >
                         {% for tool in tools %}
                         <label
@@ -5470,7 +5479,7 @@
                         type="text"
                         name="associatedResources"
                         id="edit-server-resources"
-                        class="mt-1 block w-full rounded-md border border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                         placeholder="e.g., 3,4"
                       />
                     </div>
@@ -5483,7 +5492,7 @@
                         type="text"
                         name="associatedPrompts"
                         id="edit-server-prompts"
-                        class="mt-1 block w-full rounded-md border border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
                         placeholder="e.g., 5,6"
                       />
                     </div>
@@ -5494,7 +5503,7 @@
                     <button
                       type="button"
                       onclick="closeModal('server-edit-modal')"
-                      class="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:text-gray-300"
+                      class="px-4 py-2 border border-gray-500 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:text-gray-300"
                     >
                       Cancel
                     </button>
