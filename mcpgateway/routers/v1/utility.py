@@ -59,7 +59,6 @@ from sqlalchemy.orm import Session
 # First-Party
 from mcpgateway.config import settings
 from mcpgateway.db import get_db
-from mcpgateway.registry import session_registry
 
 # Import dependency injection functions
 from mcpgateway.dependencies import (
@@ -70,11 +69,8 @@ from mcpgateway.dependencies import (
     get_root_service,
     get_tool_service,
 )
-from mcpgateway.models import (
-    LogLevel,
-)
-
-from mcpgateway.routers.v1.protocol import initialize
+from mcpgateway.models import LogLevel
+from mcpgateway.registry import session_registry
 from mcpgateway.schemas import RPCRequest
 from mcpgateway.transports.sse_transport import SSETransport
 from mcpgateway.utils.retry_manager import ResilientHttpClient
@@ -96,7 +92,6 @@ root_service = get_root_service()
 
 # Create API router
 utility_router = APIRouter(tags=["Utilities"])
-
 
 
 @utility_router.post("/rpc/")
@@ -420,4 +415,3 @@ async def set_log_level(request: Request, user: str = Depends(require_auth)) -> 
     level = LogLevel(body["level"])
     await logging_service.set_level(level)
     return None
-

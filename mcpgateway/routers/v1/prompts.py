@@ -26,8 +26,8 @@ Structure:
 """
 
 # Standard
-from typing import Any, Dict, List, Optional
 import time
+from typing import Any, Dict, List, Optional
 
 # Third-Party
 from fastapi import (
@@ -35,21 +35,22 @@ from fastapi import (
     Body,
     Depends,
     HTTPException,
-    status,
     Request,
+    status,
 )
 from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 # First-Party
 from mcpgateway.db import get_db
+from mcpgateway.db import Prompt as DbPrompt
+from mcpgateway.db import PromptMetric
 
 # Import dependency injection functions
-from mcpgateway.dependencies import get_prompt_service, get_logging_service
+from mcpgateway.dependencies import get_logging_service, get_prompt_service
 from mcpgateway.plugins.framework import PluginViolationError
 from mcpgateway.schemas import (
     PromptCreate,
@@ -62,12 +63,9 @@ from mcpgateway.services.prompt_service import (
     PromptNameConflictError,
     PromptNotFoundError,
 )
-from mcpgateway.utils.verify_credentials import require_auth
-from mcpgateway.utils.metadata_capture import MetadataCapture
 from mcpgateway.utils.error_formatter import ErrorFormatter
-
-from mcpgateway.db import Prompt as DbPrompt
-from mcpgateway.db import PromptMetric
+from mcpgateway.utils.metadata_capture import MetadataCapture
+from mcpgateway.utils.verify_credentials import require_auth
 
 # Initialize logging service first
 logging_service = get_logging_service()
@@ -78,6 +76,7 @@ prompt_service = get_prompt_service()
 
 # Create API router
 prompt_router = APIRouter(prefix="/prompts", tags=["Prompts"])
+
 
 @prompt_router.post("/{prompt_id}/toggle")
 async def toggle_prompt_status(

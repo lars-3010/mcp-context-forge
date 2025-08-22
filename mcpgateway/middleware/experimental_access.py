@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
-"""
-Experimental API Access Control Middleware.
+"""Experimental API access control middleware for MCP Gateway.
 
-This middleware controls access to experimental API endpoints based on user roles
-and feature flags, providing audit logging and graceful error handling.
+Controls access to experimental endpoints based on user roles with
+audit logging and graceful error handling.
 """
 
 # Standard
@@ -29,8 +27,7 @@ DEFAULT_EXPERIMENTAL_ROLES: Set[str] = {"admin", "developer", "platform_admin"}
 
 
 def has_experimental_access(user: str, user_roles: Set[str] = None) -> bool:
-    """
-    Check if user has access to experimental features.
+    """Check if user has access to experimental features.
 
     Args:
         user: Username
@@ -48,16 +45,14 @@ def has_experimental_access(user: str, user_roles: Set[str] = None) -> bool:
 
 
 class ExperimentalAccessMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware to control access to experimental API endpoints.
+    """Middleware to control access to experimental API endpoints.
 
     Provides role-based access control for experimental features with
     audit logging and configurable access rules.
     """
 
     def __init__(self, app, enabled: bool = True, allowed_roles: Set[str] = None):
-        """
-        Initialize experimental access middleware.
+        """Initialize experimental access middleware.
 
         Args:
             app: FastAPI application
@@ -69,8 +64,7 @@ class ExperimentalAccessMiddleware(BaseHTTPMiddleware):
         self.allowed_roles = allowed_roles or DEFAULT_EXPERIMENTAL_ROLES
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """
-        Process request and check experimental access if needed.
+        """Process request and check experimental access if needed.
 
         Args:
             request: Incoming HTTP request
@@ -119,8 +113,7 @@ class ExperimentalAccessMiddleware(BaseHTTPMiddleware):
             raise HTTPException(status_code=500, detail="Internal error processing experimental API request")
 
     def _extract_user_from_request(self, request: Request) -> str:
-        """
-        Extract user from request headers/auth.
+        """Extract user from request headers/auth.
 
         This is a simplified implementation - in production would integrate
         with the full authentication system.

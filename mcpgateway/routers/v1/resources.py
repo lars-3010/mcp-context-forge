@@ -43,20 +43,20 @@ Returns:
 
 # Standard
 from typing import Any, Dict, List, Optional
+import uuid
 
 # Third-Party
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    status,
     Request,
+    status,
 )
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-import uuid
 
 # First-Party
 from mcpgateway.db import get_db
@@ -79,9 +79,8 @@ from mcpgateway.services.resource_service import (
     ResourceURIConflictError,
 )
 from mcpgateway.utils.error_formatter import ErrorFormatter
-from mcpgateway.utils.verify_credentials import require_auth
-
 from mcpgateway.utils.metadata_capture import MetadataCapture
+from mcpgateway.utils.verify_credentials import require_auth
 
 # Initialize logging service first
 logging_service = LoggingService()

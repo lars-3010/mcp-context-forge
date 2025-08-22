@@ -67,13 +67,13 @@ from mcpgateway.db import get_db
 
 # Import dependency injection functions
 from mcpgateway.dependencies import (
-    get_prompt_service, 
-    get_resource_service, 
-    get_server_service, 
-    get_tool_service, 
     get_logging_service,
-    get_session_registry)
-
+    get_prompt_service,
+    get_resource_service,
+    get_server_service,
+    get_tool_service,
+)
+from mcpgateway.registry import session_registry
 from mcpgateway.schemas import (
     PromptRead,
     ResourceRead,
@@ -82,7 +82,6 @@ from mcpgateway.schemas import (
     ServerUpdate,
     ToolRead,
 )
-from mcpgateway.registry import session_registry
 from mcpgateway.services.server_service import (
     ServerError,
     ServerNameConflictError,
@@ -103,10 +102,9 @@ tool_service = get_tool_service()
 prompt_service = get_prompt_service()
 resource_service = get_resource_service()
 
-
-
 # Create API router
 server_router = APIRouter(prefix="/servers", tags=["Servers"])
+
 
 @server_router.get("", response_model=List[ServerRead])
 @server_router.get("/", response_model=List[ServerRead])

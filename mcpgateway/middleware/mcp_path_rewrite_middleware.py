@@ -1,3 +1,9 @@
+"""
+mcp_path_rewrite_middleware.py
+
+Middleware to rewrite MCP-related paths in HTTP requests.
+"""
+
 # First-Party
 from mcpgateway.transports.streamablehttp_transport import (
     SessionManagerWrapper,

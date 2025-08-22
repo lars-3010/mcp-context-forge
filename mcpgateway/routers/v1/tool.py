@@ -48,17 +48,17 @@ from fastapi import (
     Body,
     Depends,
     HTTPException,
-    status,
     Request,
+    status,
 )
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 # First-Party
 from mcpgateway.config import jsonpath_modifier
 from mcpgateway.db import get_db
+from mcpgateway.db import Tool as DbTool
 
 # Import dependency injection functions
 from mcpgateway.dependencies import get_tool_service
@@ -74,15 +74,9 @@ from mcpgateway.services.tool_service import (
     ToolNameConflictError,
     ToolNotFoundError,
 )
-
-from mcpgateway.db import Tool as DbTool
-from mcpgateway.utils.verify_credentials import require_auth
-
-from mcpgateway.utils.metadata_capture import MetadataCapture
-
 from mcpgateway.utils.error_formatter import ErrorFormatter
-
-
+from mcpgateway.utils.metadata_capture import MetadataCapture
+from mcpgateway.utils.verify_credentials import require_auth
 
 # Initialize logging service first
 logging_service = LoggingService()
@@ -93,6 +87,7 @@ tool_service = get_tool_service()
 
 # Create API router
 tool_router = APIRouter(prefix="/tools", tags=["Tools"])
+
 
 @tool_router.get("", response_model=Union[List[ToolRead], List[Dict], Dict, List])
 @tool_router.get("/", response_model=Union[List[ToolRead], List[Dict], Dict, List])

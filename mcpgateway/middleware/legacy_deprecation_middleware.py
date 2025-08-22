@@ -1,3 +1,9 @@
+"""Legacy API deprecation middleware for MCP Gateway.
+
+Adds deprecation warnings and headers for unversioned API endpoints
+to encourage migration to versioned endpoints.
+"""
+
 # Third-Party
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -11,11 +17,10 @@ logger = logging_service.get_logger("legacy routes")
 
 
 def is_legacy_path(path: str) -> bool:
-    """
-    Check if the given path is a legacy (unversioned) API endpoint.
-    Legacy paths:
-    - Do NOT start with /v1/ or /experimental/
-    - Are not static, docs, openapi, admin, health, ready, or root paths
+    """Check if the given path is a legacy (unversioned) API endpoint.
+
+    Legacy paths do not start with /v1/ or /experimental/ and are not
+    static, docs, openapi, admin, health, ready, or root paths.
 
     Args:
         path: The request path to check
@@ -35,10 +40,30 @@ def is_legacy_path(path: str) -> bool:
 
 
 class LegacyDeprecationMiddleware(BaseHTTPMiddleware):
+    """Middleware to add deprecation warnings for legacy API endpoints.
+
+    Logs warnings and adds deprecation headers for unversioned API calls
+    to encourage migration to versioned endpoints.
+    """
+
     def __init__(self, app):
+        """Initialize legacy deprecation middleware.
+
+        Args:
+            app: FastAPI application
+        """
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next):
+        """Process request and add deprecation warnings for legacy paths.
+
+        Args:
+            request: Incoming HTTP request
+            call_next: Next middleware or endpoint handler
+
+        Returns:
+            Response with deprecation headers if legacy path
+        """
         path = request.url.path
 
         if is_legacy_path(path):

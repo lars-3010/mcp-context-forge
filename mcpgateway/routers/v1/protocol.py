@@ -53,18 +53,18 @@ from sqlalchemy.orm import Session
 
 # First-Party
 from mcpgateway.db import get_db
-from mcpgateway.registry import session_registry
 
 # Dependencies imports
-from mcpgateway.dependencies import ( 
-    get_completion_service, 
-    get_logging_service, 
+from mcpgateway.dependencies import (
+    get_completion_service,
+    get_logging_service,
     get_sampling_handler,
-    get_session_registry,)
+)
 from mcpgateway.models import (
     InitializeResult,
     LogLevel,
 )
+from mcpgateway.registry import session_registry
 from mcpgateway.utils.verify_credentials import require_auth
 
 # Initialize logging service first

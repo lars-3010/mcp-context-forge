@@ -8,6 +8,10 @@ It organizes API endpoints into versioned groups and handles legacy route deprec
 from fastapi import FastAPI
 
 # First-Party
+from mcpgateway.config import settings
+from mcpgateway.dependencies import get_logging_service
+from mcpgateway.routers.v1.a2a import a2a_router
+from mcpgateway.routers.v1.export_import import export_import_router
 from mcpgateway.routers.v1.gateway import gateway_router
 from mcpgateway.routers.v1.metrics import metrics_router
 from mcpgateway.routers.v1.prompts import prompt_router
@@ -18,14 +22,10 @@ from mcpgateway.routers.v1.servers import server_router
 from mcpgateway.routers.v1.tag import tag_router
 from mcpgateway.routers.v1.tool import tool_router
 from mcpgateway.routers.v1.utility import utility_router
-from mcpgateway.version import router as version_router
-from mcpgateway.routers.v1.a2a import a2a_router
-from mcpgateway.routers.v1.export_import import export_import_router
 from mcpgateway.routers.well_known import well_known_router
-from mcpgateway.config import settings
-
-from mcpgateway.dependencies import get_logging_service
-
+from mcpgateway.version import router as version_router
+from mcpgateway.routers.oauth_router import oauth_router
+from mcpgateway.routers.reverse_proxy import reverse_proxy_router
 
 # Initialize logging service first
 logging_service = get_logging_service()
@@ -62,24 +62,17 @@ def setup_v1_routes(app: FastAPI) -> None:
 
     # Include OAuth router
     try:
-        # First-Party
-        from mcpgateway.routers.oauth_router import oauth_router
-
         app.include_router(oauth_router)
         logger.info("OAuth router included")
     except ImportError:
         logger.debug("OAuth router not available")
 
     # Include reverse proxy router if enabled
-    try:
-        # First-Party
-        from mcpgateway.routers.reverse_proxy import reverse_proxy_router
-
+    try:   
         app.include_router(reverse_proxy_router)
         logger.info("Reverse proxy router included")
     except ImportError:
         logger.debug("Reverse proxy router not available")
-
 
 
 def setup_version_routes(app: FastAPI) -> None:
@@ -91,7 +84,7 @@ def setup_version_routes(app: FastAPI) -> None:
     app.include_router(version_router)
 
 
-def setup_experimental_routes(app: FastAPI) -> None:
+def setup_experimental_routes(_app: FastAPI) -> None:
     """Configure experimental API routes.
 
     Args:
@@ -100,8 +93,7 @@ def setup_experimental_routes(app: FastAPI) -> None:
     # Register experimental routers here
 
 
-
-def setup_legacy_deprecation_routes(app: FastAPI) -> None:
+def setup_legacy_deprecation_routes(_app: FastAPI) -> None:
     """Configure legacy route deprecation warnings.
 
     Args:

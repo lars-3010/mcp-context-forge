@@ -41,19 +41,19 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 # First-Party
+from mcpgateway.config import settings
 from mcpgateway.db import get_db
 
 # Import dependency injection functions
 from mcpgateway.dependencies import (
+    get_a2a_agent_service,
+    get_logging_service,
     get_prompt_service,
     get_resource_service,
     get_server_service,
     get_tool_service,
-    get_logging_service,
-    get_a2a_agent_service,
 )
 from mcpgateway.utils.verify_credentials import require_auth
-from mcpgateway.config import settings
 
 # Import the admin routes from the new module
 

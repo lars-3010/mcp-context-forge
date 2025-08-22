@@ -19,8 +19,8 @@ from fastapi.responses import PlainTextResponse
 
 # First-Party
 from mcpgateway.config import settings
-from mcpgateway.utils.verify_credentials import require_auth
 from mcpgateway.dependencies import get_logging_service
+from mcpgateway.utils.verify_credentials import require_auth
 
 # Get logger instance
 logging_service = get_logging_service()

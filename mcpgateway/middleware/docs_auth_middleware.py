@@ -1,3 +1,9 @@
+"""Documentation authentication middleware for MCP Gateway.
+
+Protects FastAPI documentation endpoints (/docs, /redoc, /openapi.json)
+with Bearer token or Basic authentication.
+"""
+
 # Third-Party
 from fastapi import (
     HTTPException,
@@ -10,54 +16,22 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from mcpgateway.utils.verify_credentials import require_auth_override
 
 
-
-
 class DocsAuthMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware to protect FastAPI's auto-generated documentation routes
-    (/docs, /redoc, and /openapi.json) using Bearer token authentication.
+    """Middleware to protect FastAPI documentation routes with authentication.
 
-    If a request to one of these paths is made without a valid token,
-    the request is rejected with a 401 or 403 error.
-
-    Note:
-        When DOCS_ALLOW_BASIC_AUTH is enabled, Basic Authentication
-        is also accepted using BASIC_AUTH_USER and BASIC_AUTH_PASSWORD credentials.
+    Protects /docs, /redoc, and /openapi.json endpoints using Bearer token
+    or Basic authentication. Rejects unauthorized requests with 401/403 errors.
     """
 
     async def dispatch(self, request: Request, call_next):
-        """
-        Intercepts incoming requests to check if they are accessing protected documentation routes.
-        If so, it requires a valid Bearer token; otherwise, it allows the request to proceed.
+        """Process request and enforce authentication for documentation routes.
 
         Args:
-            request (Request): The incoming HTTP request.
-            call_next (Callable): The function to call the next middleware or endpoint.
+            request: Incoming HTTP request
+            call_next: Next middleware or endpoint handler
 
         Returns:
-            Response: Either the standard route response or a 401/403 error response.
-
-        Examples:
-            >>> import asyncio
-            >>> from unittest.mock import Mock, AsyncMock, patch
-            >>> from fastapi import HTTPException
-            >>> from fastapi.responses import JSONResponse
-            >>>
-            >>> # Test unprotected path - should pass through
-            >>> middleware = DocsAuthMiddleware(None)
-            >>> request = Mock()
-            >>> request.url.path = "/api/tools"
-            >>> request.headers.get.return_value = None
-            >>> call_next = AsyncMock(return_value="response")
-            >>>
-            >>> result = asyncio.run(middleware.dispatch(request, call_next))
-            >>> result
-            'response'
-            >>>
-            >>> # Test that middleware checks protected paths
-            >>> request.url.path = "/docs"
-            >>> isinstance(middleware, DocsAuthMiddleware)
-            True
+            Response from next handler or authentication error
         """
         protected_paths = ["/docs", "/redoc", "/openapi.json"]
 
@@ -73,4 +47,3 @@ class DocsAuthMiddleware(BaseHTTPMiddleware):
 
         # Proceed to next middleware or route
         return await call_next(request)
-

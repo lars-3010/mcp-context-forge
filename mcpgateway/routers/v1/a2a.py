@@ -50,22 +50,18 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-
 # First-Party
-from mcpgateway import __version__
-from mcpgateway.config import settings
+from mcpgateway.db import get_db
+from mcpgateway.dependencies import get_a2a_agent_service, get_logging_service
 from mcpgateway.schemas import (
     A2AAgentCreate,
     A2AAgentRead,
     A2AAgentUpdate,
 )
-from mcpgateway.services.a2a_service import A2AAgentError, A2AAgentNameConflictError, A2AAgentNotFoundError, A2AAgentService
+from mcpgateway.services.a2a_service import A2AAgentError, A2AAgentNameConflictError, A2AAgentNotFoundError
 from mcpgateway.utils.error_formatter import ErrorFormatter
 from mcpgateway.utils.metadata_capture import MetadataCapture
 from mcpgateway.utils.verify_credentials import require_auth
-
-from mcpgateway.dependencies import get_logging_service, get_a2a_agent_service
-from mcpgateway.db import get_db
 
 # Initialize logging service first
 logging_service = get_logging_service()

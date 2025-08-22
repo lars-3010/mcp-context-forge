@@ -58,8 +58,8 @@ from fastapi import (
     APIRouter,
     Depends,
     FastAPI,
-    Request,
     HTTPException,
+    Request,
     status,
 )
 from fastapi.exception_handlers import request_validation_exception_handler as fastapi_default_validation_handler
@@ -74,7 +74,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-
 # First-Party
 from mcpgateway import __version__
 from mcpgateway.admin import admin_router
@@ -82,12 +81,13 @@ from mcpgateway.bootstrap_db import main as bootstrap_db
 from mcpgateway.config import settings
 from mcpgateway.db import get_db, refresh_slugs_on_startup
 
-from mcpgateway.plugins.framework import PluginManager
-
 # Import dependency injection functions
 from mcpgateway.dependencies import (
+    get_a2a_agent_service,
     get_completion_service,
+    get_export_service,
     get_gateway_service,
+    get_import_service,
     get_logging_service,
     get_prompt_service,
     get_resource_cache,
@@ -98,9 +98,7 @@ from mcpgateway.dependencies import (
     get_streamable_http_session,
     get_tag_service,
     get_tool_service,
-    get_a2a_agent_service,
-    get_import_service,
-    get_export_service,
+    cors_origins,
 )
 
 # middleware imports
@@ -109,11 +107,8 @@ from mcpgateway.middleware.experimental_access import ExperimentalAccessMiddlewa
 from mcpgateway.middleware.legacy_deprecation_middleware import LegacyDeprecationMiddleware
 from mcpgateway.middleware.mcp_path_rewrite_middleware import MCPPathRewriteMiddleware
 from mcpgateway.middleware.security_headers import SecurityHeadersMiddleware
-from mcpgateway.transports.sse_transport import SSETransport
-
-# Initialize plugin manager as a singleton.
-plugin_manager: PluginManager | None = PluginManager(settings.plugin_config_file) if settings.plugins_enabled else None
-
+from mcpgateway.observability import init_telemetry
+from mcpgateway.plugins.framework import PluginManager
 
 # from v1 routes
 from mcpgateway.routers.setup_routes import (
@@ -121,12 +116,11 @@ from mcpgateway.routers.setup_routes import (
     setup_legacy_deprecation_routes,
     setup_v1_routes,
 )
-
 from mcpgateway.routers.v1.utility import handle_rpc
 from mcpgateway.utils.db_isready import wait_for_db_ready
 from mcpgateway.utils.error_formatter import ErrorFormatter
+from mcpgateway.utils.passthrough_headers import set_global_passthrough_headers
 from mcpgateway.utils.redis_isready import wait_for_redis_ready
-from mcpgateway.observability import init_telemetry
 
 # Import the admin routes from the new module
 from mcpgateway.version import router as version_router
@@ -155,7 +149,6 @@ else:
 # Initialize plugin manager as a singleton.
 plugin_manager: PluginManager | None = PluginManager(settings.plugin_config_file) if settings.plugins_enabled else None
 
-
 # Get service instances via dependency injection
 tool_service = get_tool_service()
 resource_service = get_resource_service()
@@ -180,11 +173,9 @@ streamable_http_session = get_streamable_http_session()
 if settings.cache_type == "redis":
     wait_for_redis_ready(redis_url=settings.redis_url, max_retries=int(settings.redis_max_retries), retry_interval_ms=int(settings.redis_retry_interval_ms), sync=True)
 
-# Configure CORS with environment-aware origins
-cors_origins = list(settings.allowed_origins) if settings.allowed_origins else []
-
 # Set up Jinja2 templates
 templates = Jinja2Templates(directory=str(settings.templates_dir))
+
 
 ####################
 # Startup/Shutdown #
@@ -288,6 +279,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
                 logger.error(f"Error shutting down {service.__class__.__name__}: {str(e)}")
         logger.info("Shutdown complete")
 
+
 def require_api_key(api_key: str) -> None:
     """Validates the provided API key.
 
@@ -323,7 +315,6 @@ def require_api_key(api_key: str) -> None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
 
 
-
 # Create the FastAPI application instance
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application.
@@ -332,7 +323,7 @@ def create_app() -> FastAPI:
         FastAPI: Configured FastAPI application instance
     """
     # Initialize FastAPI app
-    app = FastAPI(
+    fastapi_app = FastAPI(
         title=settings.app_name,
         version=__version__,
         description="A FastAPI-based MCP Gateway with federation support",
@@ -341,18 +332,18 @@ def create_app() -> FastAPI:
     )
 
     # Configure middleware (order matters - last added is executed first)
-    configure_middleware(app)
+    configure_middleware(fastapi_app)
 
     # Configure exception handlers
-    configure_exception_handlers(app)
+    configure_exception_handlers(fastapi_app)
 
     # Configure routes
-    configure_routes(app)
+    configure_routes(fastapi_app)
 
     # Configure static files and UI
-    configure_ui(app)
+    configure_ui(fastapi_app)
 
-    return app
+    return fastapi_app
 
 
 def configure_middleware(fastapi_app: FastAPI) -> None:
@@ -401,14 +392,7 @@ def configure_middleware(fastapi_app: FastAPI) -> None:
         cors_origins = []
 
     # Configure CORS
-    fastapi_app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=expose_headers
-    )
+    fastapi_app.add_middleware(CORSMiddleware, allow_origins=cors_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"], expose_headers=expose_headers)
 
 
 def configure_exception_handlers(fastapi_app: FastAPI) -> None:
@@ -420,7 +404,7 @@ def configure_exception_handlers(fastapi_app: FastAPI) -> None:
     - IntegrityError: Database constraint violations (409 status)
 
     Args:
-        app: FastAPI application instance to configure
+        fastapi_app: FastAPI application instance to configure
 
     """
 
@@ -492,7 +476,7 @@ def configure_routes(fastapi_app: FastAPI) -> None:
     - Legacy deprecation routes with migration guidance
 
     Args:
-        app: FastAPI application instance to configure
+        fastapi_app: FastAPI application instance to configure
 
     """
     logger.info("Configuring application routes")
@@ -552,7 +536,7 @@ def configure_health_endpoints(fastapi_app: FastAPI) -> None:
     - GET /ready - Readiness probe for container orchestration
 
     Args:
-        app: FastAPI application instance to configure
+        fastapi_app: FastAPI application instance to configure
 
     """
 
@@ -605,7 +589,7 @@ def configure_ui(fastapi_app: FastAPI) -> None:
     - False: Returns API information at root path
 
     Args:
-        app: FastAPI application instance to configure
+        fastapi_app: FastAPI application instance to configure
 
     """
     # Set up Jinja2 templates

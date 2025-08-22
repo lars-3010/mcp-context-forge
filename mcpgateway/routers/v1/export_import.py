@@ -27,33 +27,28 @@ Structure:
 
 # Standard
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse, urlunparse
 
 # Third-Party
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-
 # First-Party
-from mcpgateway import __version__
-from mcpgateway.routers.well_known import well_known_router
+from mcpgateway.db import get_db
+from mcpgateway.dependencies import get_export_service, get_import_service, get_logging_service
 from mcpgateway.services.export_service import ExportError
 from mcpgateway.services.import_service import ConflictStrategy, ImportConflictError
 from mcpgateway.services.import_service import ImportError as ImportServiceError
 from mcpgateway.services.import_service import ImportValidationError
-
-from mcpgateway.dependencies import get_logging_service
-from mcpgateway.db import get_db
-
-
 from mcpgateway.utils.verify_credentials import require_auth
-
 
 export_import_router = APIRouter(tags=["Export/Import"])
 
 # Initialize logging service first
 logging_service = get_logging_service()
 logger = logging_service.get_logger("export import router")
+
+export_service = get_export_service()
+import_service = get_import_service()
 
 
 @export_import_router.get("/export", response_model=Dict[str, Any])
@@ -282,4 +277,3 @@ async def cleanup_import_statuses(max_age_hours: int = 24, user: str = Depends(r
 
     removed_count = import_service.cleanup_completed_imports(max_age_hours)
     return {"status": "success", "message": f"Cleaned up {removed_count} completed import statuses", "removed_count": removed_count}
-

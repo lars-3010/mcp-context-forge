@@ -48,8 +48,8 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    status,
     Request,
+    status,
 )
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
@@ -68,8 +68,8 @@ from mcpgateway.schemas import (
 )
 from mcpgateway.services.gateway_service import GatewayConnectionError, GatewayNameConflictError, GatewayNotFoundError
 from mcpgateway.utils.error_formatter import ErrorFormatter
-from mcpgateway.utils.verify_credentials import require_auth
 from mcpgateway.utils.metadata_capture import MetadataCapture
+from mcpgateway.utils.verify_credentials import require_auth
 
 # Initialize logging service first
 logging_service = get_logging_service()
