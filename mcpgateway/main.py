@@ -65,6 +65,23 @@ from mcpgateway.models import InitializeResult, ListResourceTemplatesResult, Log
 from mcpgateway.observability import init_telemetry
 from mcpgateway.plugins.framework import PluginManager, PluginViolationError
 from mcpgateway.routers.well_known import router as well_known_router
+
+# Import multi-user authentication routers and services
+try:
+    # First-Party
+    from mcpgateway.db import User
+    from mcpgateway.routers.auth import router as auth_router
+    from mcpgateway.routers.teams import router as teams_router
+    from mcpgateway.routers.tokens import router as tokens_router
+    from mcpgateway.routers.users import router as users_router
+    from mcpgateway.services.user_service import UserService
+
+    AUTH_ROUTERS_AVAILABLE = True
+except ImportError:
+    AUTH_ROUTERS_AVAILABLE = False
+    UserService = None
+    User = None
+# First-Party
 from mcpgateway.schemas import (
     A2AAgentCreate,
     A2AAgentRead,
@@ -233,6 +250,36 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         await resource_cache.initialize()
         await streamable_http_session.initialize()
         refresh_slugs_on_startup()
+
+        # Initialize multi-user system if enabled
+        if AUTH_ROUTERS_AVAILABLE and settings.multi_user_enabled and not settings.legacy_auth_mode and UserService and User:
+            try:
+                # Create default admin user if no users exist
+                with SessionLocal() as db:
+                    user_service = UserService(db)
+
+                    # Check if any users exist
+                    existing_users = db.query(User).count()
+
+                    if existing_users == 0:
+                        # Create default admin user using legacy credentials
+                        await user_service.create_user(
+                            username=settings.basic_auth_user,
+                            password=settings.basic_auth_password,
+                            email=None,
+                            full_name="Default Admin User",
+                            is_admin=True,
+                            created_by=None,
+                            ip_address="127.0.0.1",
+                            user_agent="System Initialization",
+                        )
+                        logger.info(f"Default admin user created: {settings.basic_auth_user}")
+                    else:
+                        logger.info(f"Multi-user system initialized with {existing_users} existing users")
+
+            except Exception as e:
+                logger.error(f"Error initializing multi-user system: {e}")
+                # Continue startup even if multi-user init fails
 
         logger.info("All services initialized successfully")
 
@@ -3368,6 +3415,18 @@ else:
     logger.info("A2A router not included - A2A features disabled")
 
 app.include_router(well_known_router)
+
+# Include multi-user authentication routers
+if AUTH_ROUTERS_AVAILABLE and settings.multi_user_enabled and not settings.legacy_auth_mode:
+    app.include_router(auth_router)
+    app.include_router(users_router)
+    app.include_router(tokens_router)
+    app.include_router(teams_router)
+    logger.info("Multi-user authentication routers included")
+elif settings.legacy_auth_mode:
+    logger.info("Running in legacy authentication mode - multi-user routers not included")
+else:
+    logger.info("Multi-user authentication disabled or routers not available")
 
 # Include OAuth router
 try:

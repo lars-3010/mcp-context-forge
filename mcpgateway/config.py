@@ -125,7 +125,7 @@ class Settings(BaseSettings):
     # Protocol
     protocol_version: str = "2025-03-26"
 
-    # Authentication
+    # Authentication - Legacy single-user support (maintained for backward compatibility)
     basic_auth_user: str = "admin"
     basic_auth_password: str = "changeme"
     jwt_secret_key: str = "my-test-key"
@@ -134,6 +134,41 @@ class Settings(BaseSettings):
     token_expiry: int = 10080  # minutes
 
     require_token_expiration: bool = Field(default=False, description="Require all JWT tokens to have expiration claims")  # Default to flexible mode for backward compatibility
+
+    # Multi-User Authentication Configuration
+    multi_user_enabled: bool = Field(default=True, description="Enable multi-user authentication system")
+    legacy_auth_mode: bool = Field(default=False, description="Use legacy single-user authentication (for backward compatibility)")
+
+    # JWT Enhanced Security
+    jwt_issuer: str = Field(default="mcpgateway", description="JWT issuer claim")
+    jwt_audience: str = Field(default="mcpgateway-api", description="JWT audience claim")
+    jwt_max_age_hours: int = Field(default=24, description="Maximum token age in hours")
+
+    # Password Policy
+    password_min_length: int = Field(default=12, description="Minimum password length")
+    password_require_uppercase: bool = Field(default=True, description="Require uppercase letters")
+    password_require_lowercase: bool = Field(default=True, description="Require lowercase letters")
+    password_require_numbers: bool = Field(default=True, description="Require numbers")
+    password_require_special: bool = Field(default=True, description="Require special characters")
+    password_bcrypt_rounds: int = Field(default=12, description="Bcrypt cost factor")
+
+    # User Management
+    admin_registration_enabled: bool = Field(default=False, description="Allow admin user self-registration")
+    email_verification_required: bool = Field(default=False, description="Require email verification for new users")
+    session_timeout_hours: int = Field(default=24, description="User session timeout in hours")
+    token_default_expiry_days: int = Field(default=30, description="Default API token expiry in days")
+
+    # Account Security
+    max_failed_login_attempts: int = Field(default=5, description="Maximum failed login attempts before lockout")
+    account_lockout_duration_minutes: int = Field(default=30, description="Account lockout duration in minutes")
+
+    # Authentication Audit Logging
+    enable_auth_logging: bool = Field(default=True, description="Enable authentication audit logs")
+    auth_log_retention_days: int = Field(default=90, description="Days to retain auth logs")
+
+    # CSRF Protection
+    csrf_token_name: str = Field(default="csrf-token", description="CSRF cookie name")
+    csrf_header_name: str = Field(default="X-CSRF-Token", description="CSRF header name")
 
     # MCP Client Authentication
     mcp_client_auth_enabled: bool = Field(default=True, description="Enable JWT authentication for MCP client operations")
