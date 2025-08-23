@@ -180,6 +180,14 @@
             >
               Version and Environment Info
             </a>
+            <a
+              href="#admin"
+              id="tab-admin"
+              data-testid="admin-tab"
+              class="tab-link border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ml-8"
+            >
+              ⚙️ Admin
+            </a>
             <button @click="darkMode = !darkMode" class="p-2">
               <span x-text="darkMode ? '☀️' : '🌙'"></span>
             </button>
@@ -3847,6 +3855,320 @@
         </div>
       </div>
       {% endif %}
+
+      <!-- Admin Panel -->
+      <div id="admin-panel" class="tab-panel hidden">
+        <div class="bg-white shadow rounded-lg p-6 mb-8 dark:bg-gray-800">
+          <div class="mb-6">
+            <h2 class="text-2xl font-bold dark:text-gray-200">Administration</h2>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              System administration and user management
+            </p>
+          </div>
+
+          <!-- Admin Sub-Navigation -->
+          <div class="border-b border-gray-200 dark:border-gray-600 mb-6">
+            <nav class="-mb-px flex space-x-8">
+              {% if multi_user_enabled %}
+              <a
+                href="#admin-users"
+                id="admin-tab-users"
+                class="admin-sub-tab border-indigo-500 text-indigo-600 dark:text-indigo-500 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+              >
+                👥 Users
+              </a>
+              <a
+                href="#admin-teams"
+                id="admin-tab-teams"
+                class="admin-sub-tab border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+              >
+                🏢 Teams
+              </a>
+              <a
+                href="#admin-security"
+                id="admin-tab-security"
+                class="admin-sub-tab border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+              >
+                🔐 Security
+              </a>
+              {% endif %}
+              <a
+                href="#admin-settings"
+                id="admin-tab-settings"
+                class="admin-sub-tab border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+              >
+                ⚙️ Settings
+              </a>
+            </nav>
+          </div>
+
+          <!-- Admin Sub-Panels -->
+          {% if multi_user_enabled %}
+          <!-- Users Sub-Panel -->
+          <div id="admin-users-panel" class="admin-sub-panel">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-bold dark:text-gray-200">User Management</h3>
+              <button
+                onclick="showUserCreateForm()"
+                class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                ➕ Create User
+              </button>
+            </div>
+
+          <!-- User Statistics Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" hx-get="/admin/users/stats-html" hx-trigger="load" hx-target="this" hx-swap="innerHTML">
+            <div class="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg">
+              <div class="text-2xl font-bold text-blue-600 dark:text-blue-400" id="total-users">-</div>
+              <div class="text-sm text-blue-800 dark:text-blue-300">Total Users</div>
+            </div>
+            <div class="bg-green-50 dark:bg-green-900 p-4 rounded-lg">
+              <div class="text-2xl font-bold text-green-600 dark:text-green-400" id="active-users">-</div>
+              <div class="text-sm text-green-800 dark:text-green-300">Active Users</div>
+            </div>
+            <div class="bg-purple-50 dark:bg-purple-900 p-4 rounded-lg">
+              <div class="text-2xl font-bold text-purple-600 dark:text-purple-400" id="admin-users">-</div>
+              <div class="text-sm text-purple-800 dark:text-purple-300">Admin Users</div>
+            </div>
+            <div class="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-lg">
+              <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400" id="active-tokens">-</div>
+              <div class="text-sm text-yellow-800 dark:text-yellow-300">Active Tokens</div>
+            </div>
+          </div>
+
+          <!-- User Search and Filters -->
+          <div class="mb-4 flex flex-wrap gap-4">
+            <input
+              type="text"
+              id="user-search"
+              placeholder="Search users by username, email, or name..."
+              class="flex-1 min-w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              onkeyup="debounceUserSearch()"
+            />
+            <select
+              id="user-status-filter"
+              onchange="filterUsers()"
+              class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            >
+              <option value="">All Users</option>
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive Only</option>
+              <option value="admin">Admins Only</option>
+            </select>
+          </div>
+
+          <!-- Users List -->
+          <div
+            id="users-list"
+            hx-get="/admin/users/list-html"
+            hx-trigger="load"
+            hx-target="this"
+            hx-swap="innerHTML"
+            class="space-y-4"
+          >
+            <div class="text-center py-8 text-gray-500">Loading users...</div>
+          </div>
+        </div>
+
+        <!-- User Creation Modal -->
+        <div id="user-create-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+          <div class="flex items-center justify-center min-h-screen">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+              <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Create New User</h3>
+              <form id="user-create-form" hx-post="/admin/users" hx-target="#create-user-result" hx-swap="innerHTML">
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Username *</label>
+                    <input
+                      type="text"
+                      name="username"
+                      required
+                      class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Password *</label>
+                    <input
+                      type="password"
+                      name="password"
+                      required
+                      minlength="12"
+                      class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Minimum 12 characters with uppercase, lowercase, numbers, and special characters</p>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+                    <input
+                      type="email"
+                      name="email"
+                      class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</label>
+                    <input
+                      type="text"
+                      name="full_name"
+                      class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label class="flex items-center">
+                      <input type="checkbox" name="is_admin" class="mr-2" />
+                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Admin Privileges</span>
+                    </label>
+                  </div>
+                </div>
+                <div id="create-user-result" class="mt-4"></div>
+                <div class="mt-6 flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onclick="hideUserCreateForm()"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Create User
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+          <!-- Teams Sub-Panel -->
+          <div id="admin-teams-panel" class="admin-sub-panel hidden">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-bold dark:text-gray-200">Team Management</h3>
+              <button
+                onclick="showTeamCreateForm()"
+                class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                ➕ Create Team
+              </button>
+            </div>
+
+            <!-- Teams List -->
+            <div
+              id="teams-list"
+              hx-get="/admin/teams/list-html"
+              hx-trigger="load"
+              hx-target="this"
+              hx-swap="innerHTML"
+              class="space-y-4"
+            >
+              <div class="text-center py-8 text-gray-500">Loading teams...</div>
+            </div>
+          </div>
+
+          <!-- Security Sub-Panel -->
+          <div id="admin-security-panel" class="admin-sub-panel hidden">
+            <h3 class="text-lg font-bold dark:text-gray-200 mb-4">Security Dashboard</h3>
+
+            <!-- Security Statistics -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div class="bg-red-50 dark:bg-red-900 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-red-600 dark:text-red-400" id="failed-logins-24h">-</div>
+                <div class="text-sm text-red-800 dark:text-red-300">Failed Logins (24h)</div>
+              </div>
+              <div class="bg-orange-50 dark:bg-orange-900 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-orange-600 dark:text-orange-400" id="locked-accounts">-</div>
+                <div class="text-sm text-orange-800 dark:text-orange-300">Locked Accounts</div>
+              </div>
+              <div class="bg-green-50 dark:bg-green-900 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-green-600 dark:text-green-400" id="login-events-24h">-</div>
+                <div class="text-sm text-green-800 dark:text-green-300">Successful Logins (24h)</div>
+              </div>
+            </div>
+
+            <!-- Recent Security Events -->
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Recent Security Events</h4>
+              <div
+                id="security-events-list"
+                hx-get="/admin/security/events-html"
+                hx-trigger="load"
+                hx-target="this"
+                hx-swap="innerHTML"
+                class="space-y-2"
+              >
+                <div class="text-center py-4 text-gray-500">Loading security events...</div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Settings Sub-Panel -->
+          <div id="admin-settings-panel" class="admin-sub-panel hidden">
+            <h3 class="text-lg font-bold dark:text-gray-200 mb-4">System Settings</h3>
+
+            <!-- Authentication Settings -->
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
+              <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Authentication Configuration</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span class="font-medium">Mode:</span>
+                  {% if multi_user_enabled %}
+                    <span class="text-green-600">Multi-User</span>
+                  {% else %}
+                    <span class="text-orange-600">Legacy</span>
+                  {% endif %}
+                </div>
+                <div>
+                  <span class="font-medium">Auth Required:</span>
+                  <span class="text-blue-600">{{ "Yes" if auth_required else "No" }}</span>
+                </div>
+                <div>
+                  <span class="font-medium">JWT Algorithm:</span>
+                  <span class="text-gray-600">{{ jwt_algorithm }}</span>
+                </div>
+                {% if multi_user_enabled %}
+                <div>
+                  <span class="font-medium">Password Min Length:</span>
+                  <span class="text-gray-600">{{ password_min_length }} characters</span>
+                </div>
+                <div>
+                  <span class="font-medium">Session Timeout:</span>
+                  <span class="text-gray-600">{{ session_timeout_hours }} hours</span>
+                </div>
+                <div>
+                  <span class="font-medium">Auth Logging:</span>
+                  <span class="text-green-600">{{ "Enabled" if enable_auth_logging else "Disabled" }}</span>
+                </div>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- System Information -->
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-3">System Information</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span class="font-medium">Environment:</span>
+                  <span class="text-gray-600">{{ environment }}</span>
+                </div>
+                <div>
+                  <span class="font-medium">Database:</span>
+                  <span class="text-gray-600">{{ database_type }}</span>
+                </div>
+                <div>
+                  <span class="font-medium">Cache Type:</span>
+                  <span class="text-gray-600">{{ cache_type }}</span>
+                </div>
+                <div>
+                  <span class="font-medium">Version:</span>
+                  <span class="text-gray-600">{{ version }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Roots Panel -->
       <div id="roots-panel" class="tab-panel hidden">

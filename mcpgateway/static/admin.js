@@ -1,3 +1,5 @@
+/* global htmx */
+/* eslint-disable no-unused-vars */ // Functions are used as onclick handlers in HTML
 // Make URL field read-only for integration type MCP
 function updateEditToolUrl() {
     const editTypeField = document.getElementById("edit-tool-type");
@@ -3589,6 +3591,13 @@ function showTab(tabName) {
     try {
         console.log(`Switching to tab: ${tabName}`);
 
+        // Special debug for admin tab
+        if (tabName === "admin") {
+            console.log("Admin tab clicked - checking panel exists");
+            const adminPanel = document.getElementById("admin-panel");
+            console.log("Admin panel found:", !!adminPanel);
+        }
+
         // Clear any pending tab switch
         if (tabSwitchTimeout) {
             clearTimeout(tabSwitchTimeout);
@@ -3621,6 +3630,52 @@ function showTab(tabName) {
         const panel = safeGetElement(`${tabName}-panel`);
         if (panel) {
             panel.classList.remove("hidden");
+
+            // Special handling for admin panel - show first sub-panel
+            if (tabName === "admin") {
+                setTimeout(() => {
+                    const firstSubPanel =
+                        panel.querySelector(".admin-sub-panel");
+                    const firstSubTab = panel.querySelector(".admin-sub-tab");
+
+                    if (firstSubPanel && firstSubTab) {
+                        // Hide all admin sub-panels
+                        panel
+                            .querySelectorAll(".admin-sub-panel")
+                            .forEach((sp) => sp.classList.add("hidden"));
+
+                        // Show first sub-panel
+                        firstSubPanel.classList.remove("hidden");
+
+                        // Set first sub-tab as active
+                        panel
+                            .querySelectorAll(".admin-sub-tab")
+                            .forEach((st) => {
+                                st.classList.remove(
+                                    "border-indigo-500",
+                                    "text-indigo-600",
+                                    "dark:text-indigo-500",
+                                );
+                                st.classList.add(
+                                    "border-transparent",
+                                    "text-gray-500",
+                                    "dark:text-gray-300",
+                                );
+                            });
+
+                        firstSubTab.classList.remove(
+                            "border-transparent",
+                            "text-gray-500",
+                            "dark:text-gray-300",
+                        );
+                        firstSubTab.classList.add(
+                            "border-indigo-500",
+                            "text-indigo-600",
+                            "dark:text-indigo-500",
+                        );
+                    }
+                }, 100);
+            }
         } else {
             console.error(`Panel ${tabName}-panel not found`);
             return;
@@ -6880,6 +6935,7 @@ function setupTabNavigation() {
         "logs",
         "export-import",
         "version-info",
+        "admin",
     ];
 
     tabs.forEach((tabName) => {
@@ -9157,3 +9213,339 @@ async function testA2AAgent(agentId, agentName, endpointUrl) {
 
 // Expose A2A test function to global scope
 window.testA2AAgent = testA2AAgent;
+
+// ===================================================================
+// USER MANAGEMENT FUNCTIONS
+// ===================================================================
+
+// User search debounce timer
+let userSearchTimeout;
+
+function debounceUserSearch() {
+    clearTimeout(userSearchTimeout);
+    userSearchTimeout = setTimeout(() => {
+        filterUsers();
+    }, 300);
+}
+
+function filterUsers() {
+    const search = document.getElementById("user-search").value;
+    const statusFilter = document.getElementById("user-status-filter").value;
+
+    let url = "/admin/users/list-html?";
+    if (search) {
+        url += `search=${encodeURIComponent(search)}&`;
+    }
+    if (statusFilter) {
+        if (statusFilter === "active") {
+            url += "is_active=true&";
+        } else if (statusFilter === "inactive") {
+            url += "is_active=false&";
+        }
+    }
+
+    htmx.ajax("GET", url, { target: "#users-list", swap: "innerHTML" });
+}
+
+function showUserCreateForm() {
+    document.getElementById("user-create-modal").classList.remove("hidden");
+    document.getElementById("user-create-form").reset();
+    document.getElementById("create-user-result").innerHTML = "";
+}
+
+function hideUserCreateForm() {
+    document.getElementById("user-create-modal").classList.add("hidden");
+}
+
+function toggleUserStatus(userId, username) {
+    if (
+        confirm(
+            `Are you sure you want to toggle the status for user "${username}"?`,
+        )
+    ) {
+        htmx.ajax("POST", `/admin/users/${userId}/toggle`, {
+            target: "#users-list",
+            swap: "outerHTML",
+        }).then(() => {
+            // Refresh the user list
+            filterUsers();
+        });
+    }
+}
+
+function deleteUser(userId, username) {
+    if (
+        confirm(
+            `Are you sure you want to DELETE user "${username}"? This action cannot be undone!`,
+        )
+    ) {
+        htmx.ajax("DELETE", `/admin/users/${userId}`, {
+            target: "#users-list",
+            swap: "outerHTML",
+        }).then(() => {
+            // Refresh the user list
+            filterUsers();
+        });
+    }
+}
+
+function revokeUserTokens(userId, username) {
+    if (
+        confirm(
+            `Are you sure you want to revoke ALL tokens for user "${username}"? This will log them out immediately!`,
+        )
+    ) {
+        htmx.ajax("POST", `/admin/users/${userId}/revoke-tokens`).then(
+            (response) => {
+                if (response.success) {
+                    alert(
+                        `Revoked ${response.revoked_count} tokens for ${username}`,
+                    );
+                } else {
+                    alert(`Error: ${response.error}`);
+                }
+            },
+        );
+    }
+}
+
+function showUserTokens(userId, username) {
+    // Load user tokens in a modal or expand section
+    const tokensContainer = document.getElementById(`user-${userId}-tokens`);
+    if (tokensContainer) {
+        if (tokensContainer.classList.contains("hidden")) {
+            htmx.ajax("GET", `/admin/users/${userId}/tokens-html`, {
+                target: `#user-${userId}-tokens-content`,
+                swap: "innerHTML",
+            });
+            tokensContainer.classList.remove("hidden");
+        } else {
+            tokensContainer.classList.add("hidden");
+        }
+    }
+}
+
+function showUserAuthEvents(userId, username) {
+    // Load user authentication events
+    const eventsContainer = document.getElementById(`user-${userId}-events`);
+    if (eventsContainer) {
+        if (eventsContainer.classList.contains("hidden")) {
+            htmx.ajax("GET", `/admin/users/${userId}/events-html?limit=20`, {
+                target: `#user-${userId}-events-content`,
+                swap: "innerHTML",
+            });
+            eventsContainer.classList.remove("hidden");
+        } else {
+            eventsContainer.classList.add("hidden");
+        }
+    }
+}
+
+// Handle user creation form success
+document.addEventListener("htmx:afterRequest", function (event) {
+    if (
+        event.detail.xhr.responseURL &&
+        event.detail.xhr.responseURL.includes("/admin/users") &&
+        event.detail.xhr.status === 200
+    ) {
+        const response = JSON.parse(event.detail.xhr.responseText);
+        if (response.success) {
+            hideUserCreateForm();
+            filterUsers(); // Refresh the user list
+            showToast("success", response.message);
+        } else {
+            showToast("error", response.error);
+        }
+    }
+});
+
+// Show toast notifications
+function showToast(type, message) {
+    const toastContainer =
+        document.getElementById("toast-container") || createToastContainer();
+
+    const toast = document.createElement("div");
+    toast.className = `px-4 py-3 rounded-md shadow-lg ${type === "success" ? "bg-green-500 text-white" : "bg-red-500 text-white"} mb-2`;
+    toast.textContent = message;
+
+    toastContainer.appendChild(toast);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 5000);
+}
+
+function createToastContainer() {
+    const container = document.createElement("div");
+    container.id = "toast-container";
+    container.className = "fixed top-4 right-4 z-50";
+    document.body.appendChild(container);
+    return container;
+}
+
+// ===================================================================
+// ADMIN SUB-TAB NAVIGATION
+// ===================================================================
+
+// Handle admin sub-tab switching
+document.addEventListener("DOMContentLoaded", function () {
+    // Admin sub-tab functionality
+    const adminSubTabs = document.querySelectorAll(".admin-sub-tab");
+    const adminSubPanels = document.querySelectorAll(".admin-sub-panel");
+
+    adminSubTabs.forEach((tab) => {
+        tab.addEventListener("click", function (e) {
+            e.preventDefault();
+
+            // Get target panel ID from href
+            const targetId = this.getAttribute("href").substring(1) + "-panel";
+
+            // Hide all admin sub-panels
+            adminSubPanels.forEach((panel) => panel.classList.add("hidden"));
+
+            // Remove active classes from all admin sub-tabs
+            adminSubTabs.forEach((t) => {
+                t.classList.remove(
+                    "border-indigo-500",
+                    "text-indigo-600",
+                    "dark:text-indigo-500",
+                );
+                t.classList.add(
+                    "border-transparent",
+                    "text-gray-500",
+                    "dark:text-gray-300",
+                );
+            });
+
+            // Show target panel
+            const targetPanel = document.getElementById(targetId);
+            if (targetPanel) {
+                targetPanel.classList.remove("hidden");
+            }
+
+            // Set active classes on clicked tab
+            this.classList.remove(
+                "border-transparent",
+                "text-gray-500",
+                "dark:text-gray-300",
+            );
+            this.classList.add(
+                "border-indigo-500",
+                "text-indigo-600",
+                "dark:text-indigo-500",
+            );
+        });
+    });
+});
+
+// Team management functions
+function showTeamCreateForm() {
+    // Create team modal functionality
+    const modal = document.createElement("div");
+    modal.className = "fixed inset-0 bg-gray-600 bg-opacity-50 z-50";
+    modal.innerHTML = `
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Create New Team</h3>
+                <form id="team-create-form" hx-post="/teams" hx-target="#create-team-result" hx-swap="innerHTML">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Team Name *</label>
+                            <input type="text" name="name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+                            <textarea name="description" rows="3" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"></textarea>
+                        </div>
+                    </div>
+                    <div id="create-team-result" class="mt-4"></div>
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button type="button" onclick="hideTeamCreateForm()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button>
+                        <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700">Create Team</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.id = "team-create-modal";
+}
+
+function hideTeamCreateForm() {
+    const modal = document.getElementById("team-create-modal");
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Additional team management functions
+function viewTeamDetails(teamId, teamName) {
+    // Show team members and details
+    const detailsContainer = document.getElementById(`team-${teamId}-details`);
+    if (detailsContainer) {
+        if (detailsContainer.classList.contains("hidden")) {
+            htmx.ajax("GET", `/teams/${teamId}/members`, {
+                target: `#team-${teamId}-details-content`,
+                swap: "innerHTML",
+            });
+            detailsContainer.classList.remove("hidden");
+        } else {
+            detailsContainer.classList.add("hidden");
+        }
+    }
+}
+
+function viewTeamResources(teamId, teamName) {
+    // Show team resources
+    const resourcesContainer = document.getElementById(
+        `team-${teamId}-resources`,
+    );
+    if (resourcesContainer) {
+        if (resourcesContainer.classList.contains("hidden")) {
+            htmx.ajax("GET", `/teams/${teamId}/resources`, {
+                target: `#team-${teamId}-resources-content`,
+                swap: "innerHTML",
+            });
+            resourcesContainer.classList.remove("hidden");
+        } else {
+            resourcesContainer.classList.add("hidden");
+        }
+    }
+}
+
+function editTeam(teamId, teamName) {
+    // Team editing functionality
+    alert(`Team editing for "${teamName}" - feature coming soon!`);
+}
+
+// Update security statistics on load
+function updateSecurityStats() {
+    htmx.ajax("GET", "/admin/users/stats", {
+        target: "#admin-security-panel .grid",
+        swap: "none",
+    }).then((response) => {
+        if (response && response.failed_logins_last_24h !== undefined) {
+            document.getElementById("failed-logins-24h").textContent =
+                response.failed_logins_last_24h;
+            document.getElementById("login-events-24h").textContent =
+                response.login_events_last_24h;
+            // Note: locked-accounts would need a separate endpoint
+        }
+    });
+}
+
+// Auto-refresh security events every 30 seconds when security panel is visible
+setInterval(() => {
+    const securityPanel = document.getElementById("admin-security-panel");
+    if (securityPanel && !securityPanel.classList.contains("hidden")) {
+        htmx.ajax("GET", "/admin/security/events-html", {
+            target: "#security-events-list",
+            swap: "innerHTML",
+        });
+        updateSecurityStats();
+    }
+}, 30000);

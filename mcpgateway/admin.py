@@ -68,6 +68,7 @@ from mcpgateway.schemas import (
     ToolMetrics,
     ToolRead,
     ToolUpdate,
+    UserResponse,
 )
 from mcpgateway.services.a2a_service import A2AAgentError, A2AAgentNameConflictError, A2AAgentNotFoundError, A2AAgentService
 from mcpgateway.services.export_service import ExportError, ExportService
@@ -75,6 +76,7 @@ from mcpgateway.services.gateway_service import GatewayConnectionError, GatewayN
 from mcpgateway.services.import_service import ConflictStrategy
 from mcpgateway.services.import_service import ImportError as ImportServiceError
 from mcpgateway.services.import_service import ImportService
+from mcpgateway.services.jwt_service import JWTService
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.prompt_service import PromptNotFoundError, PromptService
 from mcpgateway.services.resource_service import ResourceNotFoundError, ResourceService
@@ -82,6 +84,7 @@ from mcpgateway.services.root_service import RootService
 from mcpgateway.services.server_service import ServerError, ServerNameConflictError, ServerNotFoundError, ServerService
 from mcpgateway.services.tag_service import TagService
 from mcpgateway.services.tool_service import ToolError, ToolNotFoundError, ToolService
+from mcpgateway.services.user_service import UserService
 from mcpgateway.utils.create_jwt_token import get_jwt_token
 from mcpgateway.utils.error_formatter import ErrorFormatter
 from mcpgateway.utils.metadata_capture import MetadataCapture
@@ -1597,6 +1600,16 @@ async def admin_ui(
             "gateway_tool_name_separator": settings.gateway_tool_name_separator,
             "bulk_import_max_tools": settings.mcpgateway_bulk_import_max_tools,
             "a2a_enabled": settings.mcpgateway_a2a_enabled,
+            "multi_user_enabled": settings.multi_user_enabled and not settings.legacy_auth_mode,
+            "auth_required": settings.auth_required,
+            "jwt_algorithm": settings.jwt_algorithm,
+            "password_min_length": settings.password_min_length,
+            "session_timeout_hours": settings.session_timeout_hours,
+            "enable_auth_logging": settings.enable_auth_logging,
+            "environment": settings.environment,
+            "cache_type": settings.cache_type,
+            "database_type": "SQLite" if "sqlite" in settings.database_url.lower() else "PostgreSQL" if "postgres" in settings.database_url.lower() else "Other",
+            "version": "0.6.0",
         },
     )
 
@@ -5689,3 +5702,675 @@ async def admin_test_a2a_agent(
     except Exception as e:
         LOGGER.error(f"Error testing A2A agent {agent_id}: {e}")
         return JSONResponse(content={"success": False, "error": str(e), "agent_id": agent_id}, status_code=500)
+
+
+# ===================================
+# User Management Admin Routes
+# ===================================
+
+
+@admin_router.get("/users", response_model=List[UserResponse])
+async def admin_list_users(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: str = Depends(require_auth),
+    search: Optional[str] = None,
+    is_active: Optional[bool] = None,
+    skip: int = 0,
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
+    """List all users for admin management."""
+    try:
+        # Only enable in multi-user mode
+        if not settings.multi_user_enabled or settings.legacy_auth_mode:
+            raise HTTPException(status_code=404, detail="User management not available in legacy mode")
+
+        user_service = UserService(db)
+        users = await user_service.list_users(skip=skip, limit=limit, search=search, is_active=is_active)
+
+        result = []
+        for user_obj in users:
+            # Get additional user statistics
+            # First-Party
+            from mcpgateway.db import ApiToken, AuthEvent
+
+            active_tokens = db.query(ApiToken).filter(ApiToken.user_id == user_obj.id, ApiToken.is_active.is_(True)).count()
+
+            last_login = db.query(AuthEvent).filter(AuthEvent.user_id == user_obj.id, AuthEvent.event_type == "login_success").order_by(AuthEvent.timestamp.desc()).first()
+
+            user_dict = {
+                "id": user_obj.id,
+                "username": user_obj.username,
+                "email": user_obj.email,
+                "full_name": user_obj.full_name,
+                "is_active": user_obj.is_active,
+                "is_admin": user_obj.is_admin,
+                "email_verified": user_obj.email_verified,
+                "created_at": user_obj.created_at.isoformat(),
+                "updated_at": user_obj.updated_at.isoformat(),
+                "last_login": last_login.timestamp.isoformat() if last_login else None,
+                "active_tokens": active_tokens,
+                "failed_login_attempts": user_obj.failed_login_attempts,
+                "locked_until": user_obj.locked_until.isoformat() if user_obj.locked_until else None,
+            }
+            result.append(user_dict)
+
+        return result
+
+    except Exception as e:
+        LOGGER.error(f"Error listing users: {e}")
+        raise HTTPException(status_code=500, detail=f"Error listing users: {str(e)}")
+
+
+@admin_router.get("/users/stats")
+async def admin_user_stats(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: str = Depends(require_auth),
+) -> Dict[str, Any]:
+    """Get user statistics for admin dashboard."""
+    try:
+        # Only enable in multi-user mode
+        if not settings.multi_user_enabled or settings.legacy_auth_mode:
+            raise HTTPException(status_code=404, detail="User management not available in legacy mode")
+
+        # Standard
+        from datetime import timedelta
+
+        # First-Party
+        from mcpgateway.db import ApiToken, AuthEvent, Team, User, utc_now
+
+        # Total users
+        total_users = db.query(User).count()
+
+        # Active users
+        active_users = db.query(User).filter(User.is_active.is_(True)).count()
+
+        # Admin users
+        admin_users = db.query(User).filter(User.is_admin.is_(True)).count()
+
+        # New users in last 30 days
+        thirty_days_ago = utc_now() - timedelta(days=30)
+        new_users_last_30_days = db.query(User).filter(User.created_at >= thirty_days_ago).count()
+
+        # Total teams
+        total_teams = db.query(Team).count()
+
+        # Total active API tokens
+        total_api_tokens = db.query(ApiToken).filter(ApiToken.is_active.is_(True)).count()
+
+        # Login events in last 24 hours
+        twenty_four_hours_ago = utc_now() - timedelta(hours=24)
+        login_events_last_24h = db.query(AuthEvent).filter(AuthEvent.event_type == "login_success", AuthEvent.timestamp >= twenty_four_hours_ago).count()
+
+        # Failed login attempts in last 24 hours
+        failed_logins_last_24h = db.query(AuthEvent).filter(AuthEvent.event_type == "login_failed", AuthEvent.timestamp >= twenty_four_hours_ago).count()
+
+        return {
+            "total_users": total_users,
+            "active_users": active_users,
+            "admin_users": admin_users,
+            "inactive_users": total_users - active_users,
+            "new_users_last_30_days": new_users_last_30_days,
+            "total_teams": total_teams,
+            "total_api_tokens": total_api_tokens,
+            "login_events_last_24h": login_events_last_24h,
+            "failed_logins_last_24h": failed_logins_last_24h,
+        }
+
+    except Exception as e:
+        LOGGER.error(f"Error getting user stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting user stats: {str(e)}")
+
+
+@admin_router.post("/users")
+async def admin_create_user(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: str = Depends(require_auth),
+) -> JSONResponse:
+    """Create a new user via admin interface."""
+    try:
+        # Only enable in multi-user mode
+        if not settings.multi_user_enabled or settings.legacy_auth_mode:
+            raise HTTPException(status_code=404, detail="User management not available in legacy mode")
+
+        # Parse form data
+        form_data = await request.form()
+        username = form_data.get("username", "").strip()
+        password = form_data.get("password", "").strip()
+        email = form_data.get("email", "").strip() or None
+        full_name = form_data.get("full_name", "").strip() or None
+        is_admin = form_data.get("is_admin") == "on"
+
+        if not username or not password:
+            return JSONResponse(content={"success": False, "error": "Username and password are required"}, status_code=400)
+
+        # Create user
+        user_service = UserService(db)
+        new_user = await user_service.create_user(
+            username=username,
+            password=password,
+            email=email,
+            full_name=full_name,
+            is_admin=is_admin,
+            created_by=user,  # Admin who created this user
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+
+        LOGGER.info(f"User created via admin UI: {username} by {user}")
+
+        return JSONResponse(
+            content={
+                "success": True,
+                "message": f"User '{username}' created successfully",
+                "user_id": new_user.id,
+                "username": new_user.username,
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        LOGGER.error(f"Error creating user via admin UI: {e}")
+        error_msg = "Username already exists" if "already exists" in str(e) else f"Error creating user: {str(e)}"
+        return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
+
+
+@admin_router.post("/users/{user_id}/toggle")
+async def admin_toggle_user_status(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin_user: str = Depends(require_auth),
+) -> JSONResponse:
+    """Toggle user active status (activate/deactivate)."""
+    try:
+        # Only enable in multi-user mode
+        if not settings.multi_user_enabled or settings.legacy_auth_mode:
+            raise HTTPException(status_code=404, detail="User management not available in legacy mode")
+
+        user_service = UserService(db)
+        target_user = await user_service.get_user_by_id(user_id)
+
+        if not target_user:
+            return JSONResponse(content={"success": False, "error": "User not found"}, status_code=404)
+
+        # Prevent admin from deactivating themselves
+        if target_user.username == admin_user:
+            return JSONResponse(content={"success": False, "error": "Cannot deactivate your own account"}, status_code=400)
+
+        # Toggle status
+        new_status = not target_user.is_active
+        await user_service.update_user(
+            user_id=user_id,
+            is_active=new_status,
+            updated_by=admin_user,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+
+        action = "activated" if new_status else "deactivated"
+        LOGGER.info(f"User {target_user.username} {action} by admin {admin_user}")
+
+        return JSONResponse(
+            content={
+                "success": True,
+                "message": f"User '{target_user.username}' {action} successfully",
+                "new_status": new_status,
+                "username": target_user.username,
+            }
+        )
+
+    except Exception as e:
+        LOGGER.error(f"Error toggling user status: {e}")
+        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+
+
+@admin_router.get("/users/list-html")
+async def admin_users_list_html(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: str = Depends(require_auth),
+    search: Optional[str] = None,
+    is_active: Optional[bool] = None,
+) -> HTMLResponse:
+    """Return HTML fragment for users list (HTMX target)."""
+    try:
+        # Only enable in multi-user mode
+        if not settings.multi_user_enabled or settings.legacy_auth_mode:
+            return HTMLResponse("<div class='text-center py-8 text-gray-500'>User management not available in legacy mode</div>")
+
+        user_service = UserService(db)
+        users = await user_service.list_users(skip=0, limit=100, search=search, is_active=is_active)
+
+        if not users:
+            return HTMLResponse("<div class='text-center py-8 text-gray-500'>No users found</div>")
+
+        # Build HTML for user list
+        html_parts = []
+        for user_obj in users:
+            # Get additional user statistics
+            # First-Party
+            from mcpgateway.db import ApiToken, AuthEvent
+
+            active_tokens = db.query(ApiToken).filter(ApiToken.user_id == user_obj.id, ApiToken.is_active.is_(True)).count()
+
+            last_login = db.query(AuthEvent).filter(AuthEvent.user_id == user_obj.id, AuthEvent.event_type == "login_success").order_by(AuthEvent.timestamp.desc()).first()
+
+            # Status indicators
+            status_class = "bg-green-100 text-green-800" if user_obj.is_active else "bg-red-100 text-red-800"
+            status_text = "Active" if user_obj.is_active else "Inactive"
+
+            admin_badge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">Admin</span>' if user_obj.is_admin else ""
+
+            locked_badge = ""
+            if user_obj.locked_until:
+                # First-Party
+                from mcpgateway.db import utc_now
+
+                if user_obj.locked_until > utc_now():
+                    locked_badge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">🔒 Locked</span>'
+
+            last_login_text = last_login.timestamp.strftime("%Y-%m-%d %H:%M") if last_login else "Never"
+
+            html_parts.append(
+                f"""
+            <div class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+              <div class="flex items-center justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center space-x-3">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{escapeHtml(user_obj.username)}</h3>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {status_class}">{status_text}</span>
+                    {admin_badge}
+                    {locked_badge}
+                  </div>
+                  <div class="mt-1 space-y-1">
+                    {f'<p class="text-sm text-gray-600 dark:text-gray-400">📧 {escapeHtml(user_obj.email)}</p>' if user_obj.email else ''}
+                    {f'<p class="text-sm text-gray-600 dark:text-gray-400">👤 {escapeHtml(user_obj.full_name)}</p>' if user_obj.full_name else ''}
+                    <p class="text-sm text-gray-600 dark:text-gray-400">🔑 {active_tokens} active tokens</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">📅 Last login: {last_login_text}</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">📝 Created: {user_obj.created_at.strftime("%Y-%m-%d")}</p>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <button
+                    onclick="toggleUserStatus('{user_obj.id}', '{escapeHtml(user_obj.username)}')"
+                    class="px-3 py-1 text-sm font-medium {'text-red-700 bg-red-100 hover:bg-red-200' if user_obj.is_active else 'text-green-700 bg-green-100 hover:bg-green-200'} rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    {'disabled' if user_obj.username == user else ''}
+                  >
+                    {'Deactivate' if user_obj.is_active else 'Activate'}
+                  </button>
+                  <button
+                    onclick="showUserTokens('{user_obj.id}', '{escapeHtml(user_obj.username)}')"
+                    class="px-3 py-1 text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    🔑 Tokens ({active_tokens})
+                  </button>
+                  <button
+                    onclick="showUserAuthEvents('{user_obj.id}', '{escapeHtml(user_obj.username)}')"
+                    class="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  >
+                    📊 Events
+                  </button>
+                  <button
+                    onclick="revokeUserTokens('{user_obj.id}', '{escapeHtml(user_obj.username)}')"
+                    class="px-3 py-1 text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    title="Emergency: Revoke all tokens"
+                  >
+                    🚨 Revoke All
+                  </button>
+                  <button
+                    onclick="deleteUser('{user_obj.id}', '{escapeHtml(user_obj.username)}')"
+                    class="px-3 py-1 text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    {'disabled' if user_obj.username == user else ''}
+                    title="Delete user account"
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
+
+              <!-- Expandable Tokens Section -->
+              <div id="user-{user_obj.id}-tokens" class="hidden mt-4 border-t border-gray-200 dark:border-gray-600 pt-4">
+                <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">API Tokens</h4>
+                <div id="user-{user_obj.id}-tokens-content" class="text-sm text-gray-600 dark:text-gray-400">
+                  Loading tokens...
+                </div>
+              </div>
+
+              <!-- Expandable Auth Events Section -->
+              <div id="user-{user_obj.id}-events" class="hidden mt-4 border-t border-gray-200 dark:border-gray-600 pt-4">
+                <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Recent Authentication Events</h4>
+                <div id="user-{user_obj.id}-events-content" class="text-sm text-gray-600 dark:text-gray-400">
+                  Loading events...
+                </div>
+              </div>
+            </div>
+            """
+            )
+
+        html_content = "".join(html_parts)
+        return HTMLResponse(html_content)
+
+    except Exception as e:
+        LOGGER.error(f"Error generating users list HTML: {e}")
+        return HTMLResponse(f"<div class='text-center py-8 text-red-500'>Error loading users: {escapeHtml(str(e))}</div>")
+
+
+def escapeHtml(text):
+    """Escape HTML to prevent XSS attacks."""
+    if text is None:
+        return ""
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#x27;")
+
+
+@admin_router.get("/users/stats-html")
+async def admin_user_stats_html(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: str = Depends(require_auth),
+) -> HTMLResponse:
+    """Get user statistics HTML fragment for dashboard cards."""
+    try:
+        # Only enable in multi-user mode
+        if not settings.multi_user_enabled or settings.legacy_auth_mode:
+            return HTMLResponse(
+                """
+                <div class="col-span-4 text-center py-4 text-gray-500">
+                    User statistics not available in legacy mode
+                </div>
+            """
+            )
+
+        # First-Party
+        from mcpgateway.db import ApiToken, User
+
+        # Get statistics
+        total_users = db.query(User).count()
+        active_users = db.query(User).filter(User.is_active.is_(True)).count()
+        admin_users = db.query(User).filter(User.is_admin.is_(True)).count()
+        total_api_tokens = db.query(ApiToken).filter(ApiToken.is_active.is_(True)).count()
+
+        # Build statistics HTML
+        html = f"""
+            <div class="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg">
+              <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{total_users}</div>
+              <div class="text-sm text-blue-800 dark:text-blue-300">Total Users</div>
+            </div>
+            <div class="bg-green-50 dark:bg-green-900 p-4 rounded-lg">
+              <div class="text-2xl font-bold text-green-600 dark:text-green-400">{active_users}</div>
+              <div class="text-sm text-green-800 dark:text-green-300">Active Users</div>
+            </div>
+            <div class="bg-purple-50 dark:bg-purple-900 p-4 rounded-lg">
+              <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">{admin_users}</div>
+              <div class="text-sm text-purple-800 dark:text-purple-300">Admin Users</div>
+            </div>
+            <div class="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-lg">
+              <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{total_api_tokens}</div>
+              <div class="text-sm text-yellow-800 dark:text-yellow-300">Active Tokens</div>
+            </div>
+        """
+
+        return HTMLResponse(html)
+
+    except Exception as e:
+        LOGGER.error(f"Error getting user stats HTML: {e}")
+        return HTMLResponse(f'<div class="col-span-4 text-center py-4 text-red-500">Error loading statistics: {escapeHtml(str(e))}</div>')
+
+
+@admin_router.get("/users/{user_id}/tokens-html")
+async def admin_user_tokens_html(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin_user: str = Depends(require_auth),
+) -> HTMLResponse:
+    """Get user tokens as HTML fragment."""
+    try:
+        if not settings.multi_user_enabled or settings.legacy_auth_mode:
+            return HTMLResponse("<div class='text-gray-500'>Not available in legacy mode</div>")
+
+        user_service = UserService(db)
+        target_user = await user_service.get_user_by_id(user_id)
+
+        if not target_user:
+            return HTMLResponse("<div class='text-red-500'>User not found</div>")
+
+        jwt_service = JWTService(db)
+        tokens = await jwt_service.list_user_tokens(user_id)
+
+        if not tokens:
+            return HTMLResponse("<div class='text-gray-500'>No tokens found</div>")
+
+        html_parts = []
+        for token in tokens:
+            status_class = "text-green-600" if token["is_active"] else "text-red-600"
+            status_text = "Active" if token["is_active"] else "Revoked"
+
+            last_used = "Never" if not token["last_used"] else datetime.fromisoformat(token["last_used"]).strftime("%Y-%m-%d %H:%M")
+            created = datetime.fromisoformat(token["created_at"]).strftime("%Y-%m-%d %H:%M")
+            expires = "Never" if not token["expires_at"] else datetime.fromisoformat(token["expires_at"]).strftime("%Y-%m-%d")
+
+            html_parts.append(
+                f"""
+                <div class="border border-gray-200 dark:border-gray-600 rounded p-3">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h5 class="font-medium text-gray-900 dark:text-gray-100">{escapeHtml(token["name"])}</h5>
+                            <p class="text-xs text-gray-500">{escapeHtml(token.get("description", ""))}</p>
+                            <p class="text-xs text-gray-600 mt-1">Created: {created}</p>
+                            <p class="text-xs text-gray-600">Last used: {last_used}</p>
+                            <p class="text-xs text-gray-600">Expires: {expires}</p>
+                        </div>
+                        <span class="text-xs font-medium {status_class}">{status_text}</span>
+                    </div>
+                </div>
+            """
+            )
+
+        return HTMLResponse("".join(html_parts))
+
+    except Exception as e:
+        LOGGER.error(f"Error getting user tokens HTML: {e}")
+        return HTMLResponse(f"<div class='text-red-500'>Error: {escapeHtml(str(e))}</div>")
+
+
+@admin_router.get("/users/{user_id}/events-html")
+async def admin_user_events_html(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin_user: str = Depends(require_auth),
+    limit: int = 20,
+) -> HTMLResponse:
+    """Get user authentication events as HTML fragment."""
+    try:
+        if not settings.multi_user_enabled or settings.legacy_auth_mode:
+            return HTMLResponse("<div class='text-gray-500'>Not available in legacy mode</div>")
+
+        user_service = UserService(db)
+        target_user = await user_service.get_user_by_id(user_id)
+
+        if not target_user:
+            return HTMLResponse("<div class='text-red-500'>User not found</div>")
+
+        # First-Party
+        from mcpgateway.db import AuthEvent
+
+        events = db.query(AuthEvent).filter(AuthEvent.user_id == user_id).order_by(AuthEvent.timestamp.desc()).limit(limit).all()
+
+        if not events:
+            return HTMLResponse("<div class='text-gray-500'>No authentication events found</div>")
+
+        html_parts = []
+        for event in events:
+            status_class = "text-green-600" if event.success else "text-red-600"
+            icon = "✅" if event.success else "❌"
+
+            timestamp = event.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+
+            html_parts.append(
+                f"""
+                <div class="border border-gray-200 dark:border-gray-600 rounded p-3">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                {icon} {escapeHtml(event.event_type)}
+                            </p>
+                            <p class="text-xs text-gray-600 dark:text-gray-400">{timestamp}</p>
+                            {f'<p class="text-xs text-gray-600">IP: {escapeHtml(event.ip_address)}</p>' if event.ip_address else ''}
+                            {f'<p class="text-xs text-red-600">Reason: {escapeHtml(event.failure_reason)}</p>' if event.failure_reason else ''}
+                        </div>
+                        <span class="text-xs {status_class}">
+                            {'Success' if event.success else 'Failed'}
+                        </span>
+                    </div>
+                </div>
+            """
+            )
+
+        return HTMLResponse("".join(html_parts))
+
+    except Exception as e:
+        LOGGER.error(f"Error getting user events HTML: {e}")
+        return HTMLResponse(f"<div class='text-red-500'>Error: {escapeHtml(str(e))}</div>")
+
+
+@admin_router.get("/teams/list-html")
+async def admin_teams_list_html(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: str = Depends(require_auth),
+) -> HTMLResponse:
+    """Return HTML fragment for teams list (admin view)."""
+    try:
+        if not settings.multi_user_enabled or settings.legacy_auth_mode:
+            return HTMLResponse("<div class='text-center py-8 text-gray-500'>Team management not available in legacy mode</div>")
+
+        # First-Party
+        from mcpgateway.db import Team, TeamMember
+
+        teams = db.query(Team).filter(Team.is_active.is_(True)).all()
+
+        if not teams:
+            return HTMLResponse("<div class='text-center py-8 text-gray-500'>No teams found</div>")
+
+        html_parts = []
+        for team in teams:
+            member_count = db.query(TeamMember).filter(TeamMember.team_id == team.id).count()
+
+            # Get team owners
+            owners = db.query(TeamMember).join(User).filter(TeamMember.team_id == team.id, TeamMember.role == "owner").all()
+            owner_names = [owner.user.username for owner in owners]
+
+            html_parts.append(
+                f"""
+            <div class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+              <div class="flex items-center justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center space-x-3">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{escapeHtml(team.name)}</h3>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{member_count} members</span>
+                  </div>
+                  <div class="mt-1 space-y-1">
+                    {f'<p class="text-sm text-gray-600 dark:text-gray-400">📝 {escapeHtml(team.description)}</p>' if team.description else ''}
+                    <p class="text-sm text-gray-600 dark:text-gray-400">👑 Owners: {", ".join(owner_names)}</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">📅 Created: {team.created_at.strftime("%Y-%m-%d")}</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">🔗 Slug: {team.slug}</p>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <button
+                    onclick="viewTeamDetails('{team.id}', '{escapeHtml(team.name)}')"
+                    class="px-3 py-1 text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    👥 Members
+                  </button>
+                  <button
+                    onclick="viewTeamResources('{team.id}', '{escapeHtml(team.name)}')"
+                    class="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 hover:bg-green-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    📦 Resources
+                  </button>
+                  <button
+                    onclick="editTeam('{team.id}', '{escapeHtml(team.name)}')"
+                    class="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  >
+                    ✏️ Edit
+                  </button>
+                </div>
+              </div>
+            </div>
+            """
+            )
+
+        return HTMLResponse("".join(html_parts))
+
+    except Exception as e:
+        LOGGER.error(f"Error generating teams list HTML: {e}")
+        return HTMLResponse(f"<div class='text-center py-8 text-red-500'>Error loading teams: {escapeHtml(str(e))}</div>")
+
+
+@admin_router.get("/security/events-html")
+async def admin_security_events_html(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: str = Depends(require_auth),
+    limit: int = 10,
+) -> HTMLResponse:
+    """Return HTML fragment for recent security events."""
+    try:
+        if not settings.multi_user_enabled or settings.legacy_auth_mode:
+            return HTMLResponse("<div class='text-center py-4 text-gray-500'>Security monitoring not available in legacy mode</div>")
+
+        # Standard
+        from datetime import timedelta
+
+        # First-Party
+        from mcpgateway.db import AuthEvent
+
+        # Get recent security events (failed logins, account lockouts, etc.)
+        recent_time = utc_now() - timedelta(hours=24)
+        events = (
+            db.query(AuthEvent)
+            .filter(AuthEvent.timestamp >= recent_time, AuthEvent.event_type.in_(["login_failed", "account_locked", "password_change_failed", "token_validation_failed"]))
+            .order_by(AuthEvent.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+
+        if not events:
+            return HTMLResponse("<div class='text-center py-4 text-green-600'>✅ No security incidents in the last 24 hours</div>")
+
+        html_parts = []
+        for event in events:
+            icon = "❌" if not event.success else "⚠️"
+            severity_class = "text-red-600" if not event.success else "text-orange-600"
+
+            timestamp = event.timestamp.strftime("%H:%M:%S")
+
+            html_parts.append(
+                f"""
+                <div class="flex items-start space-x-3 py-2 border-b border-gray-200 dark:border-gray-600">
+                    <span class="{severity_class}">{icon}</span>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {escapeHtml(event.event_type.replace('_', ' ').title())}
+                        </p>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">
+                            {timestamp} - {escapeHtml(event.username or 'Unknown user')}
+                            {f' - {escapeHtml(event.ip_address)}' if event.ip_address else ''}
+                        </p>
+                        {f'<p class="text-xs text-red-600">Reason: {escapeHtml(event.failure_reason)}</p>' if event.failure_reason else ''}
+                    </div>
+                </div>
+            """
+            )
+
+        return HTMLResponse("".join(html_parts))
+
+    except Exception as e:
+        LOGGER.error(f"Error generating security events HTML: {e}")
+        return HTMLResponse(f"<div class='text-center py-4 text-red-500'>Error: {escapeHtml(str(e))}</div>")
