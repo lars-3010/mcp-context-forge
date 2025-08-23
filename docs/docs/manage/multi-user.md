@@ -161,11 +161,11 @@ LEGACY_AUTH_MODE=true
    ```bash
    MULTI_USER_ENABLED=true
    LEGACY_AUTH_MODE=false
-   
+
    # Enhanced JWT configuration
    JWT_ISSUER=mcpgateway
    JWT_AUDIENCE=mcpgateway-api
-   
+
    # Keep existing credentials for default admin user
    BASIC_AUTH_USER=admin
    BASIC_AUTH_PASSWORD=changeme
@@ -436,7 +436,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 ### Scope Types
 
 - **Private** (`private`) - Only visible to the owner
-- **Team** (`team`) - Visible to team members  
+- **Team** (`team`) - Visible to team members
 - **Global** (`global`) - Visible to all users
 
 ### Access Control
@@ -445,7 +445,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 - Only the owner can view, edit, or delete
 - Created with `scope_type=private` and `user_id=owner_id`
 
-**Team Resources:**  
+**Team Resources:**
 - All team members can view
 - Team owners/admins can edit
 - Created with `scope_type=team` and `scope_team_id=team_id`

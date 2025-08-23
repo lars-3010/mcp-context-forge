@@ -191,7 +191,8 @@ class UserService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Password validation failed: {'; '.join(password_errors)}")
 
         # Check if username already exists
-        if self.db.query(User).filter(User.username == username).first():
+        existing_user = self.db.query(User).filter(User.username == username).first()
+        if existing_user:
             await log_auth_event(
                 db=self.db,
                 event_type="user_creation_failed",
@@ -582,6 +583,75 @@ class UserService:
             teams.append({"id": team.id, "name": team.name, "slug": team.slug, "role": membership.role, "joined_at": membership.joined_at})
 
         return teams
+
+    async def ensure_admin_user_exists(
+        self,
+        username: str,
+        password: str,
+        full_name: str = "Default Admin User",
+    ) -> User:
+        """
+        Ensure admin user exists, creating only if necessary.
+
+        This method is idempotent and safe for concurrent calls.
+
+        Args:
+            username: Admin username
+            password: Admin password
+            full_name: Full name for the admin user
+
+        Returns:
+            User: The admin user (existing or newly created)
+        """
+        try:
+            # First check if user already exists
+            existing_user = self.db.query(User).filter(User.username == username).first()
+            if existing_user:
+                return existing_user
+
+            # User doesn't exist, try to create it
+            password_hash = PasswordPolicy.hash_password(password)
+
+            user = User(
+                username=username,
+                password_hash=password_hash,
+                email=None,
+                full_name=full_name,
+                is_admin=True,
+                is_active=True,
+                email_verified=False,
+                failed_login_attempts=0,
+            )
+
+            self.db.add(user)
+            self.db.commit()
+            self.db.refresh(user)
+
+            # Log successful creation
+            await log_auth_event(
+                db=self.db,
+                event_type="admin_user_created",
+                user_id=user.id,
+                username=username,
+                success=True,
+                ip_address="127.0.0.1",
+                user_agent="System Initialization",
+                details={"created_at_startup": True},
+            )
+
+            return user
+
+        except Exception as e:
+            # If it's a unique constraint error, the user already exists
+            if "UNIQUE constraint failed" in str(e):
+                # Rollback and fetch the existing user
+                self.db.rollback()
+                existing_user = self.db.query(User).filter(User.username == username).first()
+                if existing_user:
+                    return existing_user
+
+            # Re-raise other errors
+            raise e
 
 
 # Dependency to get user service

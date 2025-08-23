@@ -254,32 +254,25 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         # Initialize multi-user system if enabled
         if AUTH_ROUTERS_AVAILABLE and settings.multi_user_enabled and not settings.legacy_auth_mode and UserService and User:
             try:
-                # Create default admin user if no users exist
+                # Ensure default admin user exists (idempotent and race-condition safe)
                 with SessionLocal() as db:
                     user_service = UserService(db)
+                    admin_user = await user_service.ensure_admin_user_exists(
+                        username=settings.basic_auth_user,
+                        password=settings.basic_auth_password,
+                        full_name="Default Admin User",
+                    )
 
-                    # Check if any users exist
                     existing_users = db.query(User).count()
-
-                    if existing_users == 0:
-                        # Create default admin user using legacy credentials
-                        await user_service.create_user(
-                            username=settings.basic_auth_user,
-                            password=settings.basic_auth_password,
-                            email=None,
-                            full_name="Default Admin User",
-                            is_admin=True,
-                            created_by=None,
-                            ip_address="127.0.0.1",
-                            user_agent="System Initialization",
-                        )
-                        logger.info(f"Default admin user created: {settings.basic_auth_user}")
-                    else:
-                        logger.info(f"Multi-user system initialized with {existing_users} existing users")
+                    logger.info(f"Multi-user system ready - admin user '{admin_user.username}' available ({existing_users} total users)")
 
             except Exception as e:
-                logger.error(f"Error initializing multi-user system: {e}")
-                # Continue startup even if multi-user init fails
+                # Multi-user initialization failed, but don't block startup
+                if "UNIQUE constraint failed" in str(e):
+                    logger.info(f"Multi-user system ready - admin user '{settings.basic_auth_user}' already exists")
+                else:
+                    logger.warning(f"Multi-user initialization issue: {e}")
+                logger.info("Application continuing with existing user configuration")
 
         logger.info("All services initialized successfully")
 
