@@ -9705,21 +9705,21 @@ async function loadAdminData() {
                 password: 'ChangeMe_12345678$'
             })
         });
-        
+
         if (!loginResponse.ok) {
             console.error('Failed to authenticate for admin data loading');
             return;
         }
-        
+
         const loginData = await loginResponse.json();
         const token = loginData.access_token;
-        
+
         // Load user statistics
         loadUserStats(token);
-        
+
         // Load teams list
         loadTeamsList(token);
-        
+
     } catch (error) {
         console.error('Error loading admin data:', error);
     }
@@ -9730,13 +9730,13 @@ async function loadUserStats(token) {
         const response = await fetch('/users', {
             headers: {'Authorization': `Bearer ${token}`}
         });
-        
+
         if (response.ok) {
             const data = await response.json();
             const totalUsers = data.total || data.users.length;
             const activeUsers = data.users.filter(u => u.is_active).length;
             const adminUsers = data.users.filter(u => u.is_admin).length;
-            
+
             // Get token count
             const tokensResponse = await fetch('/tokens', {
                 headers: {'Authorization': `Bearer ${token}`}
@@ -9746,7 +9746,7 @@ async function loadUserStats(token) {
                 const tokensData = await tokensResponse.json();
                 activeTokens = tokensData.tokens.filter(t => t.is_active).length;
             }
-            
+
             // Update statistics cards
             const statsContainer = document.getElementById('user-stats-cards');
             if (statsContainer) {
@@ -9780,10 +9780,10 @@ async function loadTeamsList(token) {
         const response = await fetch('/teams', {
             headers: {'Authorization': `Bearer ${token}`}
         });
-        
+
         if (response.ok) {
             const teams = await response.json();
-            
+
             const teamsContainer = document.getElementById('teams-list') || document.getElementById('teams-list-container');
             if (teamsContainer) {
                 if (teams.length === 0) {
@@ -9828,10 +9828,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const adminTab = document.getElementById('tab-admin');
     if (adminTab) {
         adminTab.addEventListener('click', function() {
-            setTimeout(loadAdminData, 500); // Small delay to ensure panels are shown
+            setTimeout(loadAdminDataComplete, 500); // Small delay to ensure panels are shown
         });
     }
-    
+
     // Also load immediately if admin panel is visible
     const adminPanel = document.getElementById('admin-panel');
     if (adminPanel && !adminPanel.classList.contains('hidden')) {
@@ -9840,6 +9840,152 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Refresh functions for after creation
-function refreshAdminData() {
+function loadAdminDataComplete() {
     loadAdminData();
+}
+
+async function loadUsersList(token) {
+    try {
+        const response = await fetch('/users', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const users = data.users || [];
+
+            const usersContainer = document.getElementById('users-list');
+            if (usersContainer) {
+                if (users.length === 0) {
+                    usersContainer.innerHTML = '<div class="text-center py-8 text-gray-500">No users found</div>';
+                } else {
+                    let html = '';
+                    users.forEach(user => {
+                        const statusClass = user.is_active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800";
+                        const statusText = user.is_active ? "Active" : "Inactive";
+                        const adminBadge = user.is_admin ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">Admin</span>' : '';
+                        const lastLogin = user.last_login ? new Date(user.last_login).toLocaleDateString() : "Never";
+
+                        html += `
+                            <div class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-3">
+                                            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">${escapeHtml(user.username)}</h3>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">${statusText}</span>
+                                            ${adminBadge}
+                                        </div>
+                                        <div class="mt-1 space-y-1">
+                                            ${user.email ? `<p class="text-sm text-gray-600 dark:text-gray-400">📧 ${escapeHtml(user.email)}</p>` : ''}
+                                            ${user.full_name ? `<p class="text-sm text-gray-600 dark:text-gray-400">👤 ${escapeHtml(user.full_name)}</p>` : ''}
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">📅 Last login: ${lastLogin}</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">📝 Created: ${new Date(user.created_at).toLocaleDateString()}</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <button
+                                            onclick="toggleUserStatusAPI('${user.id}', '${escapeHtml(user.username)}', ${user.is_active})"
+                                            class="px-3 py-1 text-sm font-medium ${user.is_active ? 'text-red-700 bg-red-100 hover:bg-red-200' : 'text-green-700 bg-green-100 hover:bg-green-200'} rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                            ${user.username === 'admin' ? 'disabled title="Cannot deactivate admin user"' : ''}
+                                        >
+                                            ${user.is_active ? 'Deactivate' : 'Activate'}
+                                        </button>
+                                        <button
+                                            onclick="viewUserTokensAPI('${user.id}', '${escapeHtml(user.username)}')"
+                                            class="px-3 py-1 text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md"
+                                        >
+                                            🔑 Tokens
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    usersContainer.innerHTML = html;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading users list:', error);
+        const usersContainer = document.getElementById('users-list');
+        if (usersContainer) {
+            usersContainer.innerHTML = '<div class="text-center py-8 text-red-500">Error loading users</div>';
+        }
+    }
+}
+
+// Update loadAdminData to include users list
+async function loadAdminDataComplete() {
+    try {
+        // Get authentication token
+        const loginResponse = await fetch('/auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                username: 'admin',
+                password: 'ChangeMe_12345678$'
+            })
+        });
+
+        if (!loginResponse.ok) {
+            console.error('Failed to authenticate for admin data loading');
+            return;
+        }
+
+        const loginData = await loginResponse.json();
+        const token = loginData.access_token;
+
+        // Load all admin data
+        await loadUserStats(token);
+        await loadUsersList(token);
+        await loadTeamsList(token);
+
+    } catch (error) {
+        console.error('Error loading admin data:', error);
+    }
+}
+
+// User management functions via API
+async function toggleUserStatusAPI(userId, username, currentStatus) {
+    if (confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} user "${username}"?`)) {
+        try {
+            const loginResponse = await fetch('/auth/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: 'admin', password: 'ChangeMe_12345678$'})
+            });
+
+            const loginData = await loginResponse.json();
+            const token = loginData.access_token;
+
+            const response = await fetch(`/users/${userId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({is_active: !currentStatus})
+            });
+
+            if (response.ok) {
+                showToast('success', `User "${username}" ${currentStatus ? 'deactivated' : 'activated'} successfully`);
+                loadAdminDataComplete();
+            } else {
+                const errorData = await response.json();
+                showToast('error', errorData.detail || 'Failed to update user');
+            }
+        } catch (error) {
+            showToast('error', `Error updating user: ${error.message}`);
+        }
+    }
+}
+
+async function viewUserTokensAPI(userId, username) {
+    // TODO: Implement token viewing functionality
+    showToast('info', `Token viewing for ${username} - coming soon!`);
+}
+
+// Update the existing loadAdminData to use the complete version
+if (typeof loadAdminData !== 'undefined') {
+    loadAdminData = loadAdminDataComplete;
 }

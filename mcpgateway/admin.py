@@ -5709,35 +5709,36 @@ async def admin_test_a2a_agent(
 # User Management Admin UI Endpoints
 # ===================================
 
+
 @admin_router.get("/users/stats")
 async def admin_user_stats(
     request: Request,
-    db: Session = Depends(get_db), 
+    db: Session = Depends(get_db),
     user: str = Depends(require_auth),
 ) -> Dict[str, Any]:
     """Get user statistics for admin dashboard."""
     try:
         if not settings.multi_user_enabled or settings.legacy_auth_mode:
             return {"total_users": 0, "active_users": 0, "admin_users": 0, "total_api_tokens": 0}
-            
-        from datetime import timedelta
-        
+
         # Get statistics using direct database queries
         total_users = db.query(User).count()
         active_users = db.query(User).filter(User.is_active.is_(True)).count()
         admin_users = db.query(User).filter(User.is_admin.is_(True)).count()
-        
+
         # Count API tokens
+        # First-Party
         from mcpgateway.db import ApiToken
+
         total_api_tokens = db.query(ApiToken).filter(ApiToken.is_active.is_(True)).count()
-        
+
         return {
             "total_users": total_users,
             "active_users": active_users,
             "admin_users": admin_users,
             "total_api_tokens": total_api_tokens,
         }
-        
+
     except Exception as e:
         LOGGER.error(f"Error getting user stats: {e}")
         return {"total_users": 0, "active_users": 0, "admin_users": 0, "total_api_tokens": 0}
@@ -5746,24 +5747,26 @@ async def admin_user_stats(
 @admin_router.get("/users/stats-html")
 async def admin_user_stats_html(
     request: Request,
-    db: Session = Depends(get_db), 
+    db: Session = Depends(get_db),
     user: str = Depends(require_auth),
 ) -> HTMLResponse:
     """Get user statistics HTML fragment for dashboard cards."""
     try:
         if not settings.multi_user_enabled or settings.legacy_auth_mode:
             return HTMLResponse('<div class="col-span-4 text-center py-4 text-gray-500">User statistics not available in legacy mode</div>')
-            
+
         # Get statistics
         total_users = db.query(User).count()
         active_users = db.query(User).filter(User.is_active.is_(True)).count()
         admin_users = db.query(User).filter(User.is_admin.is_(True)).count()
-        
+
+        # First-Party
         from mcpgateway.db import ApiToken
+
         total_api_tokens = db.query(ApiToken).filter(ApiToken.is_active.is_(True)).count()
-        
+
         # Build statistics HTML
-        html = f'''
+        html = f"""
             <div class="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg">
               <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{total_users}</div>
               <div class="text-sm text-blue-800 dark:text-blue-300">Total Users</div>
@@ -5780,10 +5783,10 @@ async def admin_user_stats_html(
               <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{total_api_tokens}</div>
               <div class="text-sm text-yellow-800 dark:text-yellow-300">Active Tokens</div>
             </div>
-        '''
-        
+        """
+
         return HTMLResponse(html)
-        
+
     except Exception as e:
         LOGGER.error(f"Error getting user stats HTML: {e}")
         return HTMLResponse('<div class="col-span-4 text-center py-4 text-red-500">Error loading statistics</div>')
@@ -5799,25 +5802,23 @@ async def admin_teams_list_html(
     try:
         if not settings.multi_user_enabled or settings.legacy_auth_mode:
             return HTMLResponse("<div class='text-center py-8 text-gray-500'>Team management not available in legacy mode</div>")
-            
+
         teams = db.query(Team).filter(Team.is_active.is_(True)).all()
-        
+
         if not teams:
             return HTMLResponse("<div class='text-center py-8 text-gray-500'>No teams found</div>")
-        
+
         # Build HTML for team list
         html_parts = []
         for team in teams:
             member_count = db.query(TeamMember).filter(TeamMember.team_id == team.id).count()
-            
+
             # Get team owners
-            owners = db.query(TeamMember).join(User).filter(
-                TeamMember.team_id == team.id,
-                TeamMember.role == "owner"
-            ).all()
+            owners = db.query(TeamMember).join(User).filter(TeamMember.team_id == team.id, TeamMember.role == "owner").all()
             owner_names = [owner.user.username for owner in owners]
-            
-            html_parts.append(f'''
+
+            html_parts.append(
+                f"""
             <div class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
               <div class="flex items-center justify-between">
                 <div class="flex-1">
@@ -5833,10 +5834,11 @@ async def admin_teams_list_html(
                 </div>
               </div>
             </div>
-            ''')
-        
-        return HTMLResponse(''.join(html_parts))
-        
+            """
+            )
+
+        return HTMLResponse("".join(html_parts))
+
     except Exception as e:
         LOGGER.error(f"Error generating teams list HTML: {e}")
         return HTMLResponse(f"<div class='text-center py-8 text-red-500'>Error loading teams: {str(e)}</div>")
@@ -5847,5 +5849,3 @@ def escapeHtml(text):
     if text is None:
         return ""
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#x27;")
-
-
