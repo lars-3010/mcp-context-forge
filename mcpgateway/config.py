@@ -170,6 +170,30 @@ class Settings(BaseSettings):
     csrf_token_name: str = Field(default="csrf-token", description="CSRF cookie name")
     csrf_header_name: str = Field(default="X-CSRF-Token", description="CSRF header name")
 
+    # Email-Only Authentication Configuration
+    email_only_auth: bool = Field(default=False, description="Enable email-only authentication system")
+    username_disabled: bool = Field(default=False, description="Disable username-based authentication")
+
+    # Platform Admin Bootstrap
+    platform_admin_email: Optional[str] = Field(default=None, description="Platform admin email address")
+    platform_admin_password: Optional[str] = Field(default=None, description="Platform admin password")
+    platform_admin_full_name: str = Field(default="Platform Administrator", description="Platform admin display name")
+
+    # Argon2id Configuration (#544)
+    argon2id_enabled: bool = Field(default=False, description="Enable Argon2id password hashing")
+    argon2id_time_cost: int = Field(default=3, description="Argon2id time cost parameter")
+    argon2id_memory_cost: int = Field(default=65536, description="Argon2id memory cost parameter (64MB)")
+    argon2id_parallelism: int = Field(default=1, description="Argon2id parallelism parameter")
+
+    # Registration Control
+    registration_enabled: bool = Field(default=False, description="Enable new user registration")
+    registration_requires_approval: bool = Field(default=True, description="Require admin approval for new registrations")
+    auto_approve_domains: List[str] = Field(default_factory=list, description="Domains for auto-approval")
+    email_verification_required: bool = Field(default=True, description="Require email verification")
+
+    # Password History
+    password_history_count: int = Field(default=5, description="Number of previous passwords to remember")
+
     # MCP Client Authentication
     mcp_client_auth_enabled: bool = Field(default=True, description="Enable JWT authentication for MCP client operations")
     trust_proxy_auth: bool = Field(

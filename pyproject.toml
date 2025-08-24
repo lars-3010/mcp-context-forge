@@ -48,6 +48,7 @@ maintainers = [
 dependencies = [
     "aiohttp>=3.12.15",
     "alembic>=1.16.4",
+    "argon2-cffi>=23.1.0",
     "bcrypt>=4.3.0",
     "copier>=9.9.1",
     "cryptography>=45.0.6",
