@@ -238,6 +238,17 @@ def generate_jwt() -> str:
         admin_user = os.getenv("BASIC_AUTH_USER", "admin")
         admin_password = os.getenv("BASIC_AUTH_PASSWORD", "changeme")
 
+        # Check if multi-user auth is available first
+        health_url = f"https://localhost:{PORT_GATEWAY}/auth/health"
+        try:
+            health_response = requests.get(health_url, verify=False, timeout=5)
+            if health_response.status_code != 200:
+                logging.info("🔄 Multi-user auth endpoints not available, using legacy token")
+                raise Exception("Auth endpoints not ready")
+        except:
+            logging.info("🔄 Multi-user auth not ready, using legacy token")
+            raise Exception("Auth endpoints not available")
+
         # Login via multi-user API
         login_url = f"https://localhost:{PORT_GATEWAY}/auth/login"
         login_data = {
@@ -245,6 +256,7 @@ def generate_jwt() -> str:
             "password": admin_password
         }
 
+        logging.info(f"🔐 Attempting multi-user login for {admin_user}")
         response = requests.post(
             login_url,
             json=login_data,
@@ -252,15 +264,23 @@ def generate_jwt() -> str:
             timeout=10
         )
 
+        logging.info(f"🔐 Login response status: {response.status_code}")
+
         if response.status_code == 200:
             login_result = response.json()
             token = login_result.get("access_token")
             if token:
                 logging.info("✅ Using multi-user authentication token")
                 return token
+            else:
+                logging.warning("⚠️ Login succeeded but no access_token in response")
+        else:
+            logging.warning(f"⚠️ Multi-user login failed with status {response.status_code}")
+            if response.status_code == 401:
+                logging.warning("⚠️ Invalid credentials for multi-user login")
 
     except Exception as e:
-        logging.warning(f"Multi-user login failed, falling back to legacy token: {e}")
+        logging.info(f"🔄 Multi-user login not available, using legacy token: {e}")
 
     # Fallback to legacy token generation
     logging.info("⚠️ Using legacy token generation as fallback")
