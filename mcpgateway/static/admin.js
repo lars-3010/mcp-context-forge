@@ -9450,7 +9450,7 @@ function showTeamCreateForm() {
         <div class="flex items-center justify-center min-h-screen">
             <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Create New Team</h3>
-                <form id="team-create-form" hx-post="/teams" hx-target="#create-team-result" hx-swap="innerHTML">
+                <form id="team-create-form" action="/admin/teams" method="POST" hx-post="/admin/teams" hx-target="#create-team-result" hx-swap="innerHTML">
                     <div class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Team Name *</label>

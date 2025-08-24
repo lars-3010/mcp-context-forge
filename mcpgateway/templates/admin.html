@@ -3975,7 +3975,7 @@
           <div class="flex items-center justify-center min-h-screen">
             <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
               <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Create New User</h3>
-              <form id="user-create-form" hx-post="/admin/users" hx-target="#create-user-result" hx-swap="innerHTML">
+              <form id="user-create-form" action="/admin/users" method="POST" hx-post="/admin/users" hx-target="#create-user-result" hx-swap="innerHTML">
                 <div class="space-y-4">
                   <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Username *</label>

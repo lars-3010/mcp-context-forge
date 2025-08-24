@@ -32,14 +32,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/teams", tags=["Team Management"])
 
 
-@router.post(
-    "/",
-    response_model=TeamResponse,
-    responses={
-        400: {"model": ErrorResponse, "description": "Validation error"},
-        409: {"model": ErrorResponse, "description": "Team name already exists"},
-    },
-)
+@router.get("/_debug")
+async def debug_teams():
+    """Simple debug endpoint without dependencies."""
+    return {"status": "teams router is working", "message": "debug endpoint responding"}
+
+
+@router.get("/_debug-auth")
+async def debug_teams_auth(current_user: User = Depends(get_current_user)):
+    """Debug endpoint with auth dependency."""
+    return {"status": "auth working", "user": current_user.username if current_user else None}
+
+
+@router.get("/_debug-db")
+async def debug_teams_db(db: Session = Depends(get_db)):
+    """Debug endpoint with database dependency."""
+    from mcpgateway.db import Team
+    team_count = db.query(Team).count()
+    return {"status": "database working", "team_count": team_count}
+
+
+@router.post("/", responses={
+    400: {"model": ErrorResponse, "description": "Validation error"},
+    409: {"model": ErrorResponse, "description": "Team name already exists"},
+})
+@router.post("", include_in_schema=False)  # Support both /teams and /teams/
 async def create_team(request: Request, team_data: TeamCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Create a new team.
@@ -71,12 +88,22 @@ async def create_team(request: Request, team_data: TeamCreate, current_user: Use
     # Return team with member count
     member_count = db.query(TeamMember).filter(TeamMember.team_id == team.id).count()
 
-    response = TeamResponse.from_orm(team)
-    response.member_count = member_count
+    response = TeamResponse(
+        id=team.id,
+        name=team.name,
+        slug=team.slug,
+        description=team.description,
+        created_by=team.created_by,
+        created_at=team.created_at,
+        updated_at=team.updated_at,
+        is_active=team.is_active,
+        member_count=member_count
+    )
     return response
 
 
-@router.get("/", response_model=List[TeamResponse], responses={200: {"description": "List of teams"}})
+@router.get("/", include_in_schema=True)
+@router.get("", include_in_schema=False)  # Support both /teams and /teams/
 async def list_teams(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -87,54 +114,47 @@ async def list_teams(
 
     Returns teams that the user is a member of, or all teams if admin and include_all=True.
     """
-    if include_all and current_user.is_admin:
-        # Admin can see all teams
-        teams = db.query(Team).filter(Team.is_active.is_(True)).all()
-    else:
-        # Regular users see only their teams
-        user_team_ids = db.query(TeamMember.team_id).filter(TeamMember.user_id == current_user.id).subquery()
+    try:
+        print(f"DEBUG: list_teams called by user {current_user.username}, include_all={include_all}")
+        print(f"DEBUG: user.is_admin = {current_user.is_admin}")
+        
+        if include_all and current_user.is_admin:
+            # Admin can see all teams
+            teams = db.query(Team).filter(Team.is_active.is_(True)).all()
+            print(f"DEBUG: Admin mode - found {len(teams)} active teams")
+        else:
+            # Regular users see only their teams
+            user_team_ids = db.query(TeamMember.team_id).filter(TeamMember.user_id == current_user.id).subquery()
+            teams = db.query(Team).filter(Team.id.in_(user_team_ids), Team.is_active.is_(True)).all()
+            print(f"DEBUG: User mode - found {len(teams)} teams for user {current_user.id}")
 
-        teams = db.query(Team).filter(Team.id.in_(user_team_ids), Team.is_active.is_(True)).all()
-
-    # Add member counts
-    result = []
-    for team in teams:
-        member_count = db.query(TeamMember).filter(TeamMember.team_id == team.id).count()
-        response = TeamResponse.from_orm(team)
-        response.member_count = member_count
-        result.append(response)
-
-    return result
-
-
-@router.get(
-    "/{team_id}",
-    response_model=TeamResponse,
-    responses={404: {"model": ErrorResponse, "description": "Team not found"}, 403: {"model": ErrorResponse, "description": "Not a team member"}},
-)
-async def get_team(team_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Get team details.
-
-    Returns team information if user is a member or admin.
-    """
-    team = db.query(Team).filter(Team.id == team_id).first()
-    if not team:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
-
-    # Check if user is team member or admin
-    if not current_user.is_admin:
-        membership = db.query(TeamMember).filter(TeamMember.team_id == team_id, TeamMember.user_id == current_user.id).first()
-
-        if not membership:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not a member of this team")
-
-    # Add member count
-    member_count = db.query(TeamMember).filter(TeamMember.team_id == team.id).count()
-
-    response = TeamResponse.from_orm(team)
-    response.member_count = member_count
-    return response
+        # Add member counts to all teams
+        result = []
+        for team in teams:
+            member_count = db.query(TeamMember).filter(TeamMember.team_id == team.id).count()
+            
+            team_dict = {
+                "id": team.id,
+                "name": team.name,
+                "slug": team.slug,
+                "description": team.description,
+                "created_by": team.created_by,
+                "created_at": team.created_at.isoformat(),
+                "updated_at": team.updated_at.isoformat(),
+                "is_active": team.is_active,
+                "member_count": member_count
+            }
+            result.append(team_dict)
+            print(f"DEBUG: Added team {team.name} to result")
+        
+        print(f"DEBUG: Returning {len(result)} teams")
+        return result
+        
+    except Exception as e:
+        print(f"DEBUG ERROR in list_teams: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 
 @router.get(
@@ -369,8 +389,18 @@ async def update_team(team_id: str, team_data: TeamUpdate, current_user: User = 
 
     # Return team with member count
     member_count = db.query(TeamMember).filter(TeamMember.team_id == team.id).count()
-    response = TeamResponse.from_orm(team)
-    response.member_count = member_count
+    
+    response = TeamResponse(
+        id=team.id,
+        name=team.name,
+        slug=team.slug,
+        description=team.description,
+        created_by=team.created_by,
+        created_at=team.created_at,
+        updated_at=team.updated_at,
+        is_active=team.is_active,
+        member_count=member_count
+    )
     return response
 
 
@@ -755,11 +785,22 @@ async def list_my_teams(current_user: User = Depends(get_current_user), db: Sess
         if team.is_active:
             member_count = db.query(TeamMember).filter(TeamMember.team_id == team.id).count()
 
-            response = TeamResponse.from_orm(team)
-            response.member_count = member_count
-            # Add user's role in this team
-            response.user_role = membership.role
-            response.joined_at = membership.joined_at
+            response = TeamResponse(
+                id=team.id,
+                name=team.name,
+                slug=team.slug,
+                description=team.description,
+                created_by=team.created_by,
+                created_at=team.created_at,
+                updated_at=team.updated_at,
+                is_active=team.is_active,
+                member_count=member_count
+            )
+            # Add user's role in this team (if TeamResponse supports it)
+            if hasattr(response, 'user_role'):
+                response.user_role = membership.role
+            if hasattr(response, 'joined_at'):
+                response.joined_at = membership.joined_at
             result.append(response)
 
     return result
