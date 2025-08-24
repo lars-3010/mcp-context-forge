@@ -235,6 +235,17 @@ def require_resource_access(user: User = Depends(get_current_user), user_service
     """
 
     async def check_access(resource_user_id: Optional[str], resource_scope_type: str = "global", resource_scope_team_id: Optional[str] = None) -> bool:
+        """
+        Check access to a specific resource.
+
+        Args:
+            resource_user_id: Owner of the resource
+            resource_scope_type: Scope type (private, team, global)
+            resource_scope_team_id: Team ID if team-scoped
+
+        Returns:
+            bool: True if user has access
+        """
         return await check_resource_access(
             user=user,
             resource_user_id=resource_user_id,

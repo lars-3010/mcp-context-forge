@@ -227,9 +227,43 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def generate_jwt() -> str:
     """
-    Create a short-lived admin JWT that matches the gateway's settings.
-    Resolution order → environment-variable override, then package defaults.
+    Create a multi-user compatible JWT token via login API.
+    Falls back to legacy token generation if multi-user login fails.
     """
+    # Try multi-user login first
+    try:
+        import requests
+        import json
+
+        admin_user = os.getenv("BASIC_AUTH_USER", "admin")
+        admin_password = os.getenv("BASIC_AUTH_PASSWORD", "changeme")
+
+        # Login via multi-user API
+        login_url = f"https://localhost:{PORT_GATEWAY}/auth/login"
+        login_data = {
+            "username": admin_user,
+            "password": admin_password
+        }
+
+        response = requests.post(
+            login_url,
+            json=login_data,
+            verify=False,
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            login_result = response.json()
+            token = login_result.get("access_token")
+            if token:
+                logging.info("✅ Using multi-user authentication token")
+                return token
+
+    except Exception as e:
+        logging.warning(f"Multi-user login failed, falling back to legacy token: {e}")
+
+    # Fallback to legacy token generation
+    logging.info("⚠️ Using legacy token generation as fallback")
     user = os.getenv("BASIC_AUTH_USER", "admin")
     secret = os.getenv("JWT_SECRET_KEY", "my-test-key")
     expiry = os.getenv("TOKEN_EXPIRY", "300")  # seconds

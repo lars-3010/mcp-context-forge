@@ -3711,7 +3711,9 @@ function showTab(tabName) {
                     const agentsList = safeGetElement("a2a-agents-list");
                     if (agentsList && agentsList.innerHTML.trim() === "") {
                         // Trigger HTMX load manually
-                        window.htmx.trigger(agentsList, "load");
+                        if (typeof window.htmx !== "undefined") {
+                            window.htmx.trigger(agentsList, "load");
+                        }
                     }
                 }
 
@@ -9244,7 +9246,9 @@ function filterUsers() {
         }
     }
 
-    htmx.ajax("GET", url, { target: "#users-list", swap: "innerHTML" });
+    if (typeof htmx !== "undefined") {
+        htmx.ajax("GET", url, { target: "#users-list", swap: "innerHTML" });
+    }
 }
 
 function showUserCreateForm() {
@@ -9263,13 +9267,15 @@ function toggleUserStatus(userId, username) {
             `Are you sure you want to toggle the status for user "${username}"?`,
         )
     ) {
-        htmx.ajax("POST", `/admin/users/${userId}/toggle`, {
-            target: "#users-list",
-            swap: "outerHTML",
-        }).then(() => {
-            // Refresh the user list
-            filterUsers();
-        });
+        if (typeof htmx !== "undefined") {
+            htmx.ajax("POST", `/admin/users/${userId}/toggle`, {
+                target: "#users-list",
+                swap: "outerHTML",
+            }).then(() => {
+                // Refresh the user list
+                filterUsers();
+            });
+        }
     }
 }
 
@@ -9279,13 +9285,15 @@ function deleteUser(userId, username) {
             `Are you sure you want to DELETE user "${username}"? This action cannot be undone!`,
         )
     ) {
-        htmx.ajax("DELETE", `/admin/users/${userId}`, {
-            target: "#users-list",
-            swap: "outerHTML",
-        }).then(() => {
-            // Refresh the user list
-            filterUsers();
-        });
+        if (typeof htmx !== "undefined") {
+            htmx.ajax("DELETE", `/admin/users/${userId}`, {
+                target: "#users-list",
+                swap: "outerHTML",
+            }).then(() => {
+                // Refresh the user list
+                filterUsers();
+            });
+        }
     }
 }
 
@@ -9295,17 +9303,19 @@ function revokeUserTokens(userId, username) {
             `Are you sure you want to revoke ALL tokens for user "${username}"? This will log them out immediately!`,
         )
     ) {
-        htmx.ajax("POST", `/admin/users/${userId}/revoke-tokens`).then(
-            (response) => {
-                if (response.success) {
-                    alert(
-                        `Revoked ${response.revoked_count} tokens for ${username}`,
-                    );
-                } else {
-                    alert(`Error: ${response.error}`);
-                }
-            },
-        );
+        if (typeof htmx !== "undefined") {
+            htmx.ajax("POST", `/admin/users/${userId}/revoke-tokens`).then(
+                (response) => {
+                    if (response.success) {
+                        alert(
+                            `Revoked ${response.revoked_count} tokens for ${username}`,
+                        );
+                    } else {
+                        alert(`Error: ${response.error}`);
+                    }
+                },
+            );
+        }
     }
 }
 
@@ -9314,10 +9324,12 @@ function showUserTokens(userId, username) {
     const tokensContainer = document.getElementById(`user-${userId}-tokens`);
     if (tokensContainer) {
         if (tokensContainer.classList.contains("hidden")) {
-            htmx.ajax("GET", `/admin/users/${userId}/tokens-html`, {
-                target: `#user-${userId}-tokens-content`,
-                swap: "innerHTML",
-            });
+            if (typeof htmx !== "undefined") {
+                htmx.ajax("GET", `/admin/users/${userId}/tokens-html`, {
+                    target: `#user-${userId}-tokens-content`,
+                    swap: "innerHTML",
+                });
+            }
             tokensContainer.classList.remove("hidden");
         } else {
             tokensContainer.classList.add("hidden");
@@ -9330,10 +9342,16 @@ function showUserAuthEvents(userId, username) {
     const eventsContainer = document.getElementById(`user-${userId}-events`);
     if (eventsContainer) {
         if (eventsContainer.classList.contains("hidden")) {
-            htmx.ajax("GET", `/admin/users/${userId}/events-html?limit=20`, {
-                target: `#user-${userId}-events-content`,
-                swap: "innerHTML",
-            });
+            if (typeof htmx !== "undefined") {
+                htmx.ajax(
+                    "GET",
+                    `/admin/users/${userId}/events-html?limit=20`,
+                    {
+                        target: `#user-${userId}-events-content`,
+                        swap: "innerHTML",
+                    },
+                );
+            }
             eventsContainer.classList.remove("hidden");
         } else {
             eventsContainer.classList.add("hidden");
@@ -9488,10 +9506,12 @@ function viewTeamDetails(teamId, teamName) {
     const detailsContainer = document.getElementById(`team-${teamId}-details`);
     if (detailsContainer) {
         if (detailsContainer.classList.contains("hidden")) {
-            htmx.ajax("GET", `/teams/${teamId}/members`, {
-                target: `#team-${teamId}-details-content`,
-                swap: "innerHTML",
-            });
+            if (typeof htmx !== "undefined") {
+                htmx.ajax("GET", `/teams/${teamId}/members`, {
+                    target: `#team-${teamId}-details-content`,
+                    swap: "innerHTML",
+                });
+            }
             detailsContainer.classList.remove("hidden");
         } else {
             detailsContainer.classList.add("hidden");
@@ -9506,10 +9526,12 @@ function viewTeamResources(teamId, teamName) {
     );
     if (resourcesContainer) {
         if (resourcesContainer.classList.contains("hidden")) {
-            htmx.ajax("GET", `/teams/${teamId}/resources`, {
-                target: `#team-${teamId}-resources-content`,
-                swap: "innerHTML",
-            });
+            if (typeof htmx !== "undefined") {
+                htmx.ajax("GET", `/teams/${teamId}/resources`, {
+                    target: `#team-${teamId}-resources-content`,
+                    swap: "innerHTML",
+                });
+            }
             resourcesContainer.classList.remove("hidden");
         } else {
             resourcesContainer.classList.add("hidden");
@@ -9524,28 +9546,32 @@ function editTeam(teamId, teamName) {
 
 // Update security statistics on load
 function updateSecurityStats() {
-    htmx.ajax("GET", "/admin/users/stats", {
-        target: "#admin-security-panel .grid",
-        swap: "none",
-    }).then((response) => {
-        if (response && response.failed_logins_last_24h !== undefined) {
-            document.getElementById("failed-logins-24h").textContent =
-                response.failed_logins_last_24h;
-            document.getElementById("login-events-24h").textContent =
-                response.login_events_last_24h;
-            // Note: locked-accounts would need a separate endpoint
-        }
-    });
+    if (typeof htmx !== "undefined") {
+        htmx.ajax("GET", "/admin/users/stats", {
+            target: "#admin-security-panel .grid",
+            swap: "none",
+        }).then((response) => {
+            if (response && response.failed_logins_last_24h !== undefined) {
+                document.getElementById("failed-logins-24h").textContent =
+                    response.failed_logins_last_24h;
+                document.getElementById("login-events-24h").textContent =
+                    response.login_events_last_24h;
+                // Note: locked-accounts would need a separate endpoint
+            }
+        });
+    }
 }
 
 // Auto-refresh security events every 30 seconds when security panel is visible
 setInterval(() => {
     const securityPanel = document.getElementById("admin-security-panel");
     if (securityPanel && !securityPanel.classList.contains("hidden")) {
-        htmx.ajax("GET", "/admin/security/events-html", {
-            target: "#security-events-list",
-            swap: "innerHTML",
-        });
+        if (typeof htmx !== "undefined") {
+            htmx.ajax("GET", "/admin/security/events-html", {
+                target: "#security-events-list",
+                swap: "innerHTML",
+            });
+        }
         updateSecurityStats();
     }
 }, 30000);
@@ -9556,54 +9582,59 @@ async function createTeamViaAPI(event) {
 
     const form = event.target;
     const formData = new FormData(form);
-    const name = formData.get('name');
-    const description = formData.get('description');
+    const name = formData.get("name");
+    const description = formData.get("description");
 
     if (!name) {
-        showToast('error', 'Team name is required');
+        showToast("error", "Team name is required");
         return;
     }
 
     try {
         // First, login to get a proper Bearer token
-        const loginResponse = await fetch('/auth/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+        const loginResponse = await fetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                username: 'admin',
-                password: 'ChangeMe_12345678$'  // Use the password from .env
-            })
+                username: "admin",
+                password: "ChangeMe_12345678$", // Use the password from .env
+            }),
         });
 
         if (!loginResponse.ok) {
-            throw new Error('Failed to authenticate');
+            throw new Error("Failed to authenticate");
         }
 
         const loginData = await loginResponse.json();
         const token = loginData.access_token;
 
         // Create team using the teams API
-        const createResponse = await fetch('/teams', {
-            method: 'POST',
+        const createResponse = await fetch("/teams", {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({name, description})
+            body: JSON.stringify({ name, description }),
         });
 
         if (createResponse.ok) {
             const teamData = await createResponse.json();
-            showToast('success', `Team "${teamData.name}" created successfully`);
+            showToast(
+                "success",
+                `Team "${teamData.name}" created successfully`,
+            );
 
             // Refresh the teams list
-            if (document.getElementById('teams-list')) {
-                htmx.ajax('GET', '/admin/teams/list-html', {
-                    target: '#teams-list',
-                    swap: 'innerHTML'
-                });
+            if (document.getElementById("teams-list")) {
+                if (typeof htmx !== "undefined") {
+                    htmx.ajax("GET", "/admin/teams/list-html", {
+                        target: "#teams-list",
+                        swap: "innerHTML",
+                    });
+                }
             }
-            if (typeof filterUsers === 'function') {
+            if (typeof filterUsers === "function") {
                 filterUsers(); // Refresh if on users tab
             }
 
@@ -9612,14 +9643,12 @@ async function createTeamViaAPI(event) {
 
             // Reset form
             form.reset();
-
         } else {
             const errorData = await createResponse.json();
-            showToast('error', errorData.detail || 'Failed to create team');
+            showToast("error", errorData.detail || "Failed to create team");
         }
-
     } catch (error) {
-        showToast('error', `Error creating team: ${error.message}`);
+        showToast("error", `Error creating team: ${error.message}`);
     }
 }
 
@@ -9629,51 +9658,60 @@ async function createUserViaAPI(event) {
 
     const form = event.target;
     const formData = new FormData(form);
-    const username = formData.get('username');
-    const password = formData.get('password');
-    const email = formData.get('email') || null;
-    const full_name = formData.get('full_name') || null;
-    const is_admin = formData.get('is_admin') === 'on';
+    const username = formData.get("username");
+    const password = formData.get("password");
+    const email = formData.get("email") || null;
+    const fullName = formData.get("full_name") || null;
+    const isAdmin = formData.get("is_admin") === "on";
 
     if (!username || !password) {
-        showToast('error', 'Username and password are required');
+        showToast("error", "Username and password are required");
         return;
     }
 
     try {
         // First, login to get a proper Bearer token
-        const loginResponse = await fetch('/auth/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+        const loginResponse = await fetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                username: 'admin',
-                password: 'ChangeMe_12345678$'
-            })
+                username: "admin",
+                password: "ChangeMe_12345678$",
+            }),
         });
 
         if (!loginResponse.ok) {
-            throw new Error('Failed to authenticate');
+            throw new Error("Failed to authenticate");
         }
 
         const loginData = await loginResponse.json();
         const token = loginData.access_token;
 
         // Create user using the users API
-        const createResponse = await fetch('/users', {
-            method: 'POST',
+        const createResponse = await fetch("/users", {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({username, password, email, full_name, is_admin})
+            body: JSON.stringify({
+                username,
+                password,
+                email,
+                fullName,
+                is_admin: isAdmin,
+            }),
         });
 
         if (createResponse.ok) {
             const userData = await createResponse.json();
-            showToast('success', `User "${userData.username}" created successfully`);
+            showToast(
+                "success",
+                `User "${userData.username}" created successfully`,
+            );
 
             // Refresh the users list
-            if (typeof filterUsers === 'function') {
+            if (typeof filterUsers === "function") {
                 filterUsers();
             }
 
@@ -9682,14 +9720,12 @@ async function createUserViaAPI(event) {
 
             // Reset form
             form.reset();
-
         } else {
             const errorData = await createResponse.json();
-            showToast('error', errorData.detail || 'Failed to create user');
+            showToast("error", errorData.detail || "Failed to create user");
         }
-
     } catch (error) {
-        showToast('error', `Error creating user: ${error.message}`);
+        showToast("error", `Error creating user: ${error.message}`);
     }
 }
 
@@ -9697,17 +9733,17 @@ async function createUserViaAPI(event) {
 async function loadAdminData() {
     try {
         // Get authentication token
-        const loginResponse = await fetch('/auth/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+        const loginResponse = await fetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                username: 'admin',
-                password: 'ChangeMe_12345678$'
-            })
+                username: "admin",
+                password: "ChangeMe_12345678$",
+            }),
         });
 
         if (!loginResponse.ok) {
-            console.error('Failed to authenticate for admin data loading');
+            console.error("Failed to authenticate for admin data loading");
             return;
         }
 
@@ -9717,38 +9753,42 @@ async function loadAdminData() {
         // Load user statistics
         loadUserStats(token);
 
+        // Load users list
+        loadUsersList(token);
+
         // Load teams list
         loadTeamsList(token);
-
     } catch (error) {
-        console.error('Error loading admin data:', error);
+        console.error("Error loading admin data:", error);
     }
 }
 
 async function loadUserStats(token) {
     try {
-        const response = await fetch('/users', {
-            headers: {'Authorization': `Bearer ${token}`}
+        const response = await fetch("/users", {
+            headers: { Authorization: `Bearer ${token}` },
         });
 
         if (response.ok) {
             const data = await response.json();
             const totalUsers = data.total || data.users.length;
-            const activeUsers = data.users.filter(u => u.is_active).length;
-            const adminUsers = data.users.filter(u => u.is_admin).length;
+            const activeUsers = data.users.filter((u) => u.is_active).length;
+            const adminUsers = data.users.filter((u) => u.is_admin).length;
 
             // Get token count
-            const tokensResponse = await fetch('/tokens', {
-                headers: {'Authorization': `Bearer ${token}`}
+            const tokensResponse = await fetch("/tokens", {
+                headers: { Authorization: `Bearer ${token}` },
             });
             let activeTokens = 0;
             if (tokensResponse.ok) {
                 const tokensData = await tokensResponse.json();
-                activeTokens = tokensData.tokens.filter(t => t.is_active).length;
+                activeTokens = tokensData.tokens.filter(
+                    (t) => t.is_active,
+                ).length;
             }
 
             // Update statistics cards
-            const statsContainer = document.getElementById('user-stats-cards');
+            const statsContainer = document.getElementById("user-stats-cards");
             if (statsContainer) {
                 statsContainer.innerHTML = `
                     <div class="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg">
@@ -9771,26 +9811,29 @@ async function loadUserStats(token) {
             }
         }
     } catch (error) {
-        console.error('Error loading user stats:', error);
+        console.error("Error loading user stats:", error);
     }
 }
 
 async function loadTeamsList(token) {
     try {
-        const response = await fetch('/teams', {
-            headers: {'Authorization': `Bearer ${token}`}
+        const response = await fetch("/teams", {
+            headers: { Authorization: `Bearer ${token}` },
         });
 
         if (response.ok) {
             const teams = await response.json();
 
-            const teamsContainer = document.getElementById('teams-list') || document.getElementById('teams-list-container');
+            const teamsContainer =
+                document.getElementById("teams-list") ||
+                document.getElementById("teams-list-container");
             if (teamsContainer) {
                 if (teams.length === 0) {
-                    teamsContainer.innerHTML = '<div class="text-center py-8 text-gray-500">No teams found</div>';
+                    teamsContainer.innerHTML =
+                        '<div class="text-center py-8 text-gray-500">No teams found</div>';
                 } else {
-                    let html = '';
-                    teams.forEach(team => {
+                    let html = "";
+                    teams.forEach((team) => {
                         html += `
                             <div class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
                                 <div class="flex items-center justify-between">
@@ -9800,7 +9843,7 @@ async function loadTeamsList(token) {
                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">${team.member_count} members</span>
                                         </div>
                                         <div class="mt-1 space-y-1">
-                                            <p class="text-sm text-gray-600 dark:text-gray-400">📝 ${escapeHtml(team.description || 'No description')}</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">📝 ${escapeHtml(team.description || "No description")}</p>
                                             <p class="text-sm text-gray-600 dark:text-gray-400">📅 Created: ${new Date(team.created_at).toLocaleDateString()}</p>
                                             <p class="text-sm text-gray-600 dark:text-gray-400">🔗 Slug: ${escapeHtml(team.slug)}</p>
                                         </div>
@@ -9814,57 +9857,94 @@ async function loadTeamsList(token) {
             }
         }
     } catch (error) {
-        console.error('Error loading teams list:', error);
-        const teamsContainer = document.getElementById('teams-list') || document.getElementById('teams-list-container');
+        console.error("Error loading teams list:", error);
+        const teamsContainer =
+            document.getElementById("teams-list") ||
+            document.getElementById("teams-list-container");
         if (teamsContainer) {
-            teamsContainer.innerHTML = '<div class="text-center py-8 text-red-500">Error loading teams</div>';
+            teamsContainer.innerHTML =
+                '<div class="text-center py-8 text-red-500">Error loading teams</div>';
         }
     }
 }
 
 // Auto-load admin data when admin panels are shown
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener("DOMContentLoaded", function () {
     // Load data when admin tab is clicked
-    const adminTab = document.getElementById('tab-admin');
+    const adminTab = document.getElementById("tab-admin");
     if (adminTab) {
-        adminTab.addEventListener('click', function() {
+        adminTab.addEventListener("click", function () {
             setTimeout(loadAdminDataComplete, 500); // Small delay to ensure panels are shown
         });
     }
 
     // Also load immediately if admin panel is visible
-    const adminPanel = document.getElementById('admin-panel');
-    if (adminPanel && !adminPanel.classList.contains('hidden')) {
-        loadAdminData();
+    const adminPanel = document.getElementById("admin-panel");
+    if (adminPanel && !adminPanel.classList.contains("hidden")) {
+        loadAdminDataComplete();
     }
 });
 
 // Refresh functions for after creation
-function loadAdminDataComplete() {
-    loadAdminData();
+async function loadAdminDataComplete() {
+    try {
+        // Get authentication token
+        const loginResponse = await fetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                username: "admin",
+                password: "ChangeMe_12345678$",
+            }),
+        });
+
+        if (!loginResponse.ok) {
+            console.error("Failed to authenticate for admin data loading");
+            return;
+        }
+
+        const loginData = await loginResponse.json();
+        const token = loginData.access_token;
+
+        // Load all admin data
+        await loadUserStats(token);
+        await loadUsersList(token);
+        await loadTeamsList(token);
+    } catch (error) {
+        console.error("Error loading admin data:", error);
+    }
 }
 
 async function loadUsersList(token) {
     try {
-        const response = await fetch('/users', {
-            headers: {'Authorization': `Bearer ${token}`}
+        const response = await fetch("/users", {
+            headers: { Authorization: `Bearer ${token}` },
         });
 
         if (response.ok) {
             const data = await response.json();
             const users = data.users || [];
 
-            const usersContainer = document.getElementById('users-list');
+            const usersContainer = document.getElementById("users-list");
             if (usersContainer) {
                 if (users.length === 0) {
-                    usersContainer.innerHTML = '<div class="text-center py-8 text-gray-500">No users found</div>';
+                    usersContainer.innerHTML =
+                        '<div class="text-center py-8 text-gray-500">No users found</div>';
                 } else {
-                    let html = '';
-                    users.forEach(user => {
-                        const statusClass = user.is_active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800";
-                        const statusText = user.is_active ? "Active" : "Inactive";
-                        const adminBadge = user.is_admin ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">Admin</span>' : '';
-                        const lastLogin = user.last_login ? new Date(user.last_login).toLocaleDateString() : "Never";
+                    let html = "";
+                    users.forEach((user) => {
+                        const statusClass = user.is_active
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800";
+                        const statusText = user.is_active
+                            ? "Active"
+                            : "Inactive";
+                        const adminBadge = user.is_admin
+                            ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">Admin</span>'
+                            : "";
+                        const lastLogin = user.last_login
+                            ? new Date(user.last_login).toLocaleDateString()
+                            : "Never";
 
                         html += `
                             <div class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
@@ -9876,8 +9956,8 @@ async function loadUsersList(token) {
                                             ${adminBadge}
                                         </div>
                                         <div class="mt-1 space-y-1">
-                                            ${user.email ? `<p class="text-sm text-gray-600 dark:text-gray-400">📧 ${escapeHtml(user.email)}</p>` : ''}
-                                            ${user.full_name ? `<p class="text-sm text-gray-600 dark:text-gray-400">👤 ${escapeHtml(user.full_name)}</p>` : ''}
+                                            ${user.email ? `<p class="text-sm text-gray-600 dark:text-gray-400">📧 ${escapeHtml(user.email)}</p>` : ""}
+                                            ${user.full_name ? `<p class="text-sm text-gray-600 dark:text-gray-400">👤 ${escapeHtml(user.full_name)}</p>` : ""}
                                             <p class="text-sm text-gray-600 dark:text-gray-400">📅 Last login: ${lastLogin}</p>
                                             <p class="text-sm text-gray-600 dark:text-gray-400">📝 Created: ${new Date(user.created_at).toLocaleDateString()}</p>
                                         </div>
@@ -9885,10 +9965,10 @@ async function loadUsersList(token) {
                                     <div class="flex items-center space-x-2">
                                         <button
                                             onclick="toggleUserStatusAPI('${user.id}', '${escapeHtml(user.username)}', ${user.is_active})"
-                                            class="px-3 py-1 text-sm font-medium ${user.is_active ? 'text-red-700 bg-red-100 hover:bg-red-200' : 'text-green-700 bg-green-100 hover:bg-green-200'} rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                            ${user.username === 'admin' ? 'disabled title="Cannot deactivate admin user"' : ''}
+                                            class="px-3 py-1 text-sm font-medium ${user.is_active ? "text-red-700 bg-red-100 hover:bg-red-200" : "text-green-700 bg-green-100 hover:bg-green-200"} rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                            ${user.username === "admin" ? 'disabled title="Cannot deactivate admin user"' : ""}
                                         >
-                                            ${user.is_active ? 'Deactivate' : 'Activate'}
+                                            ${user.is_active ? "Deactivate" : "Activate"}
                                         </button>
                                         <button
                                             onclick="viewUserTokensAPI('${user.id}', '${escapeHtml(user.username)}')"
@@ -9906,86 +9986,63 @@ async function loadUsersList(token) {
             }
         }
     } catch (error) {
-        console.error('Error loading users list:', error);
-        const usersContainer = document.getElementById('users-list');
+        console.error("Error loading users list:", error);
+        const usersContainer = document.getElementById("users-list");
         if (usersContainer) {
-            usersContainer.innerHTML = '<div class="text-center py-8 text-red-500">Error loading users</div>';
+            usersContainer.innerHTML =
+                '<div class="text-center py-8 text-red-500">Error loading users</div>';
         }
-    }
-}
-
-// Update loadAdminData to include users list
-async function loadAdminDataComplete() {
-    try {
-        // Get authentication token
-        const loginResponse = await fetch('/auth/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                username: 'admin',
-                password: 'ChangeMe_12345678$'
-            })
-        });
-
-        if (!loginResponse.ok) {
-            console.error('Failed to authenticate for admin data loading');
-            return;
-        }
-
-        const loginData = await loginResponse.json();
-        const token = loginData.access_token;
-
-        // Load all admin data
-        await loadUserStats(token);
-        await loadUsersList(token);
-        await loadTeamsList(token);
-
-    } catch (error) {
-        console.error('Error loading admin data:', error);
     }
 }
 
 // User management functions via API
 async function toggleUserStatusAPI(userId, username, currentStatus) {
-    if (confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} user "${username}"?`)) {
+    if (
+        confirm(
+            `Are you sure you want to ${currentStatus ? "deactivate" : "activate"} user "${username}"?`,
+        )
+    ) {
         try {
-            const loginResponse = await fetch('/auth/login', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: 'admin', password: 'ChangeMe_12345678$'})
+            const loginResponse = await fetch("/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: "admin",
+                    password: "ChangeMe_12345678$",
+                }),
             });
 
             const loginData = await loginResponse.json();
             const token = loginData.access_token;
 
             const response = await fetch(`/users/${userId}`, {
-                method: 'PUT',
+                method: "PUT",
                 headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
                 },
-                body: JSON.stringify({is_active: !currentStatus})
+                body: JSON.stringify({ is_active: !currentStatus }),
             });
 
             if (response.ok) {
-                showToast('success', `User "${username}" ${currentStatus ? 'deactivated' : 'activated'} successfully`);
+                showToast(
+                    "success",
+                    `User "${username}" ${currentStatus ? "deactivated" : "activated"} successfully`,
+                );
                 loadAdminDataComplete();
             } else {
                 const errorData = await response.json();
-                showToast('error', errorData.detail || 'Failed to update user');
+                showToast("error", errorData.detail || "Failed to update user");
             }
         } catch (error) {
-            showToast('error', `Error updating user: ${error.message}`);
+            showToast("error", `Error updating user: ${error.message}`);
         }
     }
 }
 
 async function viewUserTokensAPI(userId, username) {
     // TODO: Implement token viewing functionality
-    showToast('info', `Token viewing for ${username} - coming soon!`);
+    showToast("info", `Token viewing for ${username} - coming soon!`);
 }
 
 // Update the existing loadAdminData to use the complete version
-if (typeof loadAdminData !== 'undefined') {
-    loadAdminData = loadAdminDataComplete;
-}

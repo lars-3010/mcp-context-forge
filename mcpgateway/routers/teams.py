@@ -551,7 +551,7 @@ async def list_team_invitations(team_id: str, current_user: User = Depends(get_c
     query = db.query(TeamInvitation).filter(TeamInvitation.team_id == team_id)
 
     if not include_expired:
-        query = query.filter(TeamInvitation.is_active == True, TeamInvitation.expires_at > utc_now())
+        query = query.filter(TeamInvitation.is_active.is_(True), TeamInvitation.expires_at > utc_now())
 
     invitations = query.order_by(TeamInvitation.invited_at.desc()).all()
 
@@ -667,7 +667,7 @@ async def accept_team_invitation(token: str, current_user: User = Depends(get_cu
     User must be logged in and invitation must be valid and not expired.
     """
     # Find the invitation by token
-    invitation = db.query(TeamInvitation).filter(TeamInvitation.token == token, TeamInvitation.is_active == True).first()
+    invitation = db.query(TeamInvitation).filter(TeamInvitation.token == token, TeamInvitation.is_active.is_(True)).first()
 
     if not invitation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation not found or expired")
@@ -724,7 +724,7 @@ async def list_my_invitations(current_user: User = Depends(get_current_user), db
     # Get pending invitations for user's email
     invitations = (
         db.query(TeamInvitation)
-        .filter(TeamInvitation.email == current_user.email, TeamInvitation.is_active == True, TeamInvitation.expires_at > utc_now(), TeamInvitation.accepted_at.is_(None))
+        .filter(TeamInvitation.email == current_user.email, TeamInvitation.is_active.is_(True), TeamInvitation.expires_at > utc_now(), TeamInvitation.accepted_at.is_(None))
         .order_by(TeamInvitation.invited_at.desc())
         .all()
     )

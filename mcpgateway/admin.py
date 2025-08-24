@@ -40,8 +40,9 @@ from sqlalchemy.orm import Session
 
 # First-Party
 from mcpgateway.config import settings
-from mcpgateway.db import get_db, GlobalConfig
+from mcpgateway.db import get_db, GlobalConfig, Team, TeamMember
 from mcpgateway.db import Tool as DbTool
+from mcpgateway.db import User
 from mcpgateway.models import LogLevel
 from mcpgateway.schemas import (
     A2AAgentCreate,
@@ -5844,8 +5845,15 @@ async def admin_teams_list_html(
         return HTMLResponse(f"<div class='text-center py-8 text-red-500'>Error loading teams: {str(e)}</div>")
 
 
-def escapeHtml(text):
-    """Escape HTML to prevent XSS attacks."""
+def escape_html(text):
+    """Escape HTML to prevent XSS attacks.
+
+    Args:
+        text: Text to escape
+
+    Returns:
+        str: HTML-escaped text
+    """
     if text is None:
         return ""
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#x27;")

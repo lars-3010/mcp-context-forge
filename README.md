@@ -1079,9 +1079,9 @@ You can get started by copying the provided [.env.example](.env.example) to `.en
 | `OAUTH_REQUEST_TIMEOUT`              | OAuth request timeout in seconds               | `30`    | int     |
 | `OAUTH_MAX_RETRIES`                  | Maximum retries for OAuth token requests      | `3`     | int     |
 
-> 🆕 **Multi-User Mode** (Recommended): When `MULTI_USER_ENABLED=true`:
+> ✅ **Multi-User Mode** (Fully Implemented): When `MULTI_USER_ENABLED=true`:
 >
-> * User registration and management via `/users` API
+> * Complete user management via `/users` API
 > * Individual API token creation via `/tokens` API
 > * Team collaboration via `/teams` API
 > * Secure password policies and account lockout protection

@@ -602,6 +602,9 @@ class UserService:
 
         Returns:
             User: The admin user (existing or newly created)
+
+        Raises:
+            Exception: If user creation fails or database error occurs
         """
         try:
             # First check if user already exists
