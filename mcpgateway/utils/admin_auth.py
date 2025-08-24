@@ -9,8 +9,8 @@ Provides authentication compatibility between legacy admin auth and multi-user m
 """
 
 # Standard
-from typing import Optional, Union
 import logging
+from typing import Optional
 
 # Third-Party
 from fastapi import Depends, HTTPException, Request, status
@@ -34,18 +34,18 @@ async def require_admin_auth(
 ) -> str:
     """
     Admin authentication that works in both legacy and multi-user modes.
-    
+
     In legacy mode: Uses basic auth with BASIC_AUTH_USER/BASIC_AUTH_PASSWORD
     In multi-user mode: Uses JWT Bearer tokens, but falls back to basic auth for admin user
-    
+
     Args:
         request: FastAPI request object
         basic_credentials: HTTP Basic credentials if provided
         bearer_credentials: HTTP Bearer credentials if provided
-        
+
     Returns:
         str: Username of authenticated admin user
-        
+
     Raises:
         HTTPException: If authentication fails
     """
@@ -53,56 +53,50 @@ async def require_admin_auth(
         # If multi-user mode is disabled, use legacy auth
         if not settings.multi_user_enabled or settings.legacy_auth_mode:
             return await require_auth(request)
-        
+
         # Multi-user mode: Try both Bearer and Basic auth
-        
+
         # 1. Try Bearer token first (preferred in multi-user mode)
         if bearer_credentials:
             try:
-                from mcpgateway.auth import get_current_user
-                from mcpgateway.services.jwt_service import JWTService
+                # First-Party
                 from mcpgateway.db import SessionLocal
-                
+                from mcpgateway.services.jwt_service import JWTService
+
                 # Create a minimal request-like object for JWT verification
                 with SessionLocal() as db:
                     jwt_service = JWTService(db)
                     payload = await jwt_service.verify_token(bearer_credentials.credentials, request)
                     user_data = payload.get("user")
-                    
+
                     if user_data and user_data.get("is_admin"):
                         return user_data["username"]
                     else:
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Admin privileges required"
-                        )
-                        
+                        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
+
             except HTTPException:
                 # JWT failed, try basic auth fallback
                 pass
-        
+
         # 2. Fallback to basic auth for admin user
         if basic_credentials:
-            if (basic_credentials.username == settings.basic_auth_user and 
-                basic_credentials.password == settings.basic_auth_password):
-                
+            if basic_credentials.username == settings.basic_auth_user and basic_credentials.password == settings.basic_auth_password:
+
                 # In multi-user mode, verify this admin user exists
                 try:
-                    from mcpgateway.services.user_service import UserService
+                    # First-Party
                     from mcpgateway.db import SessionLocal
-                    
+                    from mcpgateway.services.user_service import UserService
+
                     with SessionLocal() as db:
                         user_service = UserService(db)
                         admin_user = await user_service.get_user_by_username(settings.basic_auth_user)
-                        
+
                         if admin_user and admin_user.is_admin:
                             return admin_user.username
                         else:
-                            raise HTTPException(
-                                status_code=status.HTTP_403_FORBIDDEN,
-                                detail="Admin user not found or not admin"
-                            )
-                            
+                            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin user not found or not admin")
+
                 except Exception as e:
                     logger.error(f"Error verifying admin user in multi-user mode: {e}")
                     # Fall back to basic auth verification
@@ -113,22 +107,19 @@ async def require_admin_auth(
                     detail="Invalid credentials",
                     headers={"WWW-Authenticate": "Basic"},
                 )
-        
+
         # No valid credentials provided
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
             headers={"WWW-Authenticate": "Basic"},
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Admin authentication error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication system error"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Authentication system error")
 
 
 # Backward compatibility alias

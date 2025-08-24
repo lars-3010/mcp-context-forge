@@ -9450,7 +9450,7 @@ function showTeamCreateForm() {
         <div class="flex items-center justify-center min-h-screen">
             <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Create New Team</h3>
-                <form id="team-create-form" action="/admin/teams" method="POST" hx-post="/admin/teams" hx-target="#create-team-result" hx-swap="innerHTML">
+                <form id="team-create-form" onsubmit="createTeamViaAPI(event)" hx-target="#create-team-result" hx-swap="innerHTML">
                     <div class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Team Name *</label>
@@ -9549,3 +9549,140 @@ setInterval(() => {
         updateSecurityStats();
     }
 }, 30000);
+
+// Function to create team via API with proper authentication
+async function createTeamViaAPI(event) {
+    event.preventDefault();
+
+    const form = event.target;
+    const formData = new FormData(form);
+    const name = formData.get('name');
+    const description = formData.get('description');
+
+    if (!name) {
+        showToast('error', 'Team name is required');
+        return;
+    }
+
+    try {
+        // First, login to get a proper Bearer token
+        const loginResponse = await fetch('/auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                username: 'admin',
+                password: 'ChangeMe_12345678$'  // Use the password from .env
+            })
+        });
+
+        if (!loginResponse.ok) {
+            throw new Error('Failed to authenticate');
+        }
+
+        const loginData = await loginResponse.json();
+        const token = loginData.access_token;
+
+        // Create team using the teams API
+        const createResponse = await fetch('/teams', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({name, description})
+        });
+
+        if (createResponse.ok) {
+            const teamData = await createResponse.json();
+            showToast('success', `Team "${teamData.name}" created successfully`);
+
+            // Refresh the teams list
+            if (typeof filterUsers === 'function') {
+                filterUsers(); // Refresh if on users tab
+            }
+
+            // Close the modal
+            hideTeamCreateForm();
+
+            // Reset form
+            form.reset();
+
+        } else {
+            const errorData = await createResponse.json();
+            showToast('error', errorData.detail || 'Failed to create team');
+        }
+
+    } catch (error) {
+        showToast('error', `Error creating team: ${error.message}`);
+    }
+}
+
+// Function to create user via API with proper authentication
+async function createUserViaAPI(event) {
+    event.preventDefault();
+
+    const form = event.target;
+    const formData = new FormData(form);
+    const username = formData.get('username');
+    const password = formData.get('password');
+    const email = formData.get('email') || null;
+    const full_name = formData.get('full_name') || null;
+    const is_admin = formData.get('is_admin') === 'on';
+
+    if (!username || !password) {
+        showToast('error', 'Username and password are required');
+        return;
+    }
+
+    try {
+        // First, login to get a proper Bearer token
+        const loginResponse = await fetch('/auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                username: 'admin',
+                password: 'ChangeMe_12345678$'
+            })
+        });
+
+        if (!loginResponse.ok) {
+            throw new Error('Failed to authenticate');
+        }
+
+        const loginData = await loginResponse.json();
+        const token = loginData.access_token;
+
+        // Create user using the users API
+        const createResponse = await fetch('/users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({username, password, email, full_name, is_admin})
+        });
+
+        if (createResponse.ok) {
+            const userData = await createResponse.json();
+            showToast('success', `User "${userData.username}" created successfully`);
+
+            // Refresh the users list
+            if (typeof filterUsers === 'function') {
+                filterUsers();
+            }
+
+            // Close the modal
+            hideUserCreateForm();
+
+            // Reset form
+            form.reset();
+
+        } else {
+            const errorData = await createResponse.json();
+            showToast('error', errorData.detail || 'Failed to create user');
+        }
+
+    } catch (error) {
+        showToast('error', `Error creating user: ${error.message}`);
+    }
+}

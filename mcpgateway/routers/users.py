@@ -50,6 +50,7 @@ router = APIRouter(prefix="/users", tags=["User Management"])
         403: {"model": ErrorResponse, "description": "Admin privileges required"},
     },
 )
+@router.post("", include_in_schema=False)  # Support both /users and /users/
 async def create_user(request: Request, user_data: UserCreate, current_user: User = Depends(require_admin), user_service: UserService = Depends(get_user_service)):
     """
     Create a new user.
@@ -75,6 +76,7 @@ async def create_user(request: Request, user_data: UserCreate, current_user: Use
 
 
 @router.get("/", response_model=UserListResponse, responses={403: {"model": ErrorResponse, "description": "Admin privileges required"}})
+@router.get("", include_in_schema=False)  # Support both /users and /users/
 async def list_users(
     current_user: User = Depends(require_admin),
     user_service: UserService = Depends(get_user_service),

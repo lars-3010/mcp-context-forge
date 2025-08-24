@@ -36,6 +36,7 @@ router = APIRouter(prefix="/tokens", tags=["Token Management"])
         409: {"model": ErrorResponse, "description": "Token name already exists"},
     },
 )
+@router.post("", include_in_schema=False)  # Support both /tokens and /tokens/
 async def create_token(request: Request, token_data: TokenCreate, current_user: User = Depends(get_current_user), jwt_service: JWTService = Depends(get_jwt_service)):
     """
     Create a new API token.
@@ -78,6 +79,7 @@ async def create_token(request: Request, token_data: TokenCreate, current_user: 
 
 
 @router.get("/", response_model=TokenListResponse, responses={200: {"description": "List of user's API tokens"}})
+@router.get("", include_in_schema=False)  # Support both /tokens and /tokens/
 async def list_tokens(current_user: User = Depends(get_current_user), jwt_service: JWTService = Depends(get_jwt_service)):
     """
     List current user's API tokens.
