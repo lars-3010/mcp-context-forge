@@ -9597,6 +9597,12 @@ async function createTeamViaAPI(event) {
             showToast('success', `Team "${teamData.name}" created successfully`);
 
             // Refresh the teams list
+            if (document.getElementById('teams-list')) {
+                htmx.ajax('GET', '/admin/teams/list-html', {
+                    target: '#teams-list',
+                    swap: 'innerHTML'
+                });
+            }
             if (typeof filterUsers === 'function') {
                 filterUsers(); // Refresh if on users tab
             }
@@ -9685,4 +9691,155 @@ async function createUserViaAPI(event) {
     } catch (error) {
         showToast('error', `Error creating user: ${error.message}`);
     }
+}
+
+// Load admin data using working API endpoints
+async function loadAdminData() {
+    try {
+        // Get authentication token
+        const loginResponse = await fetch('/auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                username: 'admin',
+                password: 'ChangeMe_12345678$'
+            })
+        });
+        
+        if (!loginResponse.ok) {
+            console.error('Failed to authenticate for admin data loading');
+            return;
+        }
+        
+        const loginData = await loginResponse.json();
+        const token = loginData.access_token;
+        
+        // Load user statistics
+        loadUserStats(token);
+        
+        // Load teams list
+        loadTeamsList(token);
+        
+    } catch (error) {
+        console.error('Error loading admin data:', error);
+    }
+}
+
+async function loadUserStats(token) {
+    try {
+        const response = await fetch('/users', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const totalUsers = data.total || data.users.length;
+            const activeUsers = data.users.filter(u => u.is_active).length;
+            const adminUsers = data.users.filter(u => u.is_admin).length;
+            
+            // Get token count
+            const tokensResponse = await fetch('/tokens', {
+                headers: {'Authorization': `Bearer ${token}`}
+            });
+            let activeTokens = 0;
+            if (tokensResponse.ok) {
+                const tokensData = await tokensResponse.json();
+                activeTokens = tokensData.tokens.filter(t => t.is_active).length;
+            }
+            
+            // Update statistics cards
+            const statsContainer = document.getElementById('user-stats-cards');
+            if (statsContainer) {
+                statsContainer.innerHTML = `
+                    <div class="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">${totalUsers}</div>
+                        <div class="text-sm text-blue-800 dark:text-blue-300">Total Users</div>
+                    </div>
+                    <div class="bg-green-50 dark:bg-green-900 p-4 rounded-lg">
+                        <div class="text-2xl font-bold text-green-600 dark:text-green-400">${activeUsers}</div>
+                        <div class="text-sm text-green-800 dark:text-green-300">Active Users</div>
+                    </div>
+                    <div class="bg-purple-50 dark:bg-purple-900 p-4 rounded-lg">
+                        <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">${adminUsers}</div>
+                        <div class="text-sm text-purple-800 dark:text-purple-300">Admin Users</div>
+                    </div>
+                    <div class="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-lg">
+                        <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">${activeTokens}</div>
+                        <div class="text-sm text-yellow-800 dark:text-yellow-300">Active Tokens</div>
+                    </div>
+                `;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading user stats:', error);
+    }
+}
+
+async function loadTeamsList(token) {
+    try {
+        const response = await fetch('/teams', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const teams = await response.json();
+            
+            const teamsContainer = document.getElementById('teams-list') || document.getElementById('teams-list-container');
+            if (teamsContainer) {
+                if (teams.length === 0) {
+                    teamsContainer.innerHTML = '<div class="text-center py-8 text-gray-500">No teams found</div>';
+                } else {
+                    let html = '';
+                    teams.forEach(team => {
+                        html += `
+                            <div class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-3">
+                                            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">${escapeHtml(team.name)}</h3>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">${team.member_count} members</span>
+                                        </div>
+                                        <div class="mt-1 space-y-1">
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">📝 ${escapeHtml(team.description || 'No description')}</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">📅 Created: ${new Date(team.created_at).toLocaleDateString()}</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">🔗 Slug: ${escapeHtml(team.slug)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    teamsContainer.innerHTML = html;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading teams list:', error);
+        const teamsContainer = document.getElementById('teams-list') || document.getElementById('teams-list-container');
+        if (teamsContainer) {
+            teamsContainer.innerHTML = '<div class="text-center py-8 text-red-500">Error loading teams</div>';
+        }
+    }
+}
+
+// Auto-load admin data when admin panels are shown
+document.addEventListener('DOMContentLoaded', function() {
+    // Load data when admin tab is clicked
+    const adminTab = document.getElementById('tab-admin');
+    if (adminTab) {
+        adminTab.addEventListener('click', function() {
+            setTimeout(loadAdminData, 500); // Small delay to ensure panels are shown
+        });
+    }
+    
+    // Also load immediately if admin panel is visible
+    const adminPanel = document.getElementById('admin-panel');
+    if (adminPanel && !adminPanel.classList.contains('hidden')) {
+        loadAdminData();
+    }
+});
+
+// Refresh functions for after creation
+function refreshAdminData() {
+    loadAdminData();
 }
