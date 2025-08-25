@@ -12,9 +12,8 @@ from typing import List
 class VersioningConfig:
     """
     Configuration class for API versioning and experimental access control.
-
-    This class centralizes settings for handling legacy API paths, 
-    deprecation warnings, and access to experimental features. It allows 
+    This class centralizes settings for handling legacy API paths,
+    deprecation warnings, and access to experimental features. It allows
     middleware and routers to enforce versioning rules consistently.
 
     Attributes:
@@ -36,7 +35,6 @@ class VersioningConfig:
             # Serve legacy route
             pass
     """
-
 
     # 0.6.0 settings
     enable_legacy_support: bool = True  # Still serve legacy in 0.6.0

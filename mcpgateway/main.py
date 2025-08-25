@@ -98,7 +98,6 @@ from mcpgateway.dependencies import (
     get_streamable_http_session,
     get_tag_service,
     get_tool_service,
-    cors_origins,
 )
 
 # middleware imports
