@@ -85,6 +85,7 @@ from mcpgateway.db import get_db, refresh_slugs_on_startup
 from mcpgateway.dependencies import (
     get_a2a_agent_service,
     get_completion_service,
+    get_cors_origins,
     get_export_service,
     get_gateway_service,
     get_import_service,
@@ -108,6 +109,7 @@ from mcpgateway.middleware.mcp_path_rewrite_middleware import MCPPathRewriteMidd
 from mcpgateway.middleware.security_headers import SecurityHeadersMiddleware
 from mcpgateway.observability import init_telemetry
 from mcpgateway.plugins.framework import PluginManager
+from mcpgateway.routers.current import handle_notification, handle_rpc, initialize
 
 # from v1 routes
 from mcpgateway.routers.setup_routes import (
@@ -115,7 +117,6 @@ from mcpgateway.routers.setup_routes import (
     setup_legacy_deprecation_routes,
     setup_v1_routes,
 )
-from mcpgateway.routers.v1.utility import handle_rpc
 from mcpgateway.utils.db_isready import wait_for_db_ready
 from mcpgateway.utils.error_formatter import ErrorFormatter
 from mcpgateway.utils.passthrough_headers import set_global_passthrough_headers
@@ -383,7 +384,7 @@ def configure_middleware(fastapi_app: FastAPI) -> None:
     expose_headers = sorted(default_expose | configured_expose)
 
     # Configure CORS with environment-aware origins
-    cors_origins = list(settings.allowed_origins) if settings.allowed_origins else []
+    cors_origins = get_cors_origins()
 
     # Ensure we never use wildcard in production
     if settings.environment == "production" and not cors_origins:
@@ -518,7 +519,9 @@ def configure_routes(fastapi_app: FastAPI) -> None:
     logger.info("Health endpoints configured")
 
     fastapi_app.post("/rpc/")(handle_rpc)
-    logger.info("Root-level RPC endpoints configured")
+    fastapi_app.post("/initialize")(initialize)
+    fastapi_app.post("/notifications")(handle_notification)
+    logger.info("RPC endpoints, initialize, notifications configured")
 
     # Log all registered routes for debugging
     logger.info("Registered routes:")

@@ -22,10 +22,6 @@ from mcpgateway.services.tag_service import TagService
 from mcpgateway.services.tool_service import ToolService
 from mcpgateway.transports.streamablehttp_transport import SessionManagerWrapper
 
-
-# Configure CORS with environment-aware origins
-cors_origins = list(settings.allowed_origins) if settings.allowed_origins else []
-
 # Singleton instances
 _services = {}
 
@@ -210,3 +206,12 @@ def get_session_registry() -> SessionRegistry:
             message_ttl=settings.message_ttl,
         )
     return _services["session_registry"]
+
+
+def get_cors_origins() -> list[str]:
+    """Get configured CORS origins.
+
+    Returns:
+        list[str]: List of allowed CORS origins
+    """
+    return list(settings.allowed_origins) if settings.allowed_origins else []

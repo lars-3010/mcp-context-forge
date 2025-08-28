@@ -58,8 +58,8 @@ class MCPPathRewriteMiddleware:
             >>>
             >>> # Test path rewriting for /servers/123/mcp
             >>> app_mock.reset_mock()
-            >>> scope = {"type": "http", "path": "/servers/123/mcp"}
-            >>> with patch('mcpgateway.main.streamable_http_auth', return_value=True):
+            >>> scope = {"type": "http", "path": "/mcp"}
+            >>> with patch('mcpgateway.transports.streamablehttp_transport.streamable_http_auth', return_value=True):
             ...     with patch.object(streamable_http_session, 'handle_streamable_http') as mock_handler:
             ...         asyncio.run(middleware(scope, receive, send))
             ...         scope["path"]
@@ -67,15 +67,19 @@ class MCPPathRewriteMiddleware:
             >>>
             >>> # Test regular path (no rewrite)
             >>> scope = {"type": "http", "path": "/tools"}
-            >>> with patch('mcpgateway.main.streamable_http_auth', return_value=True):
+            >>> with patch('mcpgateway.transports.streamablehttp_transport.streamable_http_auth', return_value=True):
             ...     asyncio.run(middleware(scope, receive, send))
             ...     scope["path"]
             '/tools'
         """
+
+        
         # Only handle HTTP requests, HTTPS uses scope["type"] == "http" in ASGI
         if scope["type"] != "http":
             await self.application(scope, receive, send)
             return
+    
+        scope.setdefault("headers", [])
 
         # Call auth check first
         auth_ok = await streamable_http_auth(scope, receive, send)

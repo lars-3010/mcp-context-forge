@@ -10,22 +10,24 @@ from fastapi import FastAPI
 # First-Party
 from mcpgateway.config import settings
 from mcpgateway.dependencies import get_logging_service
-from mcpgateway.routers.v1.a2a import a2a_router
-from mcpgateway.routers.v1.export_import import export_import_router
-from mcpgateway.routers.v1.gateway import gateway_router
-from mcpgateway.routers.v1.metrics import metrics_router
-from mcpgateway.routers.v1.prompts import prompt_router
-from mcpgateway.routers.v1.protocol import protocol_router
-from mcpgateway.routers.v1.resources import resource_router
-from mcpgateway.routers.v1.root import root_router
-from mcpgateway.routers.v1.servers import server_router
-from mcpgateway.routers.v1.tag import tag_router
-from mcpgateway.routers.v1.tool import tool_router
-from mcpgateway.routers.v1.utility import utility_router
-from mcpgateway.routers.well_known import well_known_router
-from mcpgateway.version import router as version_router
-from mcpgateway.routers.oauth_router import oauth_router
-from mcpgateway.routers.reverse_proxy import reverse_proxy_router
+from mcpgateway.routers.current import (  # noqa: F401
+    a2a_router,
+    export_import_router,
+    gateway_router,
+    metrics_router,
+    oauth_router,
+    prompt_router,
+    protocol_router,
+    resource_router,
+    reverse_proxy_router,
+    root_router,
+    server_router,
+    tag_router,
+    tool_router,
+    utility_router,
+    version_router,
+    well_known_router,
+)
 
 # Initialize logging service first
 logging_service = get_logging_service()
@@ -48,7 +50,6 @@ def setup_v1_routes(app: FastAPI) -> None:
     app.include_router(server_router)
     app.include_router(metrics_router)
     app.include_router(tag_router)
-
     app.include_router(export_import_router)
 
     # Conditionally include A2A router if A2A features are enabled
@@ -75,13 +76,13 @@ def setup_v1_routes(app: FastAPI) -> None:
         logger.debug("Reverse proxy router not available")
 
 
-def setup_version_routes(app: FastAPI) -> None:
+def setup_version_routes(_app: FastAPI) -> None:
     """Configure version endpoint.
 
     Args:
-        app: FastAPI application instance to configure
+        _app: FastAPI application instance to configure
     """
-    app.include_router(version_router)
+    # register version router
 
 
 def setup_experimental_routes(_app: FastAPI) -> None:

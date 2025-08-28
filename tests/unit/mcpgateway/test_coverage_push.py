@@ -130,7 +130,7 @@ def test_router_instances():
 
 def test_database_dependency():
     """Test database dependency function."""
-    from mcpgateway.main import get_db
+    from mcpgateway.db import get_db
 
     # Test function exists and is generator
     db_gen = get_db()
@@ -139,7 +139,9 @@ def test_database_dependency():
 
 def test_cors_settings():
     """Test CORS configuration."""
-    from mcpgateway.main import cors_origins
+    from mcpgateway.dependencies import get_cors_origins
+
+    cors_origins = get_cors_origins()
 
     assert isinstance(cors_origins, list)
 
