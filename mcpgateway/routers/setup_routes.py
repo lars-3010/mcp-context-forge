@@ -25,7 +25,6 @@ from mcpgateway.routers.current import (  # noqa: F401
     tag_router,
     tool_router,
     utility_router,
-    version_router,
     well_known_router,
 )
 

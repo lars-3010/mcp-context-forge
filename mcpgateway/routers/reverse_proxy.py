@@ -150,13 +150,13 @@ manager = ReverseProxyManager()
 @reverse_proxy_router.websocket("/ws")
 async def websocket_endpoint(
     websocket: WebSocket,
-    db: Session = Depends(get_db),
+    _db: Session = Depends(get_db),
 ):
     """WebSocket endpoint for reverse proxy connections.
 
     Args:
         websocket: WebSocket connection.
-        db: Database session.
+        _db: Database session.
     """
     await websocket.accept()
 
@@ -230,13 +230,13 @@ async def websocket_endpoint(
 
 @reverse_proxy_router.get("/sessions")
 async def list_sessions(
-    request: Request,
+    _request: Request,
     _: str | dict = Depends(require_auth),
 ):
     """List all active reverse proxy sessions.
 
     Args:
-        request: HTTP request.
+        _request: HTTP request.
         _: Authenticated user info (used for auth check).
 
     Returns:
@@ -248,14 +248,14 @@ async def list_sessions(
 @reverse_proxy_router.delete("/sessions/{session_id}")
 async def disconnect_session(
     session_id: str,
-    request: Request,
+    _request: Request,
     _: str | dict = Depends(require_auth),
 ):
     """Disconnect a reverse proxy session.
 
     Args:
         session_id: Session ID to disconnect.
-        request: HTTP request.
+        _request: HTTP request.
         _: Authenticated user info (used for auth check).
 
     Returns:
@@ -279,7 +279,7 @@ async def disconnect_session(
 async def send_request_to_session(
     session_id: str,
     mcp_request: Dict[str, Any],
-    request: Request,
+    _request: Request,
     _: str | dict = Depends(require_auth),
 ):
     """Send an MCP request to a reverse proxy session.
@@ -287,7 +287,7 @@ async def send_request_to_session(
     Args:
         session_id: Session ID to send request to.
         mcp_request: MCP request to send.
-        request: HTTP request.
+        _request: HTTP request.
         _: Authenticated user info (used for auth check).
 
     Returns:

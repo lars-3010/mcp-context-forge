@@ -73,12 +73,10 @@ class MCPPathRewriteMiddleware:
             '/tools'
         """
 
-        
         # Only handle HTTP requests, HTTPS uses scope["type"] == "http" in ASGI
         if scope["type"] != "http":
             await self.application(scope, receive, send)
             return
-    
         scope.setdefault("headers", [])
 
         # Call auth check first

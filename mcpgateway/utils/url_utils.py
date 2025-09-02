@@ -21,6 +21,7 @@ def get_protocol_from_request(request: Request) -> str:
     if forwarded:
         # may be a comma-separated list; take the first
         return forwarded.split(",")[0].strip()
+
     return request.url.scheme
 
 
@@ -37,5 +38,6 @@ def update_url_protocol(request: Request) -> str:
     parsed = urlparse(str(request.base_url))
     proto = get_protocol_from_request(request)
     new_parsed = parsed._replace(scheme=proto)
+
     # urlunparse keeps netloc and path intact
     return urlunparse(new_parsed).rstrip("/")

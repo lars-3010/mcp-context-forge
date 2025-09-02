@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Integration tests for metadata tracking feature.
-
+"""Location: ./tests/integration/test_metadata_integration.py
 Copyright 2025
 SPDX-License-Identifier: Apache-2.0
 Authors: Mihai Criveti
 
+Integration tests for metadata tracking feature.
 This module tests the complete metadata tracking functionality across
 the entire application stack, including API endpoints, database storage,
 and UI integration.
@@ -34,27 +34,46 @@ from mcpgateway.utils.verify_credentials import require_auth
 
 @pytest.fixture
 def test_app():
-    """Create test app with in-memory database."""
-    # Create in-memory SQLite database for testing
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    """Create test app with proper database setup."""
+    # Use file-based SQLite database for better compatibility
+    import tempfile
+    import os
+    from _pytest.monkeypatch import MonkeyPatch
+    from sqlalchemy.pool import StaticPool
 
+    mp = MonkeyPatch()
+
+    # Create temp SQLite file
+    fd, path = tempfile.mkstemp(suffix=".db")
+    url = f"sqlite:///{path}"
+
+    # Patch settings
+    from mcpgateway.config import settings
+    mp.setattr(settings, "database_url", url, raising=False)
+
+    import mcpgateway.db as db_mod
+    import mcpgateway.main as main_mod
+
+    engine = create_engine(url, connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    mp.setattr(db_mod, "engine", engine, raising=False)
+    mp.setattr(db_mod, "SessionLocal", TestingSessionLocal, raising=False)
+    mp.setattr(main_mod, "SessionLocal", TestingSessionLocal, raising=False)
+    mp.setattr(main_mod, "engine", engine, raising=False)
+
+    # Create schema
     Base.metadata.create_all(bind=engine)
 
-    def override_get_db():
-        try:
-            db = TestingSessionLocal()
-            yield db
-        finally:
-            db.close()
-
-    app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[require_auth] = lambda: "test_user"
 
     yield app
 
     # Cleanup
     app.dependency_overrides.clear()
+    mp.undo()
+    engine.dispose()
+    os.close(fd)
+    os.unlink(path)
 
 
 @pytest.fixture
@@ -73,18 +92,14 @@ class TestMetadataIntegration:
             "name": unique_name,
             "url": "http://example.com/api",
             "description": "Tool created via API",
-            "integrationType": "REST",
-            "requestType": "GET"
+            "integration_type": "REST",
+            "request_type": "GET"
         }
 
         response = client.post("/tools", json=tool_data)
         assert response.status_code == 200
 
         tool = response.json()
-
-        print()
-        print("response.status_code", response.status_code)
-        print("response.json()", response.json()['detail'])
 
         # Verify metadata was captured
         assert tool["createdBy"] == "test_user"
@@ -121,16 +136,11 @@ class TestMetadataIntegration:
             "name": f"update_test_tool_{uuid.uuid4().hex[:8]}",
             "url": "http://example.com/test",
             "description": "Tool for update testing",
-            "integrationType": "REST",
-            "requestType": "GET"
+            "integration_type": "REST",
+            "request_type": "GET"
         }
 
         create_response = client.post("/tools", json=tool_data)
-
-        print()
-        print("create_response.status_code", create_response.status_code)
-        print("create_response.json()", create_response.json()['detail']) 
-
         assert create_response.status_code == 200
         tool_id = create_response.json()["id"]
 
@@ -157,17 +167,13 @@ class TestMetadataIntegration:
             "name": f"legacy_simulation_tool_{uuid.uuid4().hex[:8]}",
             "url": "http://example.com/legacy",
             "description": "Simulated legacy tool",
-            "integrationType": "REST",
-            "requestType": "GET"
+            "integration_type": "REST",
+            "request_type": "GET"
         }
 
         response = client.post("/tools", json=tool_data)
         assert response.status_code == 200
         tool = response.json()
-
-        print()
-        print("response.status_code", response.status_code)
-        print("response.json()", response.json()['detail'])
 
         # Even "legacy" simulation should have metadata since we're testing new code
         # But verify that optional fields handle None gracefully
@@ -184,18 +190,14 @@ class TestMetadataIntegration:
             "name": f"anonymous_test_tool_{uuid.uuid4().hex[:8]}",
             "url": "http://example.com/anon",
             "description": "Tool created anonymously",
-            "integrationType": "REST",
-            "requestType": "GET"
+            "integration_type": "REST",
+            "request_type": "GET"
         }
 
         response = client.post("/tools", json=tool_data)
         assert response.status_code == 200
 
         tool = response.json()
-
-        print()
-        print("response.status_code", response.status_code)
-        print("response.json()", response.json()['detail'])
 
         # Verify anonymous metadata
         assert tool["createdBy"] == "anonymous"
@@ -208,16 +210,11 @@ class TestMetadataIntegration:
             "name": f"schema_test_tool_{uuid.uuid4().hex[:8]}",
             "url": "http://example.com/schema",
             "description": "Tool for schema testing",
-            "integrationType": "REST",
-            "requestType": "GET"
+            "integration_type": "REST",
+            "request_type": "GET"
         }
 
         response = client.post("/tools", json=tool_data)
-
-        print()
-        print("response.status_code", response.status_code)
-        print("response.json()", response.json()['detail'])
-
         assert response.status_code == 200
 
         tool = response.json()
@@ -239,8 +236,8 @@ class TestMetadataIntegration:
             "name": f"list_test_tool_{uuid.uuid4().hex[:8]}",
             "url": "http://example.com/list",
             "description": "Tool for list testing",
-            "integrationType": "REST",
-            "requestType": "GET"
+            "integration_type": "REST",
+            "request_type": "GET"
         }
 
         client.post("/tools", json=tool_data)
@@ -258,11 +255,17 @@ class TestMetadataIntegration:
         assert "version" in tool
 
     @pytest.mark.asyncio
-    async def test_service_layer_metadata_handling(self):
+    async def test_service_layer_metadata_handling(self, test_app):
         """Test metadata handling at the service layer."""
-        from mcpgateway.db import SessionLocal
         from mcpgateway.utils.metadata_capture import MetadataCapture
         from types import SimpleNamespace
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        # Create test database session
+        engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+        TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        Base.metadata.create_all(bind=engine)
 
         # Create mock request
         mock_request = SimpleNamespace()
@@ -280,13 +283,13 @@ class TestMetadataIntegration:
             name=f"service_layer_test_{uuid.uuid4().hex[:8]}",
             url="http://example.com/service",
             description="Service layer test tool",
-            integrationType="REST",
-            requestType="GET"
+            integration_type="REST",
+            request_type="GET"
         )
 
         # Test service creation with metadata
         service = ToolService()
-        db = SessionLocal()
+        db = TestingSessionLocal()
 
         try:
             tool_read = await service.register_tool(
