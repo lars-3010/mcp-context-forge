@@ -81,7 +81,6 @@ async def initiate_oauth_flow(gateway_id: str, _request: Request, db: Session = 
 async def oauth_callback(
     code: str = Query(..., description="Authorization code from OAuth provider"),
     state: str = Query(..., description="State parameter for CSRF protection"),
-    _request: Request = None,
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Handle the OAuth callback and complete the authorization process.
@@ -93,7 +92,6 @@ async def oauth_callback(
     Args:
         code (str): The authorization code returned by the OAuth provider.
         state (str): The state parameter for CSRF protection, which encodes the gateway ID.
-        _request (Request): The incoming HTTP request object.
         db (Session): The database session dependency.
 
     Returns:

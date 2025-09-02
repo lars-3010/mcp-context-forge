@@ -1,3 +1,9 @@
+"""URL utilities for MCP Gateway.
+
+Provides functions for handling URL protocol detection and manipulation,
+especially for proxy environments with forwarded headers.
+"""
+
 # Standard
 from urllib.parse import urlparse, urlunparse
 
@@ -6,16 +12,15 @@ from fastapi import Request
 
 
 def get_protocol_from_request(request: Request) -> str:
-    """
-    Return "https" or "http" based on:
-     1) X-Forwarded-Proto (if set by a proxy)
-     2) request.url.scheme  (e.g. when Gunicorn/Uvicorn is terminating TLS)
+    """Get protocol from request headers or URL scheme.
+    
+    Checks X-Forwarded-Proto header first, then falls back to request.url.scheme.
 
     Args:
-        request (Request): The FastAPI request object.
+        request: The FastAPI request object
 
     Returns:
-        str: The protocol used for the request, either "http" or "https".
+        Protocol string: "http" or "https"
     """
     forwarded = request.headers.get("x-forwarded-proto")
     if forwarded:
@@ -26,14 +31,13 @@ def get_protocol_from_request(request: Request) -> str:
 
 
 def update_url_protocol(request: Request) -> str:
-    """
-    Update the base URL protocol based on the request's scheme or forwarded headers.
+    """Update base URL protocol based on request headers.
 
     Args:
-        request (Request): The FastAPI request object.
+        request: The FastAPI request object
 
     Returns:
-        str: The base URL with the correct protocol.
+        Base URL with correct protocol
     """
     parsed = urlparse(str(request.base_url))
     proto = get_protocol_from_request(request)
