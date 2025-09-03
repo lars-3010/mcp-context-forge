@@ -904,7 +904,6 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                         "Updated passthrough_headers for gateway {gateway.id}: {gateway.passthrough_headers}"
                     )
 
-                gateway.updated_at = datetime.now(timezone.utc)
                 if getattr(gateway, "auth_type", None) is not None:
                     gateway.auth_type = gateway_update.auth_type
 
