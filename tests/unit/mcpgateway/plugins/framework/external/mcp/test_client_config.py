@@ -20,6 +20,7 @@ import pytest
 from mcpgateway.models import Message, PromptResult, ResourceContent, Role, TextContent
 from mcpgateway.plugins.framework import (
     ConfigLoader,
+    GlobalContext,
     PluginContext,
     PromptPosthookPayload,
     PromptPrehookPayload,
@@ -28,6 +29,7 @@ from mcpgateway.plugins.framework import (
     ToolPostInvokePayload,
     ToolPreInvokePayload,
 )
+from mcpgateway.plugins.framework.errors import PluginError
 from mcpgateway.plugins.framework.external.mcp.client import ExternalPlugin
 
 
@@ -42,7 +44,7 @@ async def test_initialize_missing_mcp_config():
     plugin = ExternalPlugin(plugin_config)
     plugin._config.mcp = None
 
-    with pytest.raises(ValueError, match="The mcp section must be defined for external plugin"):
+    with pytest.raises(PluginError, match="The mcp section must be defined for external plugin"):
         await plugin.initialize()
 
 
@@ -56,7 +58,7 @@ async def test_initialize_stdio_non_python_script():
     # Mock the script path to be non-Python
     plugin._config.mcp.script = "/path/to/script.sh"
 
-    with pytest.raises(ValueError, match="Server script must be a .py file"):
+    with pytest.raises(PluginError, match="Server script must be a .py file"):
         await plugin.initialize()
 
 
@@ -88,7 +90,7 @@ async def test_initialize_config_retrieval_failure():
         mock_stdio_client.return_value.__aenter__ = AsyncMock(return_value=(mock_stdio, mock_write))
         mock_stdio_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        with pytest.raises(ValueError, match="Unable to retrieve configuration for external plugin"):
+        with pytest.raises(PluginError, match="Unable to retrieve configuration for external plugin"):
             await plugin.initialize()
 
     # Cleanup
@@ -100,7 +102,7 @@ async def test_initialize_config_retrieval_failure():
 
 @pytest.mark.asyncio
 async def test_hook_methods_empty_content():
-    """Test hook methods return defaults when content is empty."""
+    """Test hook methods raise PluginError when content is empty."""
     config = ConfigLoader.load_config("tests/unit/mcpgateway/plugins/fixtures/configs/valid_stdio_external_plugin.yaml")
     plugin_config = config.plugins[0]
     plugin = ExternalPlugin(plugin_config)
@@ -113,40 +115,40 @@ async def test_hook_methods_empty_content():
     mock_session.call_tool = AsyncMock()
     mock_session.call_tool.return_value = CallToolResult(content=[])
 
-    context = PluginContext(request_id="test", server_id="test")
+    context = PluginContext(global_context=GlobalContext(request_id="test", server_id="test"))
 
-    # Test prompt_pre_fetch with empty content
+    # Test prompt_pre_fetch with empty content - should raise PluginError
     payload = PromptPrehookPayload(name="test", args={})
-    result = await plugin.prompt_pre_fetch(payload, context)
-    assert result.continue_processing is True
+    with pytest.raises(PluginError):
+        await plugin.prompt_pre_fetch(payload, context)
 
-    # Test prompt_post_fetch with empty content
+    # Test prompt_post_fetch with empty content - should raise PluginError
     message = Message(content=TextContent(type="text", text="test"), role=Role.USER)
     prompt_result = PromptResult(messages=[message])
     payload = PromptPosthookPayload(name="test", result=prompt_result)
-    result = await plugin.prompt_post_fetch(payload, context)
-    assert result.continue_processing is True
+    with pytest.raises(PluginError):
+        await plugin.prompt_post_fetch(payload, context)
 
-    # Test tool_pre_invoke with empty content
+    # Test tool_pre_invoke with empty content - should raise PluginError
     payload = ToolPreInvokePayload(name="test", args={})
-    result = await plugin.tool_pre_invoke(payload, context)
-    assert result.continue_processing is True
+    with pytest.raises(PluginError):
+        await plugin.tool_pre_invoke(payload, context)
 
-    # Test tool_post_invoke with empty content
+    # Test tool_post_invoke with empty content - should raise PluginError
     payload = ToolPostInvokePayload(name="test", result={})
-    result = await plugin.tool_post_invoke(payload, context)
-    assert result.continue_processing is True
+    with pytest.raises(PluginError):
+        await plugin.tool_post_invoke(payload, context)
 
-    # Test resource_pre_fetch with empty content
+    # Test resource_pre_fetch with empty content - should raise PluginError
     payload = ResourcePreFetchPayload(uri="file://test.txt")
-    result = await plugin.resource_pre_fetch(payload, context)
-    assert result.continue_processing is True
+    with pytest.raises(PluginError):
+        await plugin.resource_pre_fetch(payload, context)
 
-    # Test resource_post_fetch with empty content
+    # Test resource_post_fetch with empty content - should raise PluginError
     resource_content = ResourceContent(type="resource", uri="file://test.txt", text="content")
     payload = ResourcePostFetchPayload(uri="file://test.txt", content=resource_content)
-    result = await plugin.resource_post_fetch(payload, context)
-    assert result.continue_processing is True
+    with pytest.raises(PluginError):
+        await plugin.resource_post_fetch(payload, context)
 
     await plugin.shutdown()
 
@@ -185,5 +187,3 @@ async def test_shutdown():
 
     await plugin.shutdown()
     mock_exit_stack.aclose.assert_called_once()
-
-
