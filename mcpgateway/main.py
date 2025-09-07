@@ -3960,7 +3960,6 @@ if UI_ENABLED:
     logger.info("Mounting static files - UI enabled")
     try:
         # Create a sub-application for static files that will respect root_path
-        from fastapi import FastAPI as SubApp
         static_app = StaticFiles(directory=str(settings.static_dir))
         static_path = f"{settings.app_root_path}/static" if settings.app_root_path else "/static"
 
