@@ -29,32 +29,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    if "gateways" in existing_tables:
-        # Update gateways table unique constraint from slug to (slug, owner_email, team_id)
-        try:
-            existing_constraints = [c["name"] for c in inspector.get_unique_constraints("gateways")]
-            if "uq_gateways_slug" in existing_constraints:
-                print("Dropping old unique constraint uq_gateways_slug on gateways table...")
-                with op.batch_alter_table("gateways", schema=None) as batch_op:
-                    batch_op.drop_constraint("uq_gateways_slug", type_="unique")
-            print("Adding new unique constraint uq_team_owner_slug_gateway on gateways table...")
-            with op.batch_alter_table("gateways", schema=None) as batch_op:
-                batch_op.create_unique_constraint("uq_team_owner_slug_gateway", ["slug", "owner_email", "team_id"])
-        except Exception as e:
-            print(f"Warning: Could not update unique constraint on gateways table: {e}")
-        # Update gateways table unique constraint from url to (url, owner_email, team_id)
-
-        try:
-            existing_constraints = [c["name"] for c in inspector.get_unique_constraints("gateways")]
-            if "uq_gateways_url" in existing_constraints:
-                print("Dropping old unique constraint uq_gateways_url on gateways table...")
-                with op.batch_alter_table("gateways", schema=None) as batch_op:
-                    batch_op.drop_constraint("uq_gateways_url", type_="unique")
-            print("Adding new unique constraint uq_gateways_url_owner_team on gateways table...")
-            with op.batch_alter_table("gateways", schema=None) as batch_op:
-                batch_op.create_unique_constraint("uq_gateways_url_owner_team", ["url", "owner_email", "team_id"])
-        except Exception as e:
-            print(f"Warning: Could not update unique constraint on gateways table (url): {e}")
     """Consolidated upgrade schema for multi-user, team, and RBAC features.
 
     This migration creates all necessary database tables for the multitenancy system.
@@ -473,6 +447,28 @@ def upgrade() -> None:
             print(f"Processing {table_name}...")
             add_team_columns_if_not_exists(table_name)
 
+    # Combined unique constraint changes for servers, tools, and gateways due to RBAC requirements
+    for tbl, col, constraint_name in [
+        ("servers", "name", "uq_team_owner_name_servers"),
+        ("tools", "name", "uq_team_owner_name_tools"),
+        ("gateways", "slug", "uq_team_owner_slug_gateway"),
+        ("gateways", "url", "uq_team_owner_url_gateway")
+    ]:
+        if tbl in existing_tables:
+            try:
+                existing_constraints = [c["name"] for c in inspector.get_unique_constraints(tbl)]
+                # Drop old constraint if present
+                old_constraint = f"uq_{tbl}_{col}" if tbl != "gateways" else (f"uq_gateways_{col}" if col in ["slug", "url"] else None)
+                if old_constraint and old_constraint in existing_constraints:
+                    print(f"Dropping old unique constraint {old_constraint} on {tbl} table...")
+                    with op.batch_alter_table(tbl, schema=None) as batch_op:
+                        batch_op.drop_constraint(old_constraint, type_="unique")
+                print(f"Adding new unique constraint {constraint_name} on {tbl} table...")
+                cols = ["team_id", "owner_email", col]
+                with op.batch_alter_table(tbl, schema=None) as batch_op:
+                    batch_op.create_unique_constraint(constraint_name, cols)
+            except Exception as e:
+                print(f"Warning: Could not update unique constraint on {tbl} table: {e}")
     
     print("✅ Multitenancy schema migration completed successfully")
     print("📋 Schema changes applied:")
@@ -492,30 +488,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Revert gateways table unique constraints for slug and url
-    if "gateways" in existing_tables:
-        try:
-            existing_constraints = [c["name"] for c in inspector.get_unique_constraints("gateways")]
-            # Drop new slug constraint if present
-            if "uq_gateways_slug_owner_team" in existing_constraints:
-                print("Dropping unique constraint uq_gateways_slug_owner_team from gateways table...")
-                with op.batch_alter_table("gateways", schema=None) as batch_op:
-                    batch_op.drop_constraint("uq_gateways_slug_owner_team", type_="unique")
-            # Restore old slug constraint
-            print("Restoring unique constraint uq_gateways_slug on gateways table...")
-            with op.batch_alter_table("gateways", schema=None) as batch_op:
-                batch_op.create_unique_constraint("uq_gateways_slug", ["slug"])
-            # Drop new url constraint if present
-            if "uq_gateways_url_owner_team" in existing_constraints:
-                print("Dropping unique constraint uq_gateways_url_owner_team from gateways table...")
-                with op.batch_alter_table("gateways", schema=None) as batch_op:
-                    batch_op.drop_constraint("uq_gateways_url_owner_team", type_="unique")
-            # Restore old url constraint
-            print("Restoring unique constraint uq_gateways_url on gateways table...")
-            with op.batch_alter_table("gateways", schema=None) as batch_op:
-                batch_op.create_unique_constraint("uq_gateways_url", ["url"])
-        except Exception as e:
-            print(f"Warning: Could not revert unique constraints on gateways table: {e}")
+    
     """Consolidated downgrade schema for multi-user, team, and RBAC features."""
 
     def safe_drop_index(index_name: str, table_name: str):
@@ -566,7 +539,26 @@ def downgrade() -> None:
         return
 
     print("Removing multitenancy schema...")
-
+        # Combined revert for servers, tools, and gateways unique constraints
+    for tbl, col, constraint_name, old_constraint in [
+        ("servers", "name", "uq_team_owner_name_servers", "uq_servers_name"),
+        ("tools", "name", "uq_team_owner_name_tools", "uq_tools_name"),
+        ("gateways", "slug", "uq_team_owner_slug_gateway", "uq_gateways_slug"),
+        ("gateways", "url", "uq_team_owner_url_gateway", "uq_gateways_url")
+    ]:
+        if tbl in existing_tables:
+            try:
+                existing_constraints = [c["name"] for c in inspector.get_unique_constraints(tbl)]
+                # Drop new constraint if present
+                if constraint_name in existing_constraints:
+                    print(f"Dropping unique constraint {constraint_name} from {tbl} table...")
+                    with op.batch_alter_table(tbl, schema=None) as batch_op:
+                        batch_op.drop_constraint(constraint_name, type_="unique")
+                print(f"Restoring unique constraint {old_constraint} on {tbl} table...")
+                with op.batch_alter_table(tbl, schema=None) as batch_op:
+                    batch_op.create_unique_constraint(old_constraint, [col])
+            except Exception as e:
+                print(f"Warning: Could not revert unique constraint on {tbl} table: {e}")
     # Remove team scoping columns from resource tables
     resource_tables = ["tools", "servers", "resources", "prompts", "gateways", "a2a_agents"]
 
