@@ -415,7 +415,6 @@ class ToolService:
 
             if owner_email is None:
                 owner_email = tool.owner_email
-
             if visibility is None:
                 visibility = tool.visibility or "private"
             # Check for existing tool with the same name and visibility
@@ -425,10 +424,16 @@ class ToolService:
                 if existing_tool:
                     raise ToolNameConflictError(existing_tool.custom_name, enabled=existing_tool.enabled, tool_id=existing_tool.id, visibility=existing_tool.visibility)
             elif visibility.lower() == "team" and team_id:
-                # Check for existing team tool with the same name
-                existing_tool = db.execute(select(DbTool).where(DbTool.custom_name == tool.name, DbTool.visibility == "team", DbTool.team_id == team_id)).scalar_one_or_none()
+                # Check for existing team tool with the same name, team_id
+                existing_tool = db.execute(
+                    select(DbTool).where(
+                        DbTool.name == tool.name,
+                        DbTool.visibility == "team",
+                        DbTool.team_id == team_id
+                    )
+                ).scalar_one_or_none()
                 if existing_tool:
-                    raise ToolNameConflictError(existing_tool.custom_name, enabled=existing_tool.enabled, tool_id=existing_tool.id, visibility=existing_tool.visibility)
+                    raise ToolNameConflictError(existing_tool.name, enabled=existing_tool.enabled, tool_id=existing_tool.id, visibility=existing_tool.visibility)
 
             db_tool = DbTool(
                 original_name=tool.name,
@@ -469,11 +474,11 @@ class ToolService:
         except IntegrityError as ie:
             db.rollback()
             logger.error(f"IntegrityError during tool registration: {ie}")
-            raise ToolError(f"Tool already exists: {tool.name}")
+            raise ie
         except ToolNameConflictError as tnce:
             db.rollback()
             logger.error(f"ToolNameConflictError during tool registration: {tnce}")
-            raise ToolError(f"Tool name conflict: {str(tnce)}")
+            raise tnce
         except Exception as e:
             db.rollback()
             raise ToolError(f"Failed to register tool: {str(e)}")
