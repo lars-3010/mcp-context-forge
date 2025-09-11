@@ -377,6 +377,7 @@ class ToolService:
 
         Raises:
             IntegrityError: If there is a database integrity error.
+            ToolNameConflictError: If a tool with the same name and visibility public exists.
             ToolError: For other tool registration errors.
 
         Examples:
@@ -422,7 +423,7 @@ class ToolService:
                 # Check for existing public tool with the same name
                 existing_tool = db.execute(select(DbTool).where(DbTool.name == tool.name, DbTool.visibility == "public")).scalar_one_or_none()
                 if existing_tool:
-                    raise ToolNameConflictError(existing_tool.custom_name, enabled=existing_tool.enabled, tool_id=existing_tool.id, visibility=existing_tool.visibility)
+                    raise ToolNameConflictError(existing_tool.name, enabled=existing_tool.enabled, tool_id=existing_tool.id, visibility=existing_tool.visibility)
             elif visibility.lower() == "team" and team_id:
                 # Check for existing team tool with the same name, team_id
                 existing_tool = db.execute(
