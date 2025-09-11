@@ -343,26 +343,7 @@ class TestAdminToolAPIs:
         """Test creating tool with duplicate name via admin UI for private, team, and public scopes."""
         import uuid
         unique_name = f"duplicate_tool_{uuid.uuid4().hex[:8]}"
-
-        # Private scope (owner-level)
-        form_data_private = {
-            "name": unique_name,
-            "url": "https://example.com",
-            "integrationType": "REST",
-            "requestType": "GET",
-            "headers": "{}",
-            "input_schema": "{}",
-            "visibility": "private",
-        }
-        response = await client.post("/admin/tools/", data=form_data_private, headers=TEST_AUTH_HEADER)
-        assert response.status_code == 200
-        assert response.json()["success"] is True
-        # Try to create duplicate private tool (same name, same owner)
-        response = await client.post("/admin/tools/", data=form_data_private, headers=TEST_AUTH_HEADER)
-        assert response.status_code == 409
-        assert response.json()["success"] is False
-
-        # Team scope: create a real team and use its ID
+        #create a real team and use its ID
         from mcpgateway.services.team_management_service import TeamManagementService
         # Get db session from test fixture context
         # The client fixture sets test_user_context["db"]
@@ -384,6 +365,27 @@ class TestAdminToolAPIs:
             created_by="admin@example.com",
             visibility="private"
         )
+        # Private scope (owner-level)
+        form_data_private = {
+            "name": unique_name,
+            "url": "https://example.com",
+            "integrationType": "REST",
+            "requestType": "GET",
+            "headers": "{}",
+            "input_schema": "{}",
+            "visibility": "private",
+            "user_email": "admin@example.com",
+            "team_id": new_team.id,
+        }
+        response = await client.post("/admin/tools/", data=form_data_private, headers=TEST_AUTH_HEADER)
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        # Try to create duplicate private tool (same name, same owner)
+        response = await client.post("/admin/tools/", data=form_data_private, headers=TEST_AUTH_HEADER)
+        assert response.status_code == 409
+        assert response.json()["success"] is False
+
+        # Team scope: 
         real_team_id = new_team.id
         form_data_team = {
             "name": unique_name + "_team",
@@ -415,6 +417,8 @@ class TestAdminToolAPIs:
             "headers": "{}",
             "input_schema": "{}",
             "visibility": "public",
+            "user_email": "admin@example.com",
+            "team_id": new_team.id,
         }
         response = await client.post("/admin/tools/", data=form_data_public, headers=TEST_AUTH_HEADER)
         assert response.status_code == 200

@@ -1547,7 +1547,7 @@ class Tool(Base):
         """
         return cls._computed_name
 
-    __table_args__ = (UniqueConstraint("gateway_id", "original_name", name="uq_gateway_id__original_name"), UniqueConstraint("team_id", "owner_email", "name", name="uq_team_id_owner_email_name_tool"))
+    __table_args__ = (UniqueConstraint("gateway_id", "original_name", name="uq_gateway_id__original_name"), UniqueConstraint("team_id", "owner_email", "name", name="uq_team_owner_email_name_tool"))
 
     @hybrid_property
     def gateway_slug(self):
