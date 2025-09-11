@@ -127,6 +127,7 @@ class GatewayNameConflictError(GatewayError):
         name: The conflicting gateway name
         enabled: Whether the existing gateway is enabled
         gateway_id: ID of the existing gateway if available
+        visibility: The visibility of the gateway ("public" or "team").
 
     Examples:
     >>> error = GatewayNameConflictError("test_gateway")
@@ -155,6 +156,7 @@ class GatewayNameConflictError(GatewayError):
             name: The conflicting gateway name
             enabled: Whether the existing gateway is enabled
             gateway_id: ID of the existing gateway if available
+            visibility: The visibility of the gateway ("public" or "team").
         """
         self.name = name
         self.enabled = enabled
@@ -168,6 +170,7 @@ class GatewayNameConflictError(GatewayError):
             message += f" (currently inactive, ID: {gateway_id})"
         super().__init__(message)
 
+
 class GatewayUrlConflictError(GatewayError):
     """Raised when a gateway URL conflicts with existing (active or inactive) gateway.
 
@@ -175,6 +178,7 @@ class GatewayUrlConflictError(GatewayError):
         url: The conflicting gateway URL
         enabled: Whether the existing gateway is enabled
         gateway_id: ID of the existing gateway if available
+        visibility: The visibility of the gateway ("public" or "team").
 
     Examples:
     >>> error = GatewayUrlConflictError("http://example.com/gateway")
@@ -203,6 +207,7 @@ class GatewayUrlConflictError(GatewayError):
             url: The conflicting gateway URL
             enabled: Whether the existing gateway is enabled
             gateway_id: ID of the existing gateway if available
+            visibility: The visibility of the gateway ("public" or "team").
         """
         self.url = url
         self.enabled = enabled
@@ -535,8 +540,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                 # Check for existing team gateway with the same URL
                 existing_gateway = db.execute(select(DbGateway).where(DbGateway.url == normalized_url, DbGateway.visibility == "team", DbGateway.team_id == team_id)).scalar_one_or_none()
                 if existing_gateway:
-                    raise GatewayUrlConflictError(existing_gateway.url, enabled=existing_gateway.enabled, gateway_id=existing_gateway.id, visibility=existing_gateway.visibility)   
-            
+                    raise GatewayUrlConflictError(existing_gateway.url, enabled=existing_gateway.enabled, gateway_id=existing_gateway.id, visibility=existing_gateway.visibility)
 
             auth_type = getattr(gateway, "auth_type", None)
             # Support multiple custom headers
@@ -676,7 +680,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                 gnce: ExceptionGroup[GatewayNameConflictError]
             logger.error(f"GatewayNameConflictError in group: {gnce.exceptions}")
             raise gnce.exceptions[0]
-        except* GatewayUrlConflictError as guce:  # pragma: no mutate   
+        except* GatewayUrlConflictError as guce:  # pragma: no mutate
             if TYPE_CHECKING:
                 guce: ExceptionGroup[GatewayUrlConflictError]
             logger.error(f"GatewayUrlConflictError in group: {guce.exceptions}")
@@ -974,7 +978,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                     #         enabled=existing_gateway.enabled,
                     #         gateway_id=existing_gateway.id,
                     #     )
-                # Check for existing gateway with the same slug and visibility
+                    # Check for existing gateway with the same slug and visibility
                     new_slug = slugify(gateway_update.name)
                     if gateway_update.visibility is not None:
                         vis = gateway_update.visibility
@@ -990,7 +994,9 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                                 visibility=existing_gateway.visibility,
                             )
                     elif vis == "team" and gateway.team_id:
-                        existing_gateway = db.execute(select(DbGateway).where(DbGateway.slug == new_slug, DbGateway.visibility == "team", DbGateway.team_id == gateway.team_id, DbGateway.id != gateway_id)).scalar_one_or_none()
+                        existing_gateway = db.execute(
+                            select(DbGateway).where(DbGateway.slug == new_slug, DbGateway.visibility == "team", DbGateway.team_id == gateway.team_id, DbGateway.id != gateway_id)
+                        ).scalar_one_or_none()
                         if existing_gateway:
                             raise GatewayNameConflictError(
                                 new_slug,
@@ -1015,7 +1021,9 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                                 visibility=existing_gateway.visibility,
                             )
                     elif vis == "team" and gateway.team_id:
-                        existing_gateway = db.execute(select(DbGateway).where(DbGateway.url == normalized_url, DbGateway.visibility == "team", DbGateway.team_id == gateway.team_id, DbGateway.id != gateway_id)).scalar_one_or_none()
+                        existing_gateway = db.execute(
+                            select(DbGateway).where(DbGateway.url == normalized_url, DbGateway.visibility == "team", DbGateway.team_id == gateway.team_id, DbGateway.id != gateway_id)
+                        ).scalar_one_or_none()
                         if existing_gateway:
                             raise GatewayUrlConflictError(
                                 normalized_url,

@@ -99,6 +99,7 @@ class ToolNameConflictError(ToolError):
             name: The conflicting tool name.
             enabled: Whether the existing tool is enabled or not.
             tool_id: ID of the existing tool if available.
+            visibility: The visibility of the tool ("public" or "team").
 
         Examples:
             >>> from mcpgateway.services.tool_service import ToolNameConflictError
@@ -417,7 +418,7 @@ class ToolService:
 
             if visibility is None:
                 visibility = tool.visibility or "private"
-            #Check for existing tool with the same name and visibility
+            # Check for existing tool with the same name and visibility
             if visibility.lower() == "public":
                 # Check for existing public tool with the same name
                 existing_tool = db.execute(select(DbTool).where(DbTool.name == tool.name, DbTool.visibility == "public")).scalar_one_or_none()
@@ -1109,6 +1110,7 @@ class ToolService:
         Raises:
             ToolNotFoundError: If the tool is not found.
             IntegrityError: If there is a database integrity error.
+            ToolNameConflictError: If a tool with the same name already exists.
             ToolError: For other update errors.
 
         Examples:
@@ -1136,7 +1138,7 @@ class ToolService:
 
             # Check for name change and ensure uniqueness
             if tool_update.name and tool_update.name != tool.name:
-                #Check for existing tool with the same name and visibility
+                # Check for existing tool with the same name and visibility
                 if tool_update.visibility.lower() == "public":
                     # Check for existing public tool with the same name
                     existing_tool = db.execute(select(DbTool).where(DbTool.custom_name == tool_update.custom_name, DbTool.visibility == "public")).scalar_one_or_none()
@@ -1144,7 +1146,9 @@ class ToolService:
                         raise ToolNameConflictError(existing_tool.custom_name, enabled=existing_tool.enabled, tool_id=existing_tool.id, visibility=existing_tool.visibility)
                 elif tool_update.visibility.lower() == "team" and tool_update.team_id:
                     # Check for existing team tool with the same name
-                    existing_tool = db.execute(select(DbTool).where(DbTool.custom_name == tool_update.custom_name, DbTool.visibility == "team", DbTool.team_id == tool_updateteam_id)).scalar_one_or_none()
+                    existing_tool = db.execute(
+                        select(DbTool).where(DbTool.custom_name == tool_update.custom_name, DbTool.visibility == "team", DbTool.team_id == tool_update.team_id)
+                    ).scalar_one_or_none()
                     if existing_tool:
                         raise ToolNameConflictError(existing_tool.custom_name, enabled=existing_tool.enabled, tool_id=existing_tool.id, visibility=existing_tool.visibility)
 
@@ -1213,7 +1217,7 @@ class ToolService:
             raise tnfe
         except ToolNameConflictError as tnce:
             logger.error(f"Tool name conflict during update: {tnce}")
-            raise tnce    
+            raise tnce
         except Exception as ex:
             db.rollback()
             raise ToolError(f"Failed to update tool: {str(ex)}")

@@ -75,9 +75,8 @@ from mcpgateway.schemas import (
 )
 from mcpgateway.services.a2a_service import A2AAgentError, A2AAgentNameConflictError, A2AAgentNotFoundError, A2AAgentService
 from mcpgateway.services.export_service import ExportError, ExportService
-from mcpgateway.services.gateway_service import GatewayConnectionError, GatewayNotFoundError, GatewayService,GatewayUrlConflictError,GatewayNameConflictError
+from mcpgateway.services.gateway_service import GatewayConnectionError, GatewayNameConflictError, GatewayNotFoundError, GatewayService, GatewayUrlConflictError
 from mcpgateway.services.import_service import ConflictStrategy
-from mcpgateway.services.tool_service import ToolNameConflictError
 from mcpgateway.services.import_service import ImportError as ImportServiceError
 from mcpgateway.services.import_service import ImportService, ImportValidationError
 from mcpgateway.services.logging_service import LoggingService
@@ -87,7 +86,7 @@ from mcpgateway.services.root_service import RootService
 from mcpgateway.services.server_service import ServerError, ServerNameConflictError, ServerNotFoundError, ServerService
 from mcpgateway.services.tag_service import TagService
 from mcpgateway.services.team_management_service import TeamManagementService
-from mcpgateway.services.tool_service import ToolError, ToolNotFoundError, ToolService
+from mcpgateway.services.tool_service import ToolError, ToolNameConflictError, ToolNotFoundError, ToolService
 from mcpgateway.utils.create_jwt_token import create_jwt_token, get_jwt_token
 from mcpgateway.utils.error_formatter import ErrorFormatter
 from mcpgateway.utils.metadata_capture import MetadataCapture
@@ -4870,7 +4869,7 @@ async def admin_add_tool(
         return JSONResponse(status_code=409, content=error_message)
     except ToolNameConflictError as ex:
         LOGGER.error(f"ToolNameConflictError in admin_add_tool: {str(ex)}")
-        return JSONResponse(content={"message": str(ex), "success": False}, status_code=409)    
+        return JSONResponse(content={"message": str(ex), "success": False}, status_code=409)
     except ToolError as ex:
         return JSONResponse(content={"message": str(ex), "success": False}, status_code=500)
     except ValidationError as ex:  # This block should catch ValidationError
@@ -5128,7 +5127,7 @@ async def admin_edit_tool(
         return JSONResponse(status_code=409, content=error_message)
     except ToolNameConflictError as ex:
         LOGGER.error(f"ToolNameConflictError in admin_edit_tool: {str(ex)}")
-        return JSONResponse(content={"message": str(ex), "success": False}, status_code=409)    
+        return JSONResponse(content={"message": str(ex), "success": False}, status_code=409)
     except ToolError as ex:
         LOGGER.error(f"ToolError in admin_edit_tool: {str(ex)}")
         return JSONResponse(content={"message": str(ex), "success": False}, status_code=500)
