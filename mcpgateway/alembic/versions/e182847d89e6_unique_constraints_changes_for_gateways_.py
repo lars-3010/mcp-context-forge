@@ -6,11 +6,12 @@ Create Date: 2025-09-12 12:55:17.537176
 
 """
 
+# Standard
 from typing import Sequence, Union
 
+# Third-Party
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import sqlite
 
 # revision identifiers, used by Alembic.
 revision: str = "e182847d89e6"
@@ -119,17 +120,17 @@ def downgrade() -> None:
 
                 if uq_name and uq_name != "None" and all(uq_name != c[1] for c in constraints):
                     constraints_sql.append(f"CONSTRAINT {uq_name} UNIQUE ({uq_cols})")
-                elif not uq_name and uq_name != constraint_name:
-                    constraints_sql.append(f"UNIQUE ({uq_cols})")
+
             for col, constraint, old_constraint in constraints:
                 constraints_sql.append(f"UNIQUE ({col})")
             tmp_table = f"{tbl}_tmp_nounique"
             all_defs = column_defs + constraints_sql
             op.execute(f"DROP TABLE IF EXISTS {tmp_table}")
+            table_defs = ",\n    ".join(all_defs)
             op.execute(
                 f"""
     CREATE TABLE {tmp_table} (
-        {',\n    '.join(all_defs)}
+        {table_defs}
     )
     """
             )
