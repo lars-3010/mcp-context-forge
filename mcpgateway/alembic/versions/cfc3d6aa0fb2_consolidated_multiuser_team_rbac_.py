@@ -437,7 +437,6 @@ def upgrade() -> None:
                 print(f"  Adding visibility column to {table_name}")
                 batch_op.add_column(sa.Column("visibility", sa.String(length=20), nullable=False, server_default=sa.text("'private'")))
 
-
     # Add team scoping to existing resource tables if they exist
     resource_tables = ["prompts", "resources", "servers", "tools", "gateways", "a2a_agents"]
 
@@ -452,7 +451,7 @@ def upgrade() -> None:
         ("servers", "name", "uq_team_owner_name_servers"),
         ("tools", "name", "uq_team_owner_name_tools"),
         ("gateways", "slug", "uq_team_owner_slug_gateway"),
-        ("gateways", "url", "uq_team_owner_url_gateway")
+        ("gateways", "url", "uq_team_owner_url_gateway"),
     ]:
         if tbl in existing_tables:
             try:
@@ -469,7 +468,7 @@ def upgrade() -> None:
                     batch_op.create_unique_constraint(constraint_name, cols)
             except Exception as e:
                 print(f"Warning: Could not update unique constraint on {tbl} table: {e}")
-    
+
     print("✅ Multitenancy schema migration completed successfully")
     print("📋 Schema changes applied:")
     print("   • Created 15 new multitenancy tables")
@@ -488,7 +487,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    
     """Consolidated downgrade schema for multi-user, team, and RBAC features."""
 
     def safe_drop_index(index_name: str, table_name: str):
@@ -539,12 +537,12 @@ def downgrade() -> None:
         return
 
     print("Removing multitenancy schema...")
-        # Combined revert for servers, tools, and gateways unique constraints
+    # Combined revert for servers, tools, and gateways unique constraints
     for tbl, col, constraint_name, old_constraint in [
         ("servers", "name", "uq_team_owner_name_servers", "uq_servers_name"),
         ("tools", "name", "uq_team_owner_name_tools", "uq_tools_name"),
         ("gateways", "slug", "uq_team_owner_slug_gateway", "uq_gateways_slug"),
-        ("gateways", "url", "uq_team_owner_url_gateway", "uq_gateways_url")
+        ("gateways", "url", "uq_team_owner_url_gateway", "uq_gateways_url"),
     ]:
         if tbl in existing_tables:
             try:
