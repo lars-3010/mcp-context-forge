@@ -385,7 +385,7 @@ class TestAdminToolAPIs:
         assert response.status_code == 409
         assert response.json()["success"] is False
 
-        # Team scope: 
+        # Team scope:
         real_team_id = new_team.id
         form_data_team = {
             "name": unique_name + "_team",

@@ -592,7 +592,7 @@ class TestGatewayService:
         assert "Public Gateway already exists with URL" in str(err)
         assert err.gateway_id == existing_tool.id
         assert err.enabled is True
-        
+
     # ────────────────────────────────────────────────────────────────────
     # Validate Gateway URL Timeout
     # ────────────────────────────────────────────────────────────────────
