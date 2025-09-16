@@ -54,7 +54,7 @@ import os
 import signal
 import sys
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
-import urllib.parse
+from urllib.parse import urlencode
 
 # Third-Party
 import httpx
@@ -401,7 +401,6 @@ async def forward_once(
     content_type = getattr(settings, "content_type", None) or CONTENT_TYPE
 
     if content_type == "application/x-www-form-urlencoded":
-        from urllib.parse import urlencode
         # Always encode as form data
         if isinstance(payload, dict):
             body = urlencode(payload)
@@ -416,10 +415,8 @@ async def forward_once(
 
     else:
         # Auto-detect
-        if isinstance(payload, dict) and all(
-            isinstance(v, (str, int, float, bool, type(None))) for v in payload.values()
-        ):
-            body = urllib.parse.urlencode(payload)
+        if isinstance(payload, dict) and all(isinstance(v, (str, int, float, bool, type(None))) for v in payload.values()):
+            body = urlencode(payload)
             headers["Content-Type"] = "application/x-www-form-urlencoded"
         else:
             body = payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False)
