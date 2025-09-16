@@ -389,6 +389,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+@app.post("/test-echo")
+async def test_echo(request: Request) :
+    """Echo endpoint for testing"""
+    logger.info(f"Received request: {request}")
+    headers = dict(request.headers)
+    body = await request.body()
+    return {"headers": headers, "body": body.decode()}
 
 async def validate_security_configuration():
     """Validate security configuration on startup."""
