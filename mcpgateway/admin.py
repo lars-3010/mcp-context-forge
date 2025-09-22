@@ -8548,140 +8548,99 @@ async def admin_get_agent(
         LOGGER.error(f"Error getting agent {agent_id}: {e}")
         raise e
 
-
 @admin_router.get("/a2a")
 async def admin_list_a2a_agents(
     include_inactive: bool = False,
-    tags: Optional[str] = None,
     db: Session = Depends(get_db),
     user=Depends(get_current_user_with_permissions),
-) -> HTMLResponse:
-    """List A2A agents for admin UI.
+) -> List[A2AAgentRead]:
+    """
+    List A2A Agents for the admin UI with an option to include inactive agents.
+
+    This endpoint retrieves a list of A2A (Agent-to-Agent) agents associated with
+    the current user. Administrators can optionally include inactive agents for
+    management or auditing purposes.
 
     Args:
-        include_inactive: Whether to include inactive agents
-        tags: Comma-separated list of tags to filter by
-        db: Database session
-        user: Authenticated user
+        include_inactive (bool): Whether to include inactive agents in the results.
+        db (Session): Database session dependency.
+        user (dict): Authenticated user dependency.
 
     Returns:
-        HTML response with agents list
+        List[A2AAgentRead]: A list of A2A agent records formatted with by_alias=True.
 
     Raises:
-        HTTPException: If A2A features are disabled
+        HTTPException (500): If an error occurs while retrieving the agent list.
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from mcpgateway.schemas import A2AAgentRead, A2AAgentMetrics
+        >>> from datetime import datetime, timezone
+        >>>
+        >>> mock_db = MagicMock()
+        >>> mock_user = {"email": "test_user", "db": mock_db}
+        >>>
+        >>> mock_agent = A2AAgentRead(
+        ...     id="1",
+        ...     name="Agent1",
+        ...     slug="agent1",
+        ...     description="A2A Test Agent",
+        ...     endpoint_url="http://localhost/agent1",
+        ...     agent_type="test",
+        ...     protocol_version="1.0",
+        ...     capabilities={},
+        ...     config={},
+        ...     auth_type=None,
+        ...     enabled=True,
+        ...     reachable=True,
+        ...     created_at=datetime.now(timezone.utc),
+        ...     updated_at=datetime.now(timezone.utc),
+        ...     last_interaction=None,
+        ...     tags=[],
+        ...     metrics=A2AAgentMetrics(
+        ...         total_executions=1,
+        ...         successful_executions=1,
+        ...         failed_executions=0,
+        ...         failure_rate=0.0,
+        ...         min_response_time=0.1,
+        ...         max_response_time=0.2,
+        ...         avg_response_time=0.15,
+        ...         last_execution_time=datetime.now(timezone.utc)
+        ...     )
+        ... )
+        >>>
+        >>> original_list_agents_for_user = a2a_service.list_agents_for_user
+        >>> a2a_service.list_agents_for_user = AsyncMock(return_value=[mock_agent])
+        >>>
+        >>> async def test_admin_list_a2a_agents_active():
+        ...     result = await admin_list_a2a_agents(include_inactive=False, db=mock_db, user=mock_user)
+        ...     return len(result) > 0 and isinstance(result[0], dict) and result[0]['name'] == "Agent1"
+        >>>
+        >>> asyncio.run(test_admin_list_a2a_agents_active())
+        True
+        >>>
+        >>> a2a_service.list_agents_for_user = AsyncMock(side_effect=Exception("A2A error"))
+        >>> async def test_admin_list_a2a_agents_exception():
+        ...     try:
+        ...         await admin_list_a2a_agents(False, db=mock_db, user=mock_user)
+        ...         return False
+        ...     except Exception as e:
+        ...         return "A2A error" in str(e)
+        >>>
+        >>> asyncio.run(test_admin_list_a2a_agents_exception())
+        True
+        >>>
+        >>> a2a_service.list_agents_for_user = original_list_agents_for_user
     """
-    if not a2a_service or not settings.mcpgateway_a2a_enabled:
-        return HTMLResponse(content='<div class="text-center py-8"><p class="text-gray-500">A2A features are disabled. Set MCPGATEWAY_A2A_ENABLED=true to enable.</p></div>', status_code=200)
-    # Parse tags parameter if provided
-    tags_list = None
-    if tags:
-        tags_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
 
-    LOGGER.debug(f"Admin user {user} requested A2A agent list with tags={tags_list}")
-    agents = await a2a_service.list_agents(db, include_inactive=include_inactive, tags=tags_list)
+    LOGGER.debug(f"User {get_user_email(user)} requested A2A Agent list")
+    user_email = get_user_email(user)
+    agents = await a2a_service.list_agents_for_user(
+        db, user_email=user_email, include_inactive=include_inactive,
+    )
 
-    # Convert to template format
-    agent_items = []
-    for agent in agents:
-        agent_items.append(
-            {
-                "id": agent.id,
-                "name": agent.name,
-                "description": agent.description or "",
-                "endpoint_url": agent.endpoint_url,
-                "agent_type": agent.agent_type,
-                "protocol_version": agent.protocol_version,
-                "auth_type": agent.auth_type or "None",
-                "enabled": agent.enabled,
-                "reachable": agent.reachable,
-                "tags": agent.tags,
-                "created_at": agent.created_at.isoformat(),
-                "last_interaction": agent.last_interaction.isoformat() if agent.last_interaction else None,
-                "execution_count": agent.metrics.total_executions,
-                "success_rate": f"{100 - agent.metrics.failure_rate:.1f}%" if agent.metrics.total_executions > 0 else "N/A",
-            }
-        )
-
-    # Generate HTML for agents list
-    html_content = ""
-    for agent in agent_items:
-        status_class = "bg-green-100 text-green-800" if agent["enabled"] else "bg-red-100 text-red-800"
-        reachable_class = "bg-green-100 text-green-800" if agent["reachable"] else "bg-yellow-100 text-yellow-800"
-        active_text = "Active" if agent["enabled"] else "Inactive"
-        reachable_text = "Reachable" if agent["reachable"] else "Unreachable"
-
-        # Generate tags HTML separately
-        tags_html = ""
-        if agent["tags"]:
-            tag_spans: List[Any] = []
-            for tag in agent["tags"]:
-                tag_spans.append(f'<span class="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">{tag}</span>')
-            tags_html = f'<div class="mt-2 flex flex-wrap gap-1">{" ".join(tag_spans)}</div>'
-
-        # Generate last interaction HTML
-        last_interaction_html = ""
-        if agent["last_interaction"]:
-            last_interaction_html = f"<div>Last Interaction: {agent['last_interaction'][:19]}</div>"
-
-        # Generate button classes
-        toggle_class = "text-green-700 bg-green-100 hover:bg-green-200" if not agent["enabled"] else "text-red-700 bg-red-100 hover:bg-red-200"
-        toggle_text = "Activate" if not agent["enabled"] else "Deactivate"
-        toggle_action = "true" if not agent["enabled"] else "false"
-
-        html_content += f"""
-        <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4 space-y-3">
-          <div class="flex items-start justify-between">
-            <div class="flex-1">
-              <h4 class="text-lg font-medium text-gray-900 dark:text-gray-200">{agent["name"]}</h4>
-              <p class="text-sm text-gray-600 dark:text-gray-400">{agent["description"]}</p>
-              <div class="mt-2 flex flex-wrap gap-2">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {status_class}">
-                  {active_text}
-                </span>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {reachable_class}">
-                  {reachable_text}
-                </span>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {agent["agent_type"]}
-                </span>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                  Auth: {agent["auth_type"]}
-                </span>
-              </div>
-              <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                <div>Endpoint: {agent["endpoint_url"]}</div>
-                <div>Executions: {agent["execution_count"]} | Success Rate: {agent["success_rate"]}</div>
-                <div>Created: {agent["created_at"][:19]}</div>
-                {last_interaction_html}
-              </div>
-              {tags_html}
-            </div>
-            <div class="flex space-x-2">
-              <button
-                hx-post="{{ root_path }}/admin/a2a/{agent["id"]}/toggle"
-                hx-vals='{{"activate": "{toggle_action}"}}'
-                hx-target="#a2a-agents-list"
-                hx-trigger="click"
-                class="px-3 py-1 text-sm font-medium {toggle_class} rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                {toggle_text}
-              </button>
-              <button
-                hx-post="{{ root_path }}/admin/a2a/{agent["id"]}/delete"
-                hx-target="#a2a-agents-list"
-                hx-trigger="click"
-                hx-confirm="Are you sure you want to delete this A2A agent?"
-                class="px-3 py-1 text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-        """
-
-    return HTMLResponse(content=html_content)
-
+    return [agent.model_dump(by_alias=True) for agent in agents]
 
 @admin_router.post("/a2a")
 async def admin_add_a2a_agent(

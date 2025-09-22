@@ -2422,33 +2422,60 @@ async function viewAgent(agentId) {
             const metadataFields = [
                 {
                     label: "Created By",
-                    value: agent.created_by || "Legacy Entity",
+                    value:
+                        agent.created_by ||
+                        agent.createdBy ||
+                        "Legacy Entity",
                 },
                 {
                     label: "Created At",
-                    value: agent.created_at
-                        ? new Date(agent.created_at).toLocaleString()
-                        : "Pre-metadata",
+                    value:
+                        agent.created_at || agent.createdAt
+                            ? new Date(
+                                  agent.created_at || agent.createdAt,
+                              ).toLocaleString()
+                            : "Pre-metadata",
                 },
                 {
-                    label: "Created From",
-                    value: agent.created_from_ip || "Unknown",
+                    label: "Created From IP",
+                    value:
+                        agent.created_from_ip ||
+                        agent.createdFromIp ||
+                        "Unknown",
                 },
-                { label: "Created Via", value: agent.created_via || "Unknown" },
+                {
+                    label: "Created Via",
+                    value:
+                        agent.created_via || agent.createdVia || "Unknown",
+                },
                 {
                     label: "Last Modified By",
-                    value: agent.modified_by || "N/A",
+                    value: agent.modified_by || agent.modifiedBy || "N/A",
                 },
                 {
                     label: "Last Modified At",
-                    value: agent.updated_at
-                        ? new Date(agent.updated_at).toLocaleString()
-                        : "N/A",
+                    value:
+                        agent.updated_at || agent.updatedAt
+                            ? new Date(
+                                  agent.updated_at || agent.updatedAt,
+                              ).toLocaleString()
+                            : "N/A",
+                },
+                {
+                    label: "Modified From IP",
+                    value:
+                        agent.modified_from_ip ||
+                        agent.modifiedFromIp ||
+                        "N/A",
+                },
+                {
+                    label: "Modified Via",
+                    value: agent.modified_via || agent.modifiedVia || "N/A",
                 },
                 { label: "Version", value: agent.version || "1" },
                 {
                     label: "Import Batch",
-                    value: agent.import_batch_id || "N/A",
+                    value: agent.importBatchId || "N/A",
                 },
             ];
 
@@ -2675,7 +2702,7 @@ async function viewResource(resourceUri) {
                             : "Pre-metadata",
                 },
                 {
-                    label: "Created From",
+                    label: "Created From IP",
                     value:
                         resource.created_from_ip ||
                         resource.createdFromIp ||
@@ -2702,7 +2729,7 @@ async function viewResource(resourceUri) {
                             : "N/A",
                 },
                 {
-                    label: "Modified From",
+                    label: "Modified From IP",
                     value:
                         resource.modified_from_ip ||
                         resource.modifiedFromIp ||
@@ -3094,7 +3121,7 @@ async function viewPrompt(promptName) {
                             : "Pre-metadata",
                 },
                 {
-                    label: "Created From",
+                    label: "Created From IP",
                     value:
                         prompt.created_from_ip ||
                         prompt.createdFromIp ||
@@ -3118,7 +3145,7 @@ async function viewPrompt(promptName) {
                             : "N/A",
                 },
                 {
-                    label: "Modified From",
+                    label: "Modified From IP",
                     value:
                         prompt.modified_from_ip ||
                         prompt.modifiedFromIp ||
@@ -3424,7 +3451,7 @@ async function viewGateway(gatewayId) {
                             : "Pre-metadata",
                 },
                 {
-                    label: "Created From",
+                    label: "Created From IP",
                     value:
                         gateway.created_from_ip ||
                         gateway.createdFromIp ||
@@ -3449,7 +3476,7 @@ async function viewGateway(gatewayId) {
                             : "N/A",
                 },
                 {
-                    label: "Modified From",
+                    label: "Modified From IP",
                     value:
                         gateway.modified_from_ip ||
                         gateway.modifiedFromIp ||
@@ -7041,7 +7068,7 @@ async function viewTool(toolId) {
                 <span class="ml-2 metadata-created-at"></span>
               </div>
               <div>
-                <span class="font-medium text-gray-600 dark:text-gray-400">Created From:</span>
+                <span class="font-medium text-gray-600 dark:text-gray-400">Created From IP:</span>
                 <span class="ml-2 metadata-created-from"></span>
               </div>
               <div>
