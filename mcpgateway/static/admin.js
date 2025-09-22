@@ -7029,6 +7029,7 @@ async function viewTool(toolId) {
             </div>
           </div>
           <div class="mt-6 border-t pt-4">
+          <!-- Metadata Section -->
             <strong>Metadata:</strong>
             <div class="grid grid-cols-2 gap-4 mt-2 text-sm">
               <div>
@@ -7054,6 +7055,14 @@ async function viewTool(toolId) {
               <div>
                 <span class="font-medium text-gray-600 dark:text-gray-400">Last Modified At:</span>
                 <span class="ml-2 metadata-modified-at"></span>
+              </div>
+              <div>
+                <span class="font-medium text-gray-600 dark:text-gray-400">Modified From IP:</span>
+                <span class="ml-2 modified-from"></span>
+              </div>
+              <div>
+                <span class="font-medium text-gray-600 dark:text-gray-400">Modified Via:</span>
+                <span class="ml-2 metadata-modified-via"></span>
               </div>
               <div>
                 <span class="font-medium text-gray-600 dark:text-gray-400">Version:</span>
