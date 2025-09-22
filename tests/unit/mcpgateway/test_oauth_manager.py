@@ -560,23 +560,27 @@ class TestOAuthManager:
         }
 
         with patch.object(manager, '_generate_state') as mock_generate_state:
-            mock_generate_state.return_value = "state123"
+            mock_generate_state.return_value = ("state123", "verifier123")
 
-            with patch.object(manager, '_store_authorization_state') as mock_store_state:
-                with patch.object(manager, '_create_authorization_url') as mock_create_url:
-                    mock_create_url.return_value = ("https://oauth.example.com/authorize?state=state123", "state123")
+            with patch.object(manager, '_compute_code_challenge') as mock_code_challenge:
+                mock_code_challenge.return_value = "challenge123"
 
-                    result = await manager.initiate_authorization_code_flow(gateway_id, credentials, app_user_email="test@example.com")
+                with patch.object(manager, '_store_authorization_state') as mock_store_state:
+                    with patch.object(manager, '_create_authorization_url') as mock_create_url:
+                        mock_create_url.return_value = ("https://oauth.example.com/authorize?state=state123", "state123")
 
-                    expected = {
-                        "authorization_url": "https://oauth.example.com/authorize?state=state123",
-                        "state": "state123",
-                        "gateway_id": "gateway123"
-                    }
-                    assert result == expected
-                    mock_generate_state.assert_called_once_with(gateway_id, "test@example.com")
-                    mock_store_state.assert_called_once_with(gateway_id, "state123")
-                    mock_create_url.assert_called_once_with(credentials, "state123")
+                        result = await manager.initiate_authorization_code_flow(gateway_id, credentials, app_user_email="test@example.com")
+
+                        expected = {
+                            "authorization_url": "https://oauth.example.com/authorize?state=state123",
+                            "state": "state123",
+                            "gateway_id": "gateway123"
+                        }
+                        assert result == expected
+                        mock_generate_state.assert_called_once_with(gateway_id, "test@example.com")
+                        mock_code_challenge.assert_called_once_with("verifier123")
+                        mock_store_state.assert_called_once_with(gateway_id, "state123")
+                        mock_create_url.assert_called_once_with(credentials, "state123", "challenge123")
 
     @pytest.mark.asyncio
     async def test_complete_authorization_code_flow_success(self):
@@ -726,7 +730,7 @@ class TestOAuthManager:
 
             manager = OAuthManager()
 
-            state = manager._generate_state("gateway123", "test@example.com")
+            state, code_verifier = manager._generate_state("gateway123", "test@example.com")
 
             # State is now base64 encoded JSON with HMAC signature
             state_with_sig = base64.urlsafe_b64decode(state.encode())
@@ -747,10 +751,12 @@ class TestOAuthManager:
             assert decoded["app_user_email"] == "test@example.com"
             assert "nonce" in decoded
             assert "timestamp" in decoded
+            assert decoded["code_verifier"] == code_verifier
 
             # Should generate different states each time (different nonce)
-            state2 = manager._generate_state("gateway123", "test@example.com")
+            state2, verifier2 = manager._generate_state("gateway123", "test@example.com")
             assert state != state2
+            assert code_verifier != verifier2
 
     @pytest.mark.asyncio
     async def test_store_authorization_state(self):

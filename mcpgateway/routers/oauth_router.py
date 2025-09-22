@@ -125,21 +125,17 @@ async def oauth_callback(
         # Get root path for URL construction
         root_path = request.scope.get("root_path", "") if request else ""
 
-        # Extract gateway_id from state parameter
-        # Try new base64-encoded JSON format first
-        # Standard
-        import base64
-        import json
+        # Initialize OAuth manager early so we can decode the state payload consistently
+        token_storage = TokenStorageService(db)
+        oauth_manager = OAuthManager(token_storage=token_storage)
 
         try:
-            state_decoded = base64.urlsafe_b64decode(state.encode()).decode()
-            state_data = json.loads(state_decoded)
+            state_data = oauth_manager._decode_state_payload(state)  # pylint: disable=protected-access
             gateway_id = state_data.get("gateway_id")
             if not gateway_id:
-                raise ValueError("No gateway_id in state")
-        except Exception as e:
-            # Fallback to legacy format (gateway_id_random)
-            logger.warning(f"Failed to decode state as JSON, trying legacy format: {e}")
+                raise ValueError("Gateway ID missing from state")
+        except (OAuthError, ValueError) as exc:
+            logger.warning(f"Failed to decode OAuth state payload: {exc}")
             if "_" not in state:
                 return HTMLResponse(content="<h1>❌ Invalid state parameter</h1>", status_code=400)
             gateway_id = state.split("_")[0]
@@ -178,9 +174,6 @@ async def oauth_callback(
                 """,
                 status_code=400,
             )
-
-        # Complete OAuth flow
-        oauth_manager = OAuthManager(token_storage=TokenStorageService(db))
 
         result = await oauth_manager.complete_authorization_code_flow(gateway_id, code, state, gateway.oauth_config)
 
