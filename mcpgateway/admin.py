@@ -6681,7 +6681,7 @@ async def admin_add_prompt(request: Request, db: Session = Depends(get_db), user
         )
         # Extract creation metadata
         metadata = MetadataCapture.extract_creation_metadata(request, user)
-               
+
         await prompt_service.register_prompt(
             db,
             prompt,

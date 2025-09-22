@@ -420,7 +420,7 @@ class ToolService:
 
             if owner_email is None:
                 owner_email = tool.owner_email
-                
+
             if visibility is None:
                 visibility = tool.visibility or "public"
             # Check for existing tool with the same name and visibility
@@ -467,7 +467,7 @@ class ToolService:
                 owner_email=owner_email or created_by,
                 visibility=visibility,
             )
-            
+
             db.add(db_tool)
             db.commit()
             db.refresh(db_tool)

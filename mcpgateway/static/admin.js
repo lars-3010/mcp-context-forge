@@ -2423,9 +2423,7 @@ async function viewAgent(agentId) {
                 {
                     label: "Created By",
                     value:
-                        agent.created_by ||
-                        agent.createdBy ||
-                        "Legacy Entity",
+                        agent.created_by || agent.createdBy || "Legacy Entity",
                 },
                 {
                     label: "Created At",
@@ -2445,8 +2443,7 @@ async function viewAgent(agentId) {
                 },
                 {
                     label: "Created Via",
-                    value:
-                        agent.created_via || agent.createdVia || "Unknown",
+                    value: agent.created_via || agent.createdVia || "Unknown",
                 },
                 {
                     label: "Last Modified By",
@@ -2464,9 +2461,7 @@ async function viewAgent(agentId) {
                 {
                     label: "Modified From IP",
                     value:
-                        agent.modified_from_ip ||
-                        agent.modifiedFromIp ||
-                        "N/A",
+                        agent.modified_from_ip || agent.modifiedFromIp || "N/A",
                 },
                 {
                     label: "Modified Via",
