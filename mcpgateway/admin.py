@@ -2153,7 +2153,11 @@ async def admin_ui(
     # Load A2A agents if enabled
     a2a_agents = []
     if a2a_service and settings.mcpgateway_a2a_enabled:
-        a2a_agents_raw = await a2a_service.list_agents(db, include_inactive=include_inactive)
+        a2a_agents_raw = await a2a_service.list_agents_for_user(
+            db,
+            user_email=user_email,
+            include_inactive=include_inactive,
+        )
         a2a_agents = [agent.model_dump(by_alias=True) for agent in a2a_agents_raw]
         a2a_agents = _to_dict_and_filter(a2a_agents) if isinstance(a2a_agents, (list, tuple)) else a2a_agents
 

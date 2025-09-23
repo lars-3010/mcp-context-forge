@@ -25,7 +25,7 @@ import uuid
 
 # Third-Party
 from jinja2 import Environment, meta, select_autoescape
-from sqlalchemy import case, delete, desc, Float, func, not_, select
+from sqlalchemy import and_, case, delete, desc, Float, func, not_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -445,6 +445,11 @@ class PromptService:
         from mcpgateway.services.team_management_service import TeamManagementService  # pylint: disable=import-outside-toplevel
 
         # Build query following existing patterns from list_prompts()
+        team_service = TeamManagementService(db)
+        user_teams = await team_service.get_user_teams(user_email)
+        team_ids = [team.id for team in user_teams]
+
+        # Build query following existing patterns from list_resources()
         query = select(DbPrompt)
 
         # Apply active/inactive filter
@@ -452,35 +457,25 @@ class PromptService:
             query = query.where(DbPrompt.is_active)
 
         if team_id:
-            # Filter by specific team
-            query = query.where(DbPrompt.team_id == team_id)
-
-            # Validate user has access to team
-            team_service = TeamManagementService(db)
-            user_teams = await team_service.get_user_teams(user_email)
-            team_ids = [team.id for team in user_teams]
-
             if team_id not in team_ids:
                 return []  # No access to team
-        else:
-            # Get user's accessible teams
-            team_service = TeamManagementService(db)
-            user_teams = await team_service.get_user_teams(user_email)
-            team_ids = [team.id for team in user_teams]
-
-            # Build access conditions following existing patterns
-            # Third-Party
-            from sqlalchemy import and_, or_  # pylint: disable=import-outside-toplevel
 
             access_conditions = []
+            # Filter by specific team
+            access_conditions.append(and_(DbPrompt.team_id == team_id, DbPrompt.visibility.in_(["team", "public"])))
 
+            access_conditions.append(and_(DbPrompt.team_id == team_id, DbPrompt.owner_email == user_email))
+
+            query = query.where(or_(*access_conditions))
+        else:
+            # Get user's accessible teams
+            # Build access conditions following existing patterns
+            access_conditions = []
             # 1. User's personal resources (owner_email matches)
             access_conditions.append(DbPrompt.owner_email == user_email)
-
             # 2. Team resources where user is member
             if team_ids:
                 access_conditions.append(and_(DbPrompt.team_id.in_(team_ids), DbPrompt.visibility.in_(["team", "public"])))
-
             # 3. Public resources (if visibility allows)
             access_conditions.append(DbPrompt.visibility == "public")
 
