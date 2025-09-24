@@ -6681,7 +6681,7 @@ async def admin_add_prompt(request: Request, db: Session = Depends(get_db), user
         )
         # Extract creation metadata
         metadata = MetadataCapture.extract_creation_metadata(request, user)
-
+               
         await prompt_service.register_prompt(
             db,
             prompt,
@@ -8548,6 +8548,7 @@ async def admin_get_agent(
         LOGGER.error(f"Error getting agent {agent_id}: {e}")
         raise e
 
+
 @admin_router.get("/a2a")
 async def admin_list_a2a_agents(
     include_inactive: bool = False,
@@ -8633,14 +8634,20 @@ async def admin_list_a2a_agents(
         >>>
         >>> a2a_service.list_agents_for_user = original_list_agents_for_user
     """
+    if a2a_service is None:
+        LOGGER.warning("A2A features are disabled, returning empty list")
+        return []
 
     LOGGER.debug(f"User {get_user_email(user)} requested A2A Agent list")
     user_email = get_user_email(user)
-    agents = await a2a_service.list_agents_for_user(
-        db, user_email=user_email, include_inactive=include_inactive,
-    )
 
+    agents = await a2a_service.list_agents_for_user(
+        db,
+        user_email=user_email,
+        include_inactive=include_inactive,
+    )
     return [agent.model_dump(by_alias=True) for agent in agents]
+
 
 @admin_router.post("/a2a")
 async def admin_add_a2a_agent(

@@ -260,6 +260,7 @@ class PromptService:
             "modified_user_agent": getattr(db_prompt, "modified_user_agent", None),
             "version": getattr(db_prompt, "version", None),
             "team_id": getattr(db_prompt, "team_id", None),
+            "owner_email":getattr(db_prompt,"owner_email",None),
         }
 
     async def register_prompt(
@@ -360,7 +361,6 @@ class PromptService:
             db.add(db_prompt)
             db.commit()
             db.refresh(db_prompt)
-
             # Notify subscribers
             await self._notify_prompt_added(db_prompt)
 

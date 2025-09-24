@@ -1815,11 +1815,10 @@ class TestA2AAgentManagement:
         # First-Party
         from mcpgateway.admin import admin_list_a2a_agents
 
-        result = await admin_list_a2a_agents(include_inactive=False, tags=None, db=mock_db, user="test-user")
+        result = await admin_list_a2a_agents(include_inactive=False, db=mock_db, user="test-user")
 
-        assert isinstance(result, HTMLResponse)
-        assert result.status_code == 200
-        assert "A2A features are disabled" in result.body.decode()
+        assert isinstance(result, list)
+        assert len(result) == 0
 
     @patch("mcpgateway.admin.a2a_service")
     async def _test_admin_add_a2a_agent_success(self, mock_a2a_service, mock_request, mock_db):

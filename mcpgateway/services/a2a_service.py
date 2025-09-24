@@ -687,4 +687,5 @@ class A2AAgentService:
             version=db_agent.version,
             visibility=db_agent.visibility,
             team_id=db_agent.team_id,
+            owner_email=db_agent.owner_email,
         )
