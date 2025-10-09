@@ -60,7 +60,7 @@ from mcpgateway.auth import get_current_user
 from mcpgateway.bootstrap_db import main as bootstrap_db
 from mcpgateway.cache import ResourceCache, SessionRegistry
 from mcpgateway.config import jsonpath_modifier, settings
-from mcpgateway.db import refresh_slugs_on_startup, SessionLocal
+from mcpgateway.db import check_db_health, refresh_slugs_on_startup, SessionLocal
 from mcpgateway.db import Tool as DbTool
 from mcpgateway.handlers.sampling import SamplingHandler
 from mcpgateway.middleware.rbac import get_current_user_with_permissions, require_permission
@@ -3784,16 +3784,12 @@ async def healthcheck():
     Returns:
         A dictionary with the health status and optional error message.
     """
-    # First-Party
-    from mcpgateway.db import check_db_health
-
     # Use dedicated health check function that doesn't generate transaction log noise
     is_healthy = await asyncio.to_thread(check_db_health)
 
     if is_healthy:
         return {"status": "healthy"}
-    else:
-        return {"status": "unhealthy", "error": "Database connection error"}
+    return {"status": "unhealthy", "error": "Database connection error"}
 
 
 @app.get("/ready")
@@ -3807,16 +3803,12 @@ async def readiness_check():
     Returns:
         JSONResponse with status 200 if ready, 503 if not.
     """
-    # First-Party
-    from mcpgateway.db import check_db_health
-
     # Use dedicated health check function that doesn't generate transaction log noise
     is_ready = await asyncio.to_thread(check_db_health)
 
     if is_ready:
         return JSONResponse(content={"status": "ready"}, status_code=200)
-    else:
-        return JSONResponse(content={"status": "not ready", "error": "Database connection error"}, status_code=503)
+    return JSONResponse(content={"status": "not ready", "error": "Database connection error"}, status_code=503)
 
 
 @app.get("/health/security", tags=["health"])

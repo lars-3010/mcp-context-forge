@@ -1923,15 +1923,15 @@ class TestErrorHandling:
     async def test_internal_server_error(self, client: AsyncClient, mock_auth):
         """Simulate internal server error by patching the health check function."""
         # First-Party
-        from mcpgateway import db as db_module
+        from mcpgateway import main as main_module
 
         # Mock check_db_health to simulate database failure
-        original_check_db_health = db_module.check_db_health
+        original_check_db_health = main_module.check_db_health
 
         def failing_health_check():
             return False
 
-        db_module.check_db_health = failing_health_check
+        main_module.check_db_health = failing_health_check
         try:
             response = await client.get("/health", headers=TEST_AUTH_HEADER)
             # Health check should return 200 with status "unhealthy"
@@ -1940,7 +1940,7 @@ class TestErrorHandling:
             assert data.get("status") == "unhealthy" or "error" in data
         finally:
             # Restore original function
-            db_module.check_db_health = original_check_db_health
+            main_module.check_db_health = original_check_db_health
 
     async def test_validation_error(self, client: AsyncClient, mock_auth):
         """Test validation error for endpoint expecting required fields."""
