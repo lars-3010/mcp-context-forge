@@ -46,7 +46,6 @@ from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
-from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -3775,45 +3774,49 @@ async def reset_metrics(entity: Optional[str] = None, entity_id: Optional[int] =
 # Healthcheck      #
 ####################
 @app.get("/health")
-async def healthcheck(db: Session = Depends(get_db)):
+async def healthcheck():
     """
     Perform a basic health check to verify database connectivity.
 
-    Args:
-        db: SQLAlchemy session dependency.
+    Uses a lightweight connection with AUTOCOMMIT isolation level to avoid
+    generating unnecessary transaction logs in PostgreSQL (issue #1108).
 
     Returns:
         A dictionary with the health status and optional error message.
     """
-    try:
-        # Execute the query using text() for an explicit textual SQL expression.
-        db.execute(text("SELECT 1"))
-    except Exception as e:
-        error_message = f"Database connection error: {str(e)}"
-        logger.error(error_message)
-        return {"status": "unhealthy", "error": error_message}
-    return {"status": "healthy"}
+    # First-Party
+    from mcpgateway.db import check_db_health
+
+    # Use dedicated health check function that doesn't generate transaction log noise
+    is_healthy = await asyncio.to_thread(check_db_health)
+
+    if is_healthy:
+        return {"status": "healthy"}
+    else:
+        return {"status": "unhealthy", "error": "Database connection error"}
 
 
 @app.get("/ready")
-async def readiness_check(db: Session = Depends(get_db)):
+async def readiness_check():
     """
     Perform a readiness check to verify if the application is ready to receive traffic.
 
-    Args:
-        db: SQLAlchemy session dependency.
+    Uses a lightweight connection with AUTOCOMMIT isolation level to avoid
+    generating unnecessary transaction logs in PostgreSQL (issue #1108).
 
     Returns:
         JSONResponse with status 200 if ready, 503 if not.
     """
-    try:
-        # Run the blocking DB check in a thread to avoid blocking the event loop
-        await asyncio.to_thread(db.execute, text("SELECT 1"))
+    # First-Party
+    from mcpgateway.db import check_db_health
+
+    # Use dedicated health check function that doesn't generate transaction log noise
+    is_ready = await asyncio.to_thread(check_db_health)
+
+    if is_ready:
         return JSONResponse(content={"status": "ready"}, status_code=200)
-    except Exception as e:
-        error_message = f"Readiness check failed: {str(e)}"
-        logger.error(error_message)
-        return JSONResponse(content={"status": "not ready", "error": error_message}, status_code=503)
+    else:
+        return JSONResponse(content={"status": "not ready", "error": "Database connection error"}, status_code=503)
 
 
 @app.get("/health/security", tags=["health"])
