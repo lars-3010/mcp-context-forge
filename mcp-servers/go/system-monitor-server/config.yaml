@@ -29,17 +29,25 @@ health_checks:
 log_monitoring:
   max_file_size: "100MB"
   max_tail_lines: 1000
+  # SECURITY: Only allow reading from /var/log by default
+  # Add additional paths as needed for your environment
+  # NEVER use /tmp (too permissive) or relative paths
   allowed_paths:
     - "/var/log"
-    - "/tmp"
-    - "./logs"
+    # Uncomment and customize paths as needed:
+    # - "/opt/myapp/logs"
+    # - "/home/user/application/logs"
   follow_timeout: "30s"
 
 security:
+  # SECURITY: Only allow reading from /var/log by default
+  # Customize this list for your specific monitoring needs
+  # Always use absolute paths, never use /tmp or relative paths
   allowed_paths:
     - "/var/log"
-    - "/tmp"
-    - "./logs"
+    # Uncomment and customize paths as needed:
+    # - "/opt/myapp/logs"
+    # - "/home/user/application/logs"
   max_file_size: 104857600  # 100MB in bytes
   rate_limit_rps: 10
   enable_audit_log: true

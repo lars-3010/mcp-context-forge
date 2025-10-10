@@ -89,11 +89,14 @@ func DefaultConfig() *Config {
         LogMonitoring: LogMonitoringConfig{
             MaxFileSize:   "100MB",
             MaxTailLines:  1000,
-            AllowedPaths:  []string{"/var/log", "/tmp", "./logs"},
+            // SECURITY: Removed /tmp (too permissive), using absolute paths only
+            AllowedPaths:  []string{"/var/log"},
             FollowTimeout: 30 * time.Second,
         },
         Security: SecurityConfig{
-            AllowedPaths:   []string{"/var/log", "/tmp", "./logs"},
+            // SECURITY: Removed /tmp (too permissive), using absolute paths only
+            // Users should configure specific directories in config.yaml as needed
+            AllowedPaths:   []string{"/var/log"},
             MaxFileSize:    100 * 1024 * 1024, // 100MB
             RateLimitRPS:   10,
             EnableAuditLog: true,

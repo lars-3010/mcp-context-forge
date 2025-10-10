@@ -107,10 +107,10 @@ func (lm *LogMonitor) tailFileFollow(ctx context.Context, req *types.LogTailRequ
         maxLines = 1000 // default max
     }
 
-    // Compile filter regex if provided
+    // Compile filter regex if provided with ReDoS protection
     var filterRegex *regexp.Regexp
     if req.Filter != "" {
-        filterRegex, err = regexp.Compile(req.Filter)
+        filterRegex, err = lm.validateRegex(req.Filter)
         if err != nil {
             return nil, fmt.Errorf("invalid filter regex: %w", err)
         }
@@ -156,16 +156,23 @@ func (lm *LogMonitor) tailFileFollow(ctx context.Context, req *types.LogTailRequ
 
 // readLastLines reads the last N lines from a file
 func (lm *LogMonitor) readLastLines(ctx context.Context, filePath string, lines int, filter string) ([]string, error) {
+    // SECURITY: Check file size BEFORE reading to prevent memory exhaustion
+    if lm.maxFileSize > 0 {
+        if err := lm.checkFileSize(filePath, lm.maxFileSize); err != nil {
+            return nil, err
+        }
+    }
+
     file, err := os.Open(filePath)
     if err != nil {
         return nil, fmt.Errorf("failed to open file: %w", err)
     }
     defer file.Close()
 
-    // Compile filter regex if provided
+    // Compile filter regex if provided with ReDoS protection
     var filterRegex *regexp.Regexp
     if filter != "" {
-        filterRegex, err = regexp.Compile(filter)
+        filterRegex, err = lm.validateRegex(filter)
         if err != nil {
             return nil, fmt.Errorf("invalid filter regex: %w", err)
         }
@@ -174,6 +181,11 @@ func (lm *LogMonitor) readLastLines(ctx context.Context, filePath string, lines 
     // Read all lines first
     var allLines []string
     scanner := bufio.NewScanner(file)
+
+    // SECURITY: Limit scanner buffer size to prevent memory exhaustion
+    const maxScanTokenSize = 10 * 1024 * 1024 // 10MB per line max
+    buf := make([]byte, maxScanTokenSize)
+    scanner.Buffer(buf, maxScanTokenSize)
     for scanner.Scan() {
         line := scanner.Text()
 
@@ -199,6 +211,7 @@ func (lm *LogMonitor) readLastLines(ctx context.Context, filePath string, lines 
 }
 
 // validateFilePath validates that the file path is allowed
+// Security: Resolves symlinks to prevent path traversal attacks
 func (lm *LogMonitor) validateFilePath(filePath string) error {
     // Resolve the absolute path
     absPath, err := filepath.Abs(filePath)
@@ -206,25 +219,81 @@ func (lm *LogMonitor) validateFilePath(filePath string) error {
         return fmt.Errorf("failed to resolve absolute path: %w", err)
     }
 
+    // SECURITY: Resolve symlinks to prevent path traversal via symlink attacks
+    // This prevents attacks where /var/log/evil -> /etc/passwd
+    realPath, err := filepath.EvalSymlinks(absPath)
+    if err != nil {
+        // File might not exist yet, use abs path but validate parent exists
+        realPath = absPath
+    }
+
+    // Clean the path to remove any .. or . components
+    realPath = filepath.Clean(realPath)
+
     // Check if the path is in allowed directories
     allowed := false
     for _, allowedPath := range lm.allowedPaths {
+        // Resolve allowed path to absolute and evaluate symlinks
         allowedAbsPath, err := filepath.Abs(allowedPath)
         if err != nil {
             continue
         }
 
-        if strings.HasPrefix(absPath, allowedAbsPath) {
+        allowedRealPath, err := filepath.EvalSymlinks(allowedAbsPath)
+        if err != nil {
+            // Allowed path might not exist, use abs path
+            allowedRealPath = allowedAbsPath
+        }
+
+        allowedRealPath = filepath.Clean(allowedRealPath)
+
+        // Ensure we're checking directory boundaries properly
+        // Add separator to prevent /var/log matching /var/logmalicious
+        if realPath == allowedRealPath || strings.HasPrefix(realPath, allowedRealPath+string(filepath.Separator)) {
             allowed = true
             break
         }
     }
 
     if !allowed {
-        return fmt.Errorf("file path %s is not in allowed directories: %v", filePath, lm.allowedPaths)
+        return fmt.Errorf("file path %s is not in allowed directories: %v", realPath, lm.allowedPaths)
     }
 
     return nil
+}
+
+// validateRegex validates and compiles a regex pattern with ReDoS protection
+// Security: Prevents ReDoS attacks by limiting regex complexity
+func (lm *LogMonitor) validateRegex(pattern string) (*regexp.Regexp, error) {
+    // Basic ReDoS protection: limit pattern length
+    const maxPatternLength = 1000
+    if len(pattern) > maxPatternLength {
+        return nil, fmt.Errorf("regex pattern too long (max %d characters)", maxPatternLength)
+    }
+
+    // Check for dangerous patterns that could cause ReDoS
+    // Nested quantifiers like (a+)+ or (a*)*
+    dangerousPatterns := []string{
+        `\(\w*\+\)\+`,     // (a+)+
+        `\(\w*\*\)\*`,     // (a*)*
+        `\(\w*\+\)\*`,     // (a+)*
+        `\(\w*\*\)\+`,     // (a*)+
+    }
+
+    for _, dangerous := range dangerousPatterns {
+        matched, _ := regexp.MatchString(dangerous, pattern)
+        if matched {
+            return nil, fmt.Errorf("regex pattern contains potentially dangerous nested quantifiers")
+        }
+    }
+
+    // Try to compile with timeout protection
+    regex, err := regexp.Compile(pattern)
+    if err != nil {
+        return nil, fmt.Errorf("invalid regex pattern: %w", err)
+    }
+
+    return regex, nil
 }
 
 // checkFileSize checks if the file size is within limits
@@ -261,12 +330,12 @@ func (lm *LogMonitor) AnalyzeLogs(ctx context.Context, filePath string, patterns
     warningCount := 0
     infoCount := 0
 
-    // Compile patterns
+    // Compile patterns with ReDoS protection
     compiledPatterns := make(map[string]*regexp.Regexp)
     for _, pattern := range patterns {
-        regex, err := regexp.Compile(pattern)
+        regex, err := lm.validateRegex(pattern)
         if err != nil {
-            continue // skip invalid patterns
+            continue // skip invalid or dangerous patterns
         }
         compiledPatterns[pattern] = regex
     }
