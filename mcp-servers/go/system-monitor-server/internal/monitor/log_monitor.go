@@ -402,13 +402,12 @@ func (lm *LogMonitor) GetDiskUsage(ctx context.Context, req *types.DiskUsageRequ
             return nil
         }
 
-        // Check minimum size
-        if req.MinSize > 0 && info.Size() < req.MinSize {
-            return nil
-        }
-
-        // Check file type filter
+        // Check file type filter (only for files) - must check before size filter
         if len(req.FileTypes) > 0 {
+            if info.IsDir() {
+                // Skip directories when filtering by file type
+                return nil
+            }
             ext := strings.ToLower(filepath.Ext(path))
             found := false
             for _, fileType := range req.FileTypes {
@@ -418,6 +417,17 @@ func (lm *LogMonitor) GetDiskUsage(ctx context.Context, req *types.DiskUsageRequ
                 }
             }
             if !found {
+                return nil
+            }
+        }
+
+        // Check minimum size (only for files, not directories)
+        if req.MinSize > 0 {
+            if info.IsDir() {
+                // Skip directories when filtering by size
+                return nil
+            }
+            if info.Size() < req.MinSize {
                 return nil
             }
         }

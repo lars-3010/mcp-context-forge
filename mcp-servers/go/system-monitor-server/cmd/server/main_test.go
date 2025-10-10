@@ -294,10 +294,11 @@ func TestHandleTailLogs(t *testing.T) {
         t.Error("Expected error for missing file_path")
     }
 
-    // Test with valid file path (use a temp file in /tmp)
+    // SECURITY TEST: Verify that /tmp is not allowed (security hardening)
+    // Create a temp file in /tmp to test that access is properly denied
     tmpFile, err := os.CreateTemp("/tmp", "test-log-*.txt")
     if err != nil {
-        t.Fatalf("Failed to create temp file: %v", err)
+        t.Skip("Cannot create temp file for security test")
     }
     defer os.Remove(tmpFile.Name())
     defer tmpFile.Close()
@@ -319,15 +320,18 @@ func TestHandleTailLogs(t *testing.T) {
         t.Fatalf("handleTailLogs failed: %v", err)
     }
 
-    if result.IsError {
-        if len(result.Content) > 0 {
-            if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-                t.Errorf("Expected success, got error: %s", textContent.Text)
-            } else {
-                t.Error("Expected success, got error")
+    // SECURITY: Expect error because /tmp is not in allowed paths
+    if !result.IsError {
+        t.Error("Expected error for /tmp access (security hardening), but got success")
+    }
+
+    // Verify the error message mentions path validation
+    if len(result.Content) > 0 {
+        if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
+            if !strings.Contains(textContent.Text, "file path validation failed") &&
+                !strings.Contains(textContent.Text, "not in allowed directories") {
+                t.Errorf("Expected path validation error, got: %s", textContent.Text)
             }
-        } else {
-            t.Error("Expected success, got error")
         }
     }
 }
@@ -335,7 +339,7 @@ func TestHandleTailLogs(t *testing.T) {
 func TestHandleGetDiskUsage(t *testing.T) {
     ctx := context.Background()
 
-    // Test with /tmp directory (allowed path)
+    // SECURITY TEST: Verify that /tmp is not allowed (security hardening)
     req := mcp.CallToolRequest{
         Params: mcp.CallToolParams{
             Arguments: map[string]interface{}{
@@ -350,30 +354,19 @@ func TestHandleGetDiskUsage(t *testing.T) {
         t.Fatalf("handleGetDiskUsage failed: %v", err)
     }
 
-    if result.IsError {
-        if len(result.Content) > 0 {
-            if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-                t.Errorf("Expected success, got error: %s", textContent.Text)
-            } else {
-                t.Error("Expected success, got error")
-            }
-        } else {
-            t.Error("Expected success, got error")
-        }
+    // SECURITY: Expect error because /tmp is not in allowed paths
+    if !result.IsError {
+        t.Error("Expected error for /tmp access (security hardening), but got success")
     }
 
-    // Test that result contains valid JSON
+    // Verify the error message mentions path validation
     if len(result.Content) > 0 {
         if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-            var diskUsage map[string]interface{}
-            if err := json.Unmarshal([]byte(textContent.Text), &diskUsage); err != nil {
-                t.Errorf("Result should be valid JSON: %v", err)
+            if !strings.Contains(textContent.Text, "failed to get disk usage") &&
+                !strings.Contains(textContent.Text, "not in allowed directories") {
+                t.Errorf("Expected path validation error, got: %s", textContent.Text)
             }
-        } else {
-            t.Error("Expected text content in result")
         }
-    } else {
-        t.Error("Expected content in result")
     }
 }
 

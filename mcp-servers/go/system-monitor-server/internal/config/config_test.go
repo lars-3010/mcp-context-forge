@@ -70,27 +70,24 @@ func TestDefaultConfig(t *testing.T) {
     if config.LogMonitoring.MaxTailLines != 1000 {
         t.Errorf("Expected MaxTailLines 1000, got %d", config.LogMonitoring.MaxTailLines)
     }
-    if len(config.LogMonitoring.AllowedPaths) != 3 {
-        t.Errorf("Expected 3 allowed paths, got %d", len(config.LogMonitoring.AllowedPaths))
+    // SECURITY: Only /var/log should be allowed by default (removed /tmp and ./logs)
+    if len(config.LogMonitoring.AllowedPaths) != 1 {
+        t.Errorf("Expected 1 allowed path, got %d", len(config.LogMonitoring.AllowedPaths))
     }
-    expectedPaths := []string{"/var/log", "/tmp", "./logs"}
-    for i, expectedPath := range expectedPaths {
-        if config.LogMonitoring.AllowedPaths[i] != expectedPath {
-            t.Errorf("Expected allowed path %s, got %s", expectedPath, config.LogMonitoring.AllowedPaths[i])
-        }
+    if config.LogMonitoring.AllowedPaths[0] != "/var/log" {
+        t.Errorf("Expected allowed path /var/log, got %s", config.LogMonitoring.AllowedPaths[0])
     }
     if config.LogMonitoring.FollowTimeout != 30*time.Second {
         t.Errorf("Expected FollowTimeout 30s, got %v", config.LogMonitoring.FollowTimeout)
     }
 
     // Test Security config
-    if len(config.Security.AllowedPaths) != 3 {
-        t.Errorf("Expected 3 security allowed paths, got %d", len(config.Security.AllowedPaths))
+    // SECURITY: Only /var/log should be allowed by default (removed /tmp and ./logs)
+    if len(config.Security.AllowedPaths) != 1 {
+        t.Errorf("Expected 1 security allowed path, got %d", len(config.Security.AllowedPaths))
     }
-    for i, expectedPath := range expectedPaths {
-        if config.Security.AllowedPaths[i] != expectedPath {
-            t.Errorf("Expected security allowed path %s, got %s", expectedPath, config.Security.AllowedPaths[i])
-        }
+    if config.Security.AllowedPaths[0] != "/var/log" {
+        t.Errorf("Expected security allowed path /var/log, got %s", config.Security.AllowedPaths[0])
     }
     if config.Security.MaxFileSize != 100*1024*1024 {
         t.Errorf("Expected MaxFileSize 100MB, got %d", config.Security.MaxFileSize)
