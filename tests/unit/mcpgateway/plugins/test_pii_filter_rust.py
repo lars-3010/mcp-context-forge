@@ -524,5 +524,6 @@ def test_rust_availability():
         assert RustPIIDetector is not None
         print("\n✓ Rust PII filter is available")
     else:
-        assert RustPIIDetector is None
+        # When Rust is not available, RustPIIDetector will still be a class (wrapper),
+        # but RUST_AVAILABLE flag will be False
         print("\n⚠ Rust PII filter is not available - install with: pip install mcpgateway[rust]")
