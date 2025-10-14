@@ -361,6 +361,107 @@ doctest-check:
 
 
 # =============================================================================
+# 🦀 RUST PLUGINS - High-performance plugin implementations
+# =============================================================================
+# help: 🦀 RUST PLUGINS
+# help: rust-build          - Build Rust plugins in release mode
+# help: rust-dev            - Build and install Rust plugins in development mode
+# help: rust-test           - Run Rust plugin tests
+# help: rust-test-all       - Run all Rust and Python integration tests
+# help: rust-bench          - Run Rust plugin benchmarks
+# help: rust-bench-compare  - Compare Rust vs Python performance
+# help: rust-check          - Run all Rust checks (format, lint, test)
+# help: rust-clean          - Clean Rust build artifacts
+# help: rust-verify         - Verify Rust plugin installation
+
+.PHONY: rust-build rust-dev rust-test rust-test-all rust-bench rust-bench-compare rust-check rust-clean rust-verify
+
+rust-build:                             ## Build Rust plugins (release)
+	@echo "🦀 Building Rust plugins..."
+	@cd plugins_rust && $(MAKE) build
+
+rust-dev:                               ## Build and install Rust plugins (development mode)
+	@echo "🦀 Building Rust plugins in development mode..."
+	@cd plugins_rust && $(MAKE) dev
+
+rust-test:                              ## Run Rust plugin tests
+	@echo "🦀 Running Rust tests..."
+	@cd plugins_rust && $(MAKE) test
+
+rust-test-integration:                  ## Run Rust integration tests
+	@echo "🦀 Running Rust integration tests..."
+	@cd plugins_rust && $(MAKE) test-integration
+
+rust-test-python:                       ## Run Python tests for Rust plugins
+	@echo "🐍 Running Python tests for Rust plugins..."
+	@cd plugins_rust && $(MAKE) test-python
+
+rust-test-differential:                 ## Run differential tests (Rust vs Python)
+	@echo "⚖️  Running differential tests..."
+	@cd plugins_rust && $(MAKE) test-differential
+
+rust-test-all:                          ## Run all Rust and Python integration tests
+	@echo "🧪 Running all Rust plugin tests..."
+	@cd plugins_rust && $(MAKE) test-all
+
+rust-bench:                             ## Run Rust benchmarks
+	@echo "📊 Running Rust benchmarks..."
+	@cd plugins_rust && $(MAKE) bench
+
+rust-bench-compare:                     ## Compare Rust vs Python performance
+	@echo "⚖️  Comparing Rust vs Python performance..."
+	@cd plugins_rust && $(MAKE) bench-compare
+
+rust-bench-all:                         ## Run all benchmarks
+	@echo "📊 Running all benchmarks..."
+	@cd plugins_rust && $(MAKE) bench-all
+
+rust-check:                             ## Run all Rust checks (format, lint, test)
+	@echo "✅ Running Rust checks..."
+	@cd plugins_rust && $(MAKE) check
+
+rust-fmt:                               ## Format Rust code
+	@echo "📝 Formatting Rust code..."
+	@cd plugins_rust && $(MAKE) fmt
+
+rust-clippy:                            ## Run Rust linter
+	@echo "📎 Running clippy..."
+	@cd plugins_rust && $(MAKE) clippy
+
+rust-audit:                             ## Run security audit
+	@echo "🔒 Running security audit..."
+	@cd plugins_rust && $(MAKE) audit
+
+rust-doc:                               ## Build Rust documentation
+	@echo "📚 Building Rust documentation..."
+	@cd plugins_rust && $(MAKE) doc
+
+rust-doc-open:                          ## Build and open Rust documentation
+	@echo "📚 Opening Rust documentation..."
+	@cd plugins_rust && $(MAKE) doc-open
+
+rust-coverage:                          ## Generate Rust coverage report
+	@echo "📊 Generating Rust coverage..."
+	@cd plugins_rust && $(MAKE) coverage
+
+rust-clean:                             ## Clean Rust build artifacts
+	@echo "🧹 Cleaning Rust build artifacts..."
+	@cd plugins_rust && $(MAKE) clean
+
+rust-verify:                            ## Verify Rust plugin installation
+	@echo "✅ Verifying Rust plugin installation..."
+	@cd plugins_rust && $(MAKE) verify
+
+rust-info:                              ## Show Rust build information
+	@cd plugins_rust && $(MAKE) info
+
+# Convenience targets
+rust: rust-dev rust-verify              ## Build and verify Rust plugins (quick start)
+
+rust-full: rust-check rust-dev rust-test-all rust-bench-compare  ## Full Rust workflow (checks, build, test, benchmark)
+
+
+# =============================================================================
 # 📊 LOAD TESTING - Database population and performance testing
 # =============================================================================
 # help: 📊 LOAD TESTING
