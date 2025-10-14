@@ -49,7 +49,7 @@ _RustPIIDetector = None
 try:
     from .pii_filter_rust import RustPIIDetector as _RustPIIDetector, RUST_AVAILABLE as _RUST_AVAILABLE
     if _RUST_AVAILABLE:
-        logger.info("Rust PII filter available - using high-performance implementation (5-100x speedup)")
+        logger.info("🦀 Rust PII filter available - using high-performance implementation (5-100x speedup)")
 except ImportError as e:
     logger.debug(f"Rust PII filter not available, using Python implementation: {e}")
     _RUST_AVAILABLE = False
@@ -427,11 +427,11 @@ class PIIFilterPlugin(Plugin):
         if _RUST_AVAILABLE and _RustPIIDetector is not None:
             self.detector = _RustPIIDetector(self.pii_config)
             self.implementation = "Rust"
-            logger.info("PIIFilterPlugin initialized with Rust acceleration (5-100x speedup)")
+            logger.info("🦀 PIIFilterPlugin initialized with Rust acceleration (5-100x speedup)")
         else:
             self.detector = PIIDetector(self.pii_config)
             self.implementation = "Python"
-            logger.info("PIIFilterPlugin initialized with Python implementation")
+            logger.info("🐍 PIIFilterPlugin initialized with Python implementation")
 
         self.detection_count = 0
         self.masked_count = 0
