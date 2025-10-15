@@ -503,28 +503,35 @@ rust-install-targets:                   ## Install all Rust cross-compilation ta
 	rustup target add x86_64-pc-windows-gnu
 	@echo "✅ All Rust targets installed"
 
-rust-install-deps: rust-check-maturin   ## Install all Rust build dependencies
+rust-install-deps: rust-check-maturin rust-install-targets  ## Install all Rust build dependencies
+	@echo "🦀 Installing Rust build dependencies..."
+	@if ! command -v cross >/dev/null 2>&1; then \
+		echo "📦 Installing cross (cross-compilation tool)..."; \
+		cargo install cross --git https://github.com/cross-rs/cross; \
+	else \
+		echo "✅ cross already installed"; \
+	fi
 	@echo "✅ All Rust dependencies installed"
 
 rust-build-x86_64: rust-check-maturin   ## Build Rust wheels for x86_64 (native)
 	@echo "🦀 Building for x86_64..."
-	@cd plugins_rust && maturin build --release --target x86_64-unknown-linux-gnu --compatibility manylinux2014
+	@cd plugins_rust && maturin build --release --target x86_64-unknown-linux-gnu --compatibility linux
 
 rust-build-aarch64: rust-check-maturin  ## Build Rust wheels for arm64/aarch64
 	@echo "🦀 Building for aarch64 (arm64)..."
-	@cd plugins_rust && maturin build --release --target aarch64-unknown-linux-gnu --compatibility manylinux2014
+	@cd plugins_rust && maturin build --release --target aarch64-unknown-linux-gnu --compatibility linux
 
 rust-build-armv7: rust-check-maturin    ## Build Rust wheels for armv7 (32-bit ARM)
 	@echo "🦀 Building for armv7..."
-	@cd plugins_rust && maturin build --release --target armv7-unknown-linux-gnueabihf --compatibility manylinux2014
+	@cd plugins_rust && maturin build --release --target armv7-unknown-linux-gnueabihf --compatibility linux
 
 rust-build-s390x: rust-check-maturin    ## Build Rust wheels for s390x (IBM mainframe)
 	@echo "🦀 Building for s390x..."
-	@cd plugins_rust && maturin build --release --target s390x-unknown-linux-gnu --compatibility manylinux2014
+	@cd plugins_rust && maturin build --release --target s390x-unknown-linux-gnu --compatibility linux
 
 rust-build-ppc64le: rust-check-maturin  ## Build Rust wheels for ppc64le (IBM POWER)
 	@echo "🦀 Building for ppc64le..."
-	@cd plugins_rust && maturin build --release --target powerpc64le-unknown-linux-gnu --compatibility manylinux2014
+	@cd plugins_rust && maturin build --release --target powerpc64le-unknown-linux-gnu --compatibility linux
 
 rust-build-macos: rust-check-maturin    ## Build Rust wheels for macOS (universal2)
 	@echo "🦀 Building for macOS universal2..."

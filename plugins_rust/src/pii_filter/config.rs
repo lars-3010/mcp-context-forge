@@ -48,20 +48,15 @@ impl PIIType {
 }
 
 /// Masking strategies for detected PII
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum MaskingStrategy {
-    Redact,   // Replace with [REDACTED]
+    #[default]
+    Redact, // Replace with [REDACTED]
     Partial,  // Show first/last chars (e.g., ***-**-1234)
     Hash,     // Replace with hash (e.g., [HASH:abc123])
     Tokenize, // Replace with token (e.g., [TOKEN:xyz789])
     Remove,   // Remove entirely
-}
-
-impl Default for MaskingStrategy {
-    fn default() -> Self {
-        MaskingStrategy::Redact
-    }
 }
 
 /// Configuration for PII Filter

@@ -48,12 +48,12 @@ install: build ## Build and install (non-editable)
 	pip install --force-reinstall dist/*.whl
 
 # Testing targets
-test: ## Run all Rust tests
+test: ## Run all Rust tests (unit tests only, excludes integration tests requiring Python)
 	@echo "$(GREEN)Running Rust tests...$(NC)"
-	cargo test --verbose
+	cargo test --lib --bins --verbose --no-default-features
 
-test-integration: ## Run integration tests
-	@echo "$(GREEN)Running integration tests...$(NC)"
+test-integration: dev ## Run integration tests (requires Python module built)
+	@echo "$(GREEN)Running integration tests (with Python module)...$(NC)"
 	cargo test --test integration --verbose
 
 test-python: ## Run Python tests (requires dev install)

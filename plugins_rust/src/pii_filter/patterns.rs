@@ -15,6 +15,7 @@ pub struct CompiledPattern {
     pub pii_type: PIIType,
     pub regex: Regex,
     pub mask_strategy: MaskingStrategy,
+    #[allow(dead_code)]
     pub description: String,
 }
 
@@ -266,7 +267,7 @@ mod tests {
 
         // Should have patterns for all enabled types
         assert!(!compiled.patterns.is_empty());
-        assert!(compiled.regex_set.len() > 0);
+        assert!(!compiled.regex_set.is_empty());
     }
 
     #[test]

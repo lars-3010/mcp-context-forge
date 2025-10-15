@@ -11,6 +11,41 @@ use super::config::{MaskingStrategy, PIIConfig, PIIType};
 use super::masking;
 use super::patterns::{compile_patterns, CompiledPatterns};
 
+/// Public API for benchmarks - detect PII in text
+#[allow(dead_code)]
+pub fn detect_pii(
+    text: &str,
+    patterns: &CompiledPatterns,
+    _config: &PIIConfig,
+) -> HashMap<PIIType, Vec<Detection>> {
+    let mut detections: HashMap<PIIType, Vec<Detection>> = HashMap::new();
+
+    // Use RegexSet for parallel matching
+    let matches = patterns.regex_set.matches(text);
+
+    for pattern_idx in matches.iter() {
+        let pattern = &patterns.patterns[pattern_idx];
+
+        for capture in pattern.regex.captures_iter(text) {
+            if let Some(mat) = capture.get(0) {
+                let detection = Detection {
+                    value: mat.as_str().to_string(),
+                    start: mat.start(),
+                    end: mat.end(),
+                    mask_strategy: pattern.mask_strategy,
+                };
+
+                detections
+                    .entry(pattern.pii_type)
+                    .or_default()
+                    .push(detection);
+            }
+        }
+    }
+
+    detections
+}
+
 /// A single PII detection result
 #[derive(Debug, Clone)]
 pub struct Detection {
@@ -203,7 +238,7 @@ impl PIIDetectorRust {
                                     let rust_items = self.py_list_to_detections(items)?;
                                     all_detections
                                         .entry(pii_type)
-                                        .or_insert_with(Vec::new)
+                                        .or_default()
                                         .extend(rust_items);
                                 }
                             }
@@ -241,7 +276,7 @@ impl PIIDetectorRust {
                                     let rust_items = self.py_list_to_detections(items)?;
                                     all_detections
                                         .entry(pii_type)
-                                        .or_insert_with(Vec::new)
+                                        .or_default()
                                         .extend(rust_items);
                                 }
                             }
@@ -300,7 +335,7 @@ impl PIIDetectorRust {
 
                     detections
                         .entry(pattern.pii_type)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(detection);
                 }
             }

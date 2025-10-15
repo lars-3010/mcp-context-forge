@@ -99,8 +99,6 @@ fn partial_mask(value: &str, pii_type: PIIType) -> String {
 
                 if local.len() > 2 {
                     format!("{}***{}{}", &local[..1], &local[local.len() - 1..], domain)
-                } else if !local.is_empty() {
-                    format!("***{}", domain)
                 } else {
                     format!("***{}", domain)
                 }

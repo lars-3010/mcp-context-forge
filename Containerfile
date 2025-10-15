@@ -24,9 +24,7 @@ COPY plugins_rust/ /build/plugins_rust/
 RUN cd /build/plugins_rust && \
     python${PYTHON_VERSION} -m venv /tmp/venv && \
     /tmp/venv/bin/pip install --upgrade pip maturin && \
-    /tmp/venv/bin/maturin build --release --compatibility linux && \
-    mkdir -p /build/wheels && \
-    cp target/wheels/*.whl /build/wheels/
+    /tmp/venv/bin/maturin build --release --compatibility linux
 
 ###############################################################################
 # Main application stage
@@ -54,14 +52,14 @@ WORKDIR /app
 COPY . /app
 
 # Copy Rust plugin wheels from builder
-COPY --from=rust-builder /build/wheels/*.whl /tmp/rust-wheels/
+COPY --from=rust-builder /build/plugins_rust/target/wheels/*.whl /tmp/rust-wheels/
 
 # Create virtual environment, upgrade pip and install dependencies using uv for speed
 # Including observability packages for OpenTelemetry support and Rust plugins
 RUN python3 -m venv /app/.venv && \
     /app/.venv/bin/python3 -m pip install --upgrade pip setuptools pdm uv && \
     /app/.venv/bin/python3 -m uv pip install ".[redis,postgres,mysql,alembic,observability]" && \
-    /app/.venv/bin/python3 -m pip install /tmp/rust-wheels/*.whl && \
+    /app/.venv/bin/python3 -m pip install /tmp/rust-wheels/mcpgateway_rust-*-linux_x86_64.whl && \
     rm -rf /tmp/rust-wheels
 
 # update the user permissions

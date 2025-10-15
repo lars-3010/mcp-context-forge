@@ -4,9 +4,12 @@
 // Rust-accelerated plugins for MCP Gateway
 // Built with PyO3 for seamless Python integration
 
+// Allow non-local definitions for PyO3 macros (known issue with PyO3 0.20.x)
+#![allow(non_local_definitions)]
+
 use pyo3::prelude::*;
 
-mod pii_filter;
+pub mod pii_filter;
 
 /// Python module: plugins_rust
 ///

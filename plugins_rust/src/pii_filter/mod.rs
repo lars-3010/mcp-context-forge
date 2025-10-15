@@ -8,9 +8,9 @@
 // - Copy-on-write strings for zero-copy operations
 // - Zero-copy JSON traversal with serde_json
 
-mod config;
-mod detector;
-mod masking;
-mod patterns;
+pub mod config;
+pub mod detector;
+pub mod masking;
+pub mod patterns;
 
 pub use detector::PIIDetectorRust;

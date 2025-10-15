@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 /// Helper to create a Python config dict
-fn create_test_config(py: Python) -> &PyDict {
+fn create_test_config(py: Python<'_>) -> &PyDict {
     let config = PyDict::new(py);
 
     // Enable all detectors
@@ -46,7 +46,7 @@ fn test_detector_initialization() {
 
         // Import the Rust detector
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .and_then(|m| m.getattr("PIIDetectorRust"))
             .expect("Failed to import PIIDetectorRust");
 
@@ -66,7 +66,7 @@ fn test_ssn_detection() {
     Python::with_gil(|py| {
         let config = create_test_config(py);
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -110,7 +110,7 @@ fn test_email_detection() {
     Python::with_gil(|py| {
         let config = create_test_config(py);
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -139,7 +139,7 @@ fn test_credit_card_detection() {
     Python::with_gil(|py| {
         let config = create_test_config(py);
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -160,7 +160,7 @@ fn test_phone_detection() {
     Python::with_gil(|py| {
         let config = create_test_config(py);
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -181,7 +181,7 @@ fn test_masking() {
     Python::with_gil(|py| {
         let config = create_test_config(py);
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -204,7 +204,7 @@ fn test_multiple_pii_types() {
     Python::with_gil(|py| {
         let config = create_test_config(py);
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -227,7 +227,7 @@ fn test_nested_data_processing() {
     Python::with_gil(|py| {
         let config = create_test_config(py);
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -281,7 +281,7 @@ fn test_nested_list_processing() {
     Python::with_gil(|py| {
         let config = create_test_config(py);
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -290,7 +290,7 @@ fn test_nested_list_processing() {
         // Create list with PII
         let list = PyList::new(
             py,
-            &["SSN: 123-45-6789", "No PII here", "Email: test@example.com"],
+            ["SSN: 123-45-6789", "No PII here", "Email: test@example.com"],
         );
 
         let result = detector
@@ -318,7 +318,7 @@ fn test_aws_key_detection() {
     Python::with_gil(|py| {
         let config = create_test_config(py);
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -360,7 +360,7 @@ fn test_no_detection_when_disabled() {
             .unwrap();
 
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -386,11 +386,11 @@ fn test_whitelist_patterns() {
         let config = create_test_config(py);
 
         // Add whitelist pattern
-        let whitelist = PyList::new(py, &["test@example\\.com"]);
+        let whitelist = PyList::new(py, ["test@example\\.com"]);
         config.set_item("whitelist_patterns", whitelist).unwrap();
 
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -438,7 +438,7 @@ fn test_empty_string() {
     Python::with_gil(|py| {
         let config = create_test_config(py);
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -459,7 +459,7 @@ fn test_large_text_performance() {
     Python::with_gil(|py| {
         let config = create_test_config(py);
         let detector_class = py
-            .import("plugins_rust")
+            .import("mcpgateway_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();

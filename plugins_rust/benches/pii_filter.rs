@@ -4,7 +4,6 @@
 // Criterion benchmarks for PII filter performance
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use std::collections::HashMap;
 
 // Import the PII filter modules
 use plugins_rust::pii_filter::{
@@ -26,11 +25,13 @@ fn create_test_config() -> PIIConfig {
         detect_driver_license: true,
         detect_bank_account: true,
         detect_medical_record: true,
-        detect_aws_key: true,
-        detect_api_key: true,
+        detect_aws_keys: true,
+        detect_api_keys: true,
         default_mask_strategy: MaskingStrategy::Partial,
         redaction_text: "[REDACTED]".to_string(),
-        custom_patterns: vec![],
+        block_on_detection: false,
+        log_detections: true,
+        include_detection_details: true,
         whitelist_patterns: vec![],
     }
 }
