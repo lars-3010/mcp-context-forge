@@ -24,6 +24,44 @@ ARG ROOTFS_PATH=/tmp/rootfs
 ARG PYTHON_VERSION=3.12
 
 ###########################
+# Rust builder stage
+###########################
+FROM registry.access.redhat.com/ubi10/ubi:10.0-1756805986 AS rust-builder
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+
+ARG PYTHON_VERSION
+
+# hadolint ignore=DL3041
+RUN set -euo pipefail \
+    && dnf upgrade -y \
+    && dnf install -y \
+         python${PYTHON_VERSION} \
+         python${PYTHON_VERSION}-devel \
+         gcc \
+         git \
+         curl \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1 \
+    && dnf clean all
+
+# Install Rust toolchain
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:$PATH"
+
+WORKDIR /build
+
+# Copy only Rust plugin files for efficient caching
+COPY plugins_rust/ /build/plugins_rust/
+
+# Build Rust plugins as wheels
+RUN set -euo pipefail \
+    && python3 -m venv /tmp/venv \
+    && /tmp/venv/bin/pip install --no-cache-dir --upgrade pip maturin \
+    && cd /build/plugins_rust \
+    && /tmp/venv/bin/maturin build --release --compatibility linux \
+    && mkdir -p /build/wheels \
+    && cp target/wheels/*.whl /build/wheels/
+
+###########################
 # Builder stage
 ###########################
 FROM registry.access.redhat.com/ubi10/ubi:10.0-1756805986 AS builder
@@ -58,10 +96,16 @@ WORKDIR /app
 COPY pyproject.toml /app/
 
 # ----------------------------------------------------------------------------
+# Copy Rust plugin wheels from rust-builder stage
+# ----------------------------------------------------------------------------
+COPY --from=rust-builder /build/wheels/*.whl /tmp/rust-wheels/
+
+# ----------------------------------------------------------------------------
 # Create and populate virtual environment
 #  - Upgrade pip, setuptools, wheel, pdm, uv
 #  - Install project dependencies and package
 #  - Include observability packages for OpenTelemetry support
+#  - Install Rust plugins from pre-built wheels
 #  - Remove build tools but keep runtime dist-info
 #  - Remove build caches and build artifacts
 # ----------------------------------------------------------------------------
@@ -69,6 +113,8 @@ RUN set -euo pipefail \
     && python3 -m venv /app/.venv \
     && /app/.venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel pdm uv \
     && /app/.venv/bin/uv pip install ".[redis,postgres,mysql,observability]" \
+    && /app/.venv/bin/pip install --no-cache-dir /tmp/rust-wheels/*.whl \
+    && rm -rf /tmp/rust-wheels \
     && /app/.venv/bin/pip uninstall --yes uv pip setuptools wheel pdm \
     && rm -rf /root/.cache /var/cache/dnf \
     && find /app/.venv -name "*.dist-info" -type d \
