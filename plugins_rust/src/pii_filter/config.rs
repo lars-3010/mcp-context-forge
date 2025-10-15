@@ -51,11 +51,11 @@ impl PIIType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MaskingStrategy {
-    Redact,    // Replace with [REDACTED]
-    Partial,   // Show first/last chars (e.g., ***-**-1234)
-    Hash,      // Replace with hash (e.g., [HASH:abc123])
-    Tokenize,  // Replace with token (e.g., [TOKEN:xyz789])
-    Remove,    // Remove entirely
+    Redact,   // Replace with [REDACTED]
+    Partial,  // Show first/last chars (e.g., ***-**-1234)
+    Hash,     // Replace with hash (e.g., [HASH:abc123])
+    Tokenize, // Replace with token (e.g., [TOKEN:xyz789])
+    Remove,   // Remove entirely
 }
 
 impl Default for MaskingStrategy {

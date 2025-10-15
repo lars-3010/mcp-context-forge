@@ -27,8 +27,12 @@ fn create_test_config(py: Python) -> &PyDict {
     // Masking configuration
     config.set_item("default_mask_strategy", "partial").unwrap();
     config.set_item("redaction_text", "[REDACTED]").unwrap();
-    config.set_item("custom_patterns", Vec::<String>::new()).unwrap();
-    config.set_item("whitelist_patterns", Vec::<String>::new()).unwrap();
+    config
+        .set_item("custom_patterns", Vec::<String>::new())
+        .unwrap();
+    config
+        .set_item("whitelist_patterns", Vec::<String>::new())
+        .unwrap();
 
     config
 }
@@ -41,12 +45,14 @@ fn test_detector_initialization() {
         let config = create_test_config(py);
 
         // Import the Rust detector
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .and_then(|m| m.getattr("PIIDetectorRust"))
             .expect("Failed to import PIIDetectorRust");
 
         // Create detector instance
-        let detector = detector_class.call1((config,))
+        let detector = detector_class
+            .call1((config,))
             .expect("Failed to create detector");
 
         assert!(detector.is_instance_of::<pyo3::types::PyAny>());
@@ -59,7 +65,8 @@ fn test_ssn_detection() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -67,14 +74,16 @@ fn test_ssn_detection() {
 
         // Test SSN detection
         let text = "My SSN is 123-45-6789";
-        let result = detector.call_method1("detect", (text,))
+        let result = detector
+            .call_method1("detect", (text,))
             .expect("detect() failed");
 
         // Check that SSN was detected
         let detections = result.downcast::<PyDict>().unwrap();
         assert!(detections.contains("ssn").unwrap());
 
-        let ssn_list = detections.get_item("ssn")
+        let ssn_list = detections
+            .get_item("ssn")
             .unwrap()
             .unwrap()
             .downcast::<PyList>()
@@ -83,7 +92,12 @@ fn test_ssn_detection() {
 
         let detection = ssn_list.get_item(0).unwrap().downcast::<PyDict>().unwrap();
         assert_eq!(
-            detection.get_item("value").unwrap().unwrap().extract::<String>().unwrap(),
+            detection
+                .get_item("value")
+                .unwrap()
+                .unwrap()
+                .extract::<String>()
+                .unwrap(),
             "123-45-6789"
         );
     });
@@ -95,7 +109,8 @@ fn test_email_detection() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -107,7 +122,8 @@ fn test_email_detection() {
         let detections = result.downcast::<PyDict>().unwrap();
         assert!(detections.contains("email").unwrap());
 
-        let email_list = detections.get_item("email")
+        let email_list = detections
+            .get_item("email")
             .unwrap()
             .unwrap()
             .downcast::<PyList>()
@@ -122,7 +138,8 @@ fn test_credit_card_detection() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -142,7 +159,8 @@ fn test_phone_detection() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -162,7 +180,8 @@ fn test_masking() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -184,7 +203,8 @@ fn test_multiple_pii_types() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -206,7 +226,8 @@ fn test_nested_data_processing() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -221,7 +242,8 @@ fn test_nested_data_processing() {
         outer_dict.set_item("user", inner_dict).unwrap();
 
         // Process nested data
-        let result = detector.call_method1("process_nested", (outer_dict, ""))
+        let result = detector
+            .call_method1("process_nested", (outer_dict, ""))
             .expect("process_nested failed");
 
         // Result is tuple: (modified, new_data, detections)
@@ -233,13 +255,15 @@ fn test_nested_data_processing() {
 
         let new_data = result_tuple.get_item(1).unwrap();
         let new_outer = new_data.downcast::<PyDict>().unwrap();
-        let new_inner = new_outer.get_item("user")
+        let new_inner = new_outer
+            .get_item("user")
             .unwrap()
             .unwrap()
             .downcast::<PyDict>()
             .unwrap();
 
-        let masked_ssn = new_inner.get_item("ssn")
+        let masked_ssn = new_inner
+            .get_item("ssn")
             .unwrap()
             .unwrap()
             .extract::<String>()
@@ -256,23 +280,32 @@ fn test_nested_list_processing() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
         let detector = detector_class.call1((config,)).unwrap();
 
         // Create list with PII
-        let list = PyList::new(py, &["SSN: 123-45-6789", "No PII here", "Email: test@example.com"]);
+        let list = PyList::new(
+            py,
+            &["SSN: 123-45-6789", "No PII here", "Email: test@example.com"],
+        );
 
-        let result = detector.call_method1("process_nested", (list, ""))
+        let result = detector
+            .call_method1("process_nested", (list, ""))
             .expect("process_nested failed");
 
         let result_tuple = result.downcast::<pyo3::types::PyTuple>().unwrap();
         let modified = result_tuple.get_item(0).unwrap().extract::<bool>().unwrap();
         assert!(modified);
 
-        let new_list = result_tuple.get_item(1).unwrap().downcast::<PyList>().unwrap();
+        let new_list = result_tuple
+            .get_item(1)
+            .unwrap()
+            .downcast::<PyList>()
+            .unwrap();
         let first_item = new_list.get_item(0).unwrap().extract::<String>().unwrap();
         assert!(first_item.contains("***-**-6789"));
     });
@@ -284,7 +317,8 @@ fn test_aws_key_detection() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -318,10 +352,15 @@ fn test_no_detection_when_disabled() {
         config.set_item("detect_api_key", false).unwrap();
         config.set_item("default_mask_strategy", "partial").unwrap();
         config.set_item("redaction_text", "[REDACTED]").unwrap();
-        config.set_item("custom_patterns", Vec::<String>::new()).unwrap();
-        config.set_item("whitelist_patterns", Vec::<String>::new()).unwrap();
+        config
+            .set_item("custom_patterns", Vec::<String>::new())
+            .unwrap();
+        config
+            .set_item("whitelist_patterns", Vec::<String>::new())
+            .unwrap();
 
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -331,7 +370,11 @@ fn test_no_detection_when_disabled() {
         let result = detector.call_method1("detect", (text,)).unwrap();
 
         let detections = result.downcast::<PyDict>().unwrap();
-        assert_eq!(detections.len(), 0, "Should not detect any PII when all disabled");
+        assert_eq!(
+            detections.len(),
+            0,
+            "Should not detect any PII when all disabled"
+        );
     });
 }
 
@@ -346,7 +389,8 @@ fn test_whitelist_patterns() {
         let whitelist = PyList::new(py, &["test@example\\.com"]);
         config.set_item("whitelist_patterns", whitelist).unwrap();
 
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -358,7 +402,8 @@ fn test_whitelist_patterns() {
         let detections = result.downcast::<PyDict>().unwrap();
 
         if detections.contains("email").unwrap() {
-            let email_list = detections.get_item("email")
+            let email_list = detections
+                .get_item("email")
                 .unwrap()
                 .unwrap()
                 .downcast::<PyList>()
@@ -366,13 +411,21 @@ fn test_whitelist_patterns() {
 
             // Should only detect john@test.com, not test@example.com (whitelisted)
             for i in 0..email_list.len() {
-                let detection = email_list.get_item(i).unwrap().downcast::<PyDict>().unwrap();
-                let value = detection.get_item("value")
+                let detection = email_list
+                    .get_item(i)
+                    .unwrap()
+                    .downcast::<PyDict>()
+                    .unwrap();
+                let value = detection
+                    .get_item("value")
                     .unwrap()
                     .unwrap()
                     .extract::<String>()
                     .unwrap();
-                assert_ne!(value, "test@example.com", "Whitelisted email should not be detected");
+                assert_ne!(
+                    value, "test@example.com",
+                    "Whitelisted email should not be detected"
+                );
             }
         }
     });
@@ -384,7 +437,8 @@ fn test_empty_string() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -404,7 +458,8 @@ fn test_large_text_performance() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py.import("plugins_rust")
+        let detector_class = py
+            .import("plugins_rust")
             .unwrap()
             .getattr("PIIDetectorRust")
             .unwrap();
@@ -413,7 +468,10 @@ fn test_large_text_performance() {
         // Create large text with multiple PII instances
         let mut text = String::new();
         for i in 0..1000 {
-            text.push_str(&format!("User {}: SSN 123-45-{:04}, Email user{}@example.com\n", i, i, i));
+            text.push_str(&format!(
+                "User {}: SSN 123-45-{:04}, Email user{}@example.com\n",
+                i, i, i
+            ));
         }
 
         let start = std::time::Instant::now();
@@ -425,6 +483,9 @@ fn test_large_text_performance() {
         assert!(detections.contains("email").unwrap());
 
         println!("Processed {} bytes in {:?}", text.len(), duration);
-        assert!(duration.as_millis() < 1000, "Should process 1000 PII instances in under 1 second");
+        assert!(
+            duration.as_millis() < 1000,
+            "Should process 1000 PII instances in under 1 second"
+        );
     });
 }

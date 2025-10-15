@@ -69,12 +69,17 @@ impl PIIDetectorRust {
     #[new]
     pub fn new(config_dict: &PyDict) -> PyResult<Self> {
         // Extract configuration from Python dict
-        let config = PIIConfig::from_py_dict(config_dict)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid config: {}", e)))?;
+        let config = PIIConfig::from_py_dict(config_dict).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid config: {}", e))
+        })?;
 
         // Compile regex patterns
-        let patterns = compile_patterns(&config)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Pattern compilation failed: {}", e)))?;
+        let patterns = compile_patterns(&config).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Pattern compilation failed: {}",
+                e
+            ))
+        })?;
 
         Ok(Self { patterns, config })
     }
@@ -111,7 +116,10 @@ impl PIIDetectorRust {
                     item_dict.set_item("value", detection.value)?;
                     item_dict.set_item("start", detection.start)?;
                     item_dict.set_item("end", detection.end)?;
-                    item_dict.set_item("mask_strategy", format!("{:?}", detection.mask_strategy).to_lowercase())?;
+                    item_dict.set_item(
+                        "mask_strategy",
+                        format!("{:?}", detection.mask_strategy).to_lowercase(),
+                    )?;
 
                     py_list.append(item_dict)?;
                 }
@@ -331,7 +339,10 @@ impl PIIDetectorRust {
     }
 
     /// Convert Python detections to Rust format
-    fn py_detections_to_rust(&self, detections: &PyAny) -> PyResult<HashMap<PIIType, Vec<Detection>>> {
+    fn py_detections_to_rust(
+        &self,
+        detections: &PyAny,
+    ) -> PyResult<HashMap<PIIType, Vec<Detection>>> {
         let mut rust_detections = HashMap::new();
 
         if let Ok(dict) = detections.downcast::<PyDict>() {
@@ -358,7 +369,8 @@ impl PIIDetectorRust {
                     let value: String = dict.get_item("value")?.unwrap().extract()?;
                     let start: usize = dict.get_item("start")?.unwrap().extract()?;
                     let end: usize = dict.get_item("end")?.unwrap().extract()?;
-                    let strategy_str: String = dict.get_item("mask_strategy")?.unwrap().extract()?;
+                    let strategy_str: String =
+                        dict.get_item("mask_strategy")?.unwrap().extract()?;
 
                     let mask_strategy = match strategy_str.as_str() {
                         "partial" => MaskingStrategy::Partial,

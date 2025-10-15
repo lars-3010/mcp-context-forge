@@ -234,16 +234,8 @@ pub fn compile_patterns(config: &PIIConfig) -> Result<CompiledPatterns, String> 
         PIIType::MedicalRecord,
         &*MEDICAL_RECORD_PATTERNS
     );
-    add_patterns!(
-        config.detect_aws_keys,
-        PIIType::AwsKey,
-        &*AWS_KEY_PATTERNS
-    );
-    add_patterns!(
-        config.detect_api_keys,
-        PIIType::ApiKey,
-        &*API_KEY_PATTERNS
-    );
+    add_patterns!(config.detect_aws_keys, PIIType::AwsKey, &*AWS_KEY_PATTERNS);
+    add_patterns!(config.detect_api_keys, PIIType::ApiKey, &*API_KEY_PATTERNS);
 
     // Compile RegexSet for parallel matching
     let regex_set = RegexSet::new(&pattern_strings)

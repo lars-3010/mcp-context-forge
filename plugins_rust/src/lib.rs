@@ -42,7 +42,10 @@ fn plugins_rust(_py: Python, m: &PyModule) -> PyResult<()> {
 
     // Module metadata
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-    m.add("__doc__", "High-performance Rust implementations of MCP Gateway plugins")?;
+    m.add(
+        "__doc__",
+        "High-performance Rust implementations of MCP Gateway plugins",
+    )?;
 
     Ok(())
 }

@@ -44,12 +44,8 @@ pub fn mask_pii<'a>(
     // Apply masking from end to start
     let mut result = text.to_string();
     for (detection, pii_type) in all_detections {
-        let masked_value = apply_mask_strategy(
-            &detection.value,
-            pii_type,
-            detection.mask_strategy,
-            config,
-        );
+        let masked_value =
+            apply_mask_strategy(&detection.value, pii_type, detection.mask_strategy, config);
 
         result.replace_range(detection.start..detection.end, &masked_value);
     }
@@ -102,12 +98,7 @@ fn partial_mask(value: &str, pii_type: PIIType) -> String {
                 let domain = &value[at_pos..];
 
                 if local.len() > 2 {
-                    format!(
-                        "{}***{}{}",
-                        &local[..1],
-                        &local[local.len() - 1..],
-                        domain
-                    )
+                    format!("{}***{}{}", &local[..1], &local[local.len() - 1..], domain)
                 } else if !local.is_empty() {
                     format!("***{}", domain)
                 } else {

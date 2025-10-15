@@ -3,15 +3,15 @@
 //
 // Criterion benchmarks for PII filter performance
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::collections::HashMap;
 
 // Import the PII filter modules
 use plugins_rust::pii_filter::{
-    config::{PIIConfig, MaskingStrategy},
-    patterns::compile_patterns,
+    config::{MaskingStrategy, PIIConfig},
     detector::detect_pii,
     masking::mask_pii,
+    patterns::compile_patterns,
 };
 
 fn create_test_config() -> PIIConfig {
@@ -39,9 +39,7 @@ fn bench_pattern_compilation(c: &mut Criterion) {
     let config = create_test_config();
 
     c.bench_function("pattern_compilation", |b| {
-        b.iter(|| {
-            compile_patterns(black_box(&config))
-        })
+        b.iter(|| compile_patterns(black_box(&config)))
     });
 }
 
@@ -51,9 +49,7 @@ fn bench_single_ssn_detection(c: &mut Criterion) {
     let text = "My SSN is 123-45-6789";
 
     c.bench_function("detect_single_ssn", |b| {
-        b.iter(|| {
-            detect_pii(black_box(text), black_box(&patterns), black_box(&config))
-        })
+        b.iter(|| detect_pii(black_box(text), black_box(&patterns), black_box(&config)))
     });
 }
 
@@ -63,21 +59,18 @@ fn bench_single_email_detection(c: &mut Criterion) {
     let text = "Contact me at john.doe@example.com for more info";
 
     c.bench_function("detect_single_email", |b| {
-        b.iter(|| {
-            detect_pii(black_box(text), black_box(&patterns), black_box(&config))
-        })
+        b.iter(|| detect_pii(black_box(text), black_box(&patterns), black_box(&config)))
     });
 }
 
 fn bench_multiple_pii_types(c: &mut Criterion) {
     let config = create_test_config();
     let patterns = compile_patterns(&config).unwrap();
-    let text = "SSN: 123-45-6789, Email: john@example.com, Phone: (555) 123-4567, IP: 192.168.1.100";
+    let text =
+        "SSN: 123-45-6789, Email: john@example.com, Phone: (555) 123-4567, IP: 192.168.1.100";
 
     c.bench_function("detect_multiple_types", |b| {
-        b.iter(|| {
-            detect_pii(black_box(text), black_box(&patterns), black_box(&config))
-        })
+        b.iter(|| detect_pii(black_box(text), black_box(&patterns), black_box(&config)))
     });
 }
 
@@ -88,9 +81,7 @@ fn bench_no_pii_detection(c: &mut Criterion) {
                 It contains nothing that should be detected as PII. Just plain English text.";
 
     c.bench_function("detect_no_pii", |b| {
-        b.iter(|| {
-            detect_pii(black_box(text), black_box(&patterns), black_box(&config))
-        })
+        b.iter(|| detect_pii(black_box(text), black_box(&patterns), black_box(&config)))
     });
 }
 
@@ -101,9 +92,7 @@ fn bench_masking_ssn(c: &mut Criterion) {
     let detections = detect_pii(text, &patterns, &config);
 
     c.bench_function("mask_ssn", |b| {
-        b.iter(|| {
-            mask_pii(black_box(text), black_box(&detections), black_box(&config))
-        })
+        b.iter(|| mask_pii(black_box(text), black_box(&detections), black_box(&config)))
     });
 }
 
@@ -114,9 +103,7 @@ fn bench_masking_multiple(c: &mut Criterion) {
     let detections = detect_pii(text, &patterns, &config);
 
     c.bench_function("mask_multiple_types", |b| {
-        b.iter(|| {
-            mask_pii(black_box(text), black_box(&detections), black_box(&config))
-        })
+        b.iter(|| mask_pii(black_box(text), black_box(&detections), black_box(&config)))
     });
 }
 
@@ -132,15 +119,17 @@ fn bench_large_text_detection(c: &mut Criterion) {
         for i in 0..*size {
             text.push_str(&format!(
                 "User {}: SSN {:03}-45-6789, Email user{}@example.com, Phone: (555) {:03}-{:04}\n",
-                i, i % 1000, i, i % 1000, i % 10000
+                i,
+                i % 1000,
+                i,
+                i % 1000,
+                i % 10000
             ));
         }
 
         group.throughput(Throughput::Bytes(text.len() as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), &text, |b, text| {
-            b.iter(|| {
-                detect_pii(black_box(text), black_box(&patterns), black_box(&config))
-            })
+            b.iter(|| detect_pii(black_box(text), black_box(&patterns), black_box(&config)))
         });
     }
 
@@ -158,9 +147,7 @@ fn bench_parallel_regex_matching(c: &mut Criterion) {
                 DOB 01/15/1990, Passport AB1234567";
 
     c.bench_function("parallel_regex_set", |b| {
-        b.iter(|| {
-            detect_pii(black_box(text), black_box(&patterns), black_box(&config))
-        })
+        b.iter(|| detect_pii(black_box(text), black_box(&patterns), black_box(&config)))
     });
 }
 
@@ -195,9 +182,7 @@ fn bench_whitelist_checking(c: &mut Criterion) {
     let text = "Email1: test@example.com, Email2: john@example.com";
 
     c.bench_function("whitelist_filtering", |b| {
-        b.iter(|| {
-            detect_pii(black_box(text), black_box(&patterns), black_box(&config))
-        })
+        b.iter(|| detect_pii(black_box(text), black_box(&patterns), black_box(&config)))
     });
 }
 
@@ -224,11 +209,7 @@ fn bench_different_masking_strategies(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("strategy", format!("{:?}", strategy)),
             strategy,
-            |b, _| {
-                b.iter(|| {
-                    mask_pii(black_box(text), black_box(&detections), black_box(&config))
-                })
-            },
+            |b, _| b.iter(|| mask_pii(black_box(text), black_box(&detections), black_box(&config))),
         );
     }
 
@@ -247,19 +228,31 @@ fn bench_empty_vs_pii_text(c: &mut Criterion) {
 
     group.bench_function("empty_text", |b| {
         b.iter(|| {
-            detect_pii(black_box(empty_text), black_box(&patterns), black_box(&config))
+            detect_pii(
+                black_box(empty_text),
+                black_box(&patterns),
+                black_box(&config),
+            )
         })
     });
 
     group.bench_function("no_pii_text", |b| {
         b.iter(|| {
-            detect_pii(black_box(no_pii_text), black_box(&patterns), black_box(&config))
+            detect_pii(
+                black_box(no_pii_text),
+                black_box(&patterns),
+                black_box(&config),
+            )
         })
     });
 
     group.bench_function("with_pii_text", |b| {
         b.iter(|| {
-            detect_pii(black_box(with_pii_text), black_box(&patterns), black_box(&config))
+            detect_pii(
+                black_box(with_pii_text),
+                black_box(&patterns),
+                black_box(&config),
+            )
         })
     });
 
@@ -289,8 +282,16 @@ fn bench_realistic_workload(c: &mut Criterion) {
 
     c.bench_function("realistic_api_payload", |b| {
         b.iter(|| {
-            let detections = detect_pii(black_box(realistic_text), black_box(&patterns), black_box(&config));
-            mask_pii(black_box(realistic_text), black_box(&detections), black_box(&config))
+            let detections = detect_pii(
+                black_box(realistic_text),
+                black_box(&patterns),
+                black_box(&config),
+            );
+            mask_pii(
+                black_box(realistic_text),
+                black_box(&detections),
+                black_box(&config),
+            )
         })
     });
 }
