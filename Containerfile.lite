@@ -52,11 +52,13 @@ WORKDIR /build
 # Copy only Rust plugin files for efficient caching
 COPY plugins_rust/ /build/plugins_rust/
 
+# Switch to Rust plugin directory
+WORKDIR /build/plugins_rust
+
 # Build Rust plugins as wheels
 RUN set -euo pipefail \
     && python3 -m venv /tmp/venv \
     && /tmp/venv/bin/pip install --no-cache-dir --upgrade pip maturin \
-    && cd /build/plugins_rust \
     && /tmp/venv/bin/maturin build --release --compatibility linux
 
 ###########################

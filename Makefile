@@ -16,6 +16,9 @@ SHELL := /bin/bash
 # Read values from .env.make
 -include .env.make
 
+# Rust build configuration (set to 0 to disable Rust builds)
+ENABLE_RUST_BUILD ?= 1
+
 # Project variables
 PROJECT_NAME      = mcpgateway
 DOCS_DIR          = docs
@@ -2061,17 +2064,21 @@ containerfile-update:
 # =============================================================================
 .PHONY: dist wheel sdist verify publish publish-testpypi dist-all dist-collect
 
-dist: clean                  ## Build wheel + sdist into ./dist (includes Rust plugins)
+dist: clean                  ## Build wheel + sdist into ./dist (optionally includes Rust plugins)
 	@test -d "$(VENV_DIR)" || $(MAKE) --no-print-directory venv
 	@echo "📦 Building Python package..."
 	@/bin/bash -eu -c "\
 	    source $(VENV_DIR)/bin/activate && \
 	    python3 -m pip install --quiet --upgrade pip build && \
 	    python3 -m build"
-	@echo "🦀 Building Rust plugins..."
-	@$(MAKE) rust-build
+	@if [ "$(ENABLE_RUST_BUILD)" = "1" ]; then \
+		echo "🦀 Building Rust plugins..."; \
+		$(MAKE) rust-build || { echo "⚠️  Rust build failed, continuing without Rust plugins"; exit 0; }; \
+		echo '🦀 Rust wheels written to ./plugins_rust/target/wheels/'; \
+	else \
+		echo "⏭️  Rust builds disabled (ENABLE_RUST_BUILD=0)"; \
+	fi
 	@echo '🛠  Python wheel & sdist written to ./dist'
-	@echo '🦀 Rust wheels written to ./plugins_rust/target/wheels/'
 	@echo ''
 	@echo '💡 To publish both Python and Rust packages:'
 	@echo '   make publish         # Publish Python package'

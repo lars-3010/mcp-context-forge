@@ -20,9 +20,11 @@ WORKDIR /build
 # Copy only Rust plugin files
 COPY plugins_rust/ /build/plugins_rust/
 
+# Switch to Rust plugin directory
+WORKDIR /build/plugins_rust
+
 # Build Rust plugins
-RUN cd /build/plugins_rust && \
-    python${PYTHON_VERSION} -m venv /tmp/venv && \
+RUN python${PYTHON_VERSION} -m venv /tmp/venv && \
     /tmp/venv/bin/pip install --upgrade pip maturin && \
     /tmp/venv/bin/maturin build --release --compatibility linux
 
