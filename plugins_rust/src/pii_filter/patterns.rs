@@ -65,7 +65,7 @@ static PHONE_PATTERNS: Lazy<Vec<PatternDef>> = Lazy::new(|| {
             MaskingStrategy::Partial,
         ),
         (
-            r"\b\+?[1-9]\d{1,14}\b",
+            r"\b\+[1-9]\d{9,14}\b",
             "International phone number",
             MaskingStrategy::Partial,
         ),
@@ -177,13 +177,16 @@ pub fn compile_patterns(config: &PIIConfig) -> Result<CompiledPatterns, String> 
     let mut pattern_strings = Vec::new();
     let mut patterns = Vec::new();
 
-    // Helper macro to add patterns
+    // Helper macro to add patterns with case-insensitive matching (match Python behavior)
     macro_rules! add_patterns {
         ($enabled:expr, $pii_type:expr, $pattern_list:expr) => {
             if $enabled {
                 for (pattern, description, mask_strategy) in $pattern_list.iter() {
-                    pattern_strings.push(pattern.to_string());
-                    let regex = Regex::new(pattern)
+                    // Add case-insensitive flag to pattern string for RegexSet
+                    pattern_strings.push(format!("(?i){}", pattern));
+                    let regex = regex::RegexBuilder::new(pattern)
+                        .case_insensitive(true)
+                        .build()
                         .map_err(|e| format!("Failed to compile pattern '{}': {}", pattern, e))?;
                     patterns.push(CompiledPattern {
                         pii_type: $pii_type,
@@ -238,16 +241,48 @@ pub fn compile_patterns(config: &PIIConfig) -> Result<CompiledPatterns, String> 
     add_patterns!(config.detect_aws_keys, PIIType::AwsKey, &*AWS_KEY_PATTERNS);
     add_patterns!(config.detect_api_keys, PIIType::ApiKey, &*API_KEY_PATTERNS);
 
-    // Compile RegexSet for parallel matching
-    let regex_set = RegexSet::new(&pattern_strings)
-        .map_err(|e| format!("Failed to compile RegexSet: {}", e))?;
+    // Add custom patterns
+    for custom in &config.custom_patterns {
+        if custom.enabled {
+            // Add case-insensitive flag to pattern string for RegexSet
+            pattern_strings.push(format!("(?i){}", custom.pattern));
+            let regex = regex::RegexBuilder::new(&custom.pattern)
+                .case_insensitive(true)
+                .build()
+                .map_err(|e| {
+                    format!(
+                        "Failed to compile custom pattern '{}': {}",
+                        custom.pattern, e
+                    )
+                })?;
+            patterns.push(CompiledPattern {
+                pii_type: PIIType::Custom,
+                regex,
+                mask_strategy: custom.mask_strategy,
+                description: custom.description.clone(),
+            });
+        }
+    }
 
-    // Compile whitelist patterns
-    let whitelist: Vec<Regex> = config
-        .whitelist_patterns
-        .iter()
-        .filter_map(|pattern| Regex::new(pattern).ok())
-        .collect();
+    // Compile RegexSet for parallel matching
+    // Handle empty pattern set gracefully (all detectors disabled)
+    let regex_set = if pattern_strings.is_empty() {
+        RegexSet::empty()
+    } else {
+        RegexSet::new(&pattern_strings).map_err(|e| format!("Failed to compile RegexSet: {}", e))?
+    };
+
+    // Compile whitelist patterns with error checking and case-insensitive (match Python behavior)
+    let mut whitelist = Vec::new();
+    for pattern in &config.whitelist_patterns {
+        match regex::RegexBuilder::new(pattern)
+            .case_insensitive(true)
+            .build()
+        {
+            Ok(regex) => whitelist.push(regex),
+            Err(e) => return Err(format!("Invalid whitelist pattern '{}': {}", pattern, e)),
+        }
+    }
 
     Ok(CompiledPatterns {
         regex_set,

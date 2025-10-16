@@ -8,7 +8,7 @@ Differential testing: Ensure Rust and Python implementations produce identical r
 """
 
 import pytest
-from plugins.pii_filter.pii_filter_python import PIIDetector as PythonPIIDetector, PIIFilterConfig
+from plugins.pii_filter.pii_filter import PIIDetector as PythonPIIDetector, PIIFilterConfig
 
 # Try to import Rust implementation
 try:

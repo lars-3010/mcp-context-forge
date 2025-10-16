@@ -32,6 +32,7 @@ fn create_test_config() -> PIIConfig {
         block_on_detection: false,
         log_detections: true,
         include_detection_details: true,
+        custom_patterns: vec![],
         whitelist_patterns: vec![],
     }
 }

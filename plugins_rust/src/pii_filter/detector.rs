@@ -473,6 +473,7 @@ impl PIIDetectorRust {
             "medical_record" => Ok(PIIType::MedicalRecord),
             "aws_key" => Ok(PIIType::AwsKey),
             "api_key" => Ok(PIIType::ApiKey),
+            "custom" => Ok(PIIType::Custom),
             _ => Err(()),
         }
     }

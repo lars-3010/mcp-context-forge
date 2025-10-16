@@ -59,6 +59,20 @@ pub enum MaskingStrategy {
     Remove,   // Remove entirely
 }
 
+/// Custom pattern definition from Python
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomPattern {
+    pub pattern: String,
+    pub description: String,
+    pub mask_strategy: MaskingStrategy,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
 /// Configuration for PII Filter
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PIIConfig {
@@ -84,6 +98,10 @@ pub struct PIIConfig {
     pub block_on_detection: bool,
     pub log_detections: bool,
     pub include_detection_details: bool,
+
+    // Custom patterns
+    #[serde(default)]
+    pub custom_patterns: Vec<CustomPattern>,
 
     // Whitelist patterns (regex strings)
     pub whitelist_patterns: Vec<String>,
@@ -114,6 +132,9 @@ impl Default for PIIConfig {
             block_on_detection: false,
             log_detections: true,
             include_detection_details: true,
+
+            // Custom patterns
+            custom_patterns: Vec::new(),
 
             whitelist_patterns: Vec::new(),
         }
@@ -167,6 +188,54 @@ impl PIIConfig {
                 "remove" => MaskingStrategy::Remove,
                 _ => MaskingStrategy::Redact,
             };
+        }
+
+        // Extract custom patterns
+        if let Some(value) = dict.get_item("custom_patterns")? {
+            if let Ok(py_list) = value.downcast::<pyo3::types::PyList>() {
+                for item in py_list.iter() {
+                    if let Ok(py_dict) = item.downcast::<PyDict>() {
+                        let pattern: String = py_dict
+                            .get_item("pattern")?
+                            .ok_or_else(|| {
+                                pyo3::exceptions::PyValueError::new_err("Missing 'pattern' field")
+                            })?
+                            .extract()?;
+                        let description: String = py_dict
+                            .get_item("description")?
+                            .ok_or_else(|| {
+                                pyo3::exceptions::PyValueError::new_err(
+                                    "Missing 'description' field",
+                                )
+                            })?
+                            .extract()?;
+                        let mask_strategy_str: String = match py_dict.get_item("mask_strategy")? {
+                            Some(val) => val.extract()?,
+                            None => "redact".to_string(),
+                        };
+                        let enabled: bool = match py_dict.get_item("enabled")? {
+                            Some(val) => val.extract()?,
+                            None => true,
+                        };
+
+                        let mask_strategy = match mask_strategy_str.as_str() {
+                            "redact" => MaskingStrategy::Redact,
+                            "partial" => MaskingStrategy::Partial,
+                            "hash" => MaskingStrategy::Hash,
+                            "tokenize" => MaskingStrategy::Tokenize,
+                            "remove" => MaskingStrategy::Remove,
+                            _ => MaskingStrategy::Redact,
+                        };
+
+                        config.custom_patterns.push(CustomPattern {
+                            pattern,
+                            description,
+                            mask_strategy,
+                            enabled,
+                        });
+                    }
+                }
+            }
         }
 
         // Extract whitelist patterns

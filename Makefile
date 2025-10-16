@@ -134,6 +134,8 @@ install-db: venv
 .PHONY: install-dev
 install-dev: venv
 	@/bin/bash -c "source $(VENV_DIR)/bin/activate && uv pip install --group dev ."
+	@echo "🦀 Building Rust plugins..."
+	@$(MAKE) rust-dev || echo "⚠️  Rust plugins not available (optional)"
 
 .PHONY: update
 update:

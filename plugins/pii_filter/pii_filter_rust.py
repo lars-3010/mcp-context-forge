@@ -9,23 +9,42 @@ Rust PII Filter Wrapper
 Thin Python wrapper around the Rust implementation for seamless integration.
 """
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, TYPE_CHECKING
 import logging
 
-# Import shared types from Python implementation
-from .pii_filter_python import PIIFilterConfig
+# Use TYPE_CHECKING to avoid circular import at runtime
+if TYPE_CHECKING:
+    from .pii_filter import PIIFilterConfig
 
 logger = logging.getLogger(__name__)
 
 # Try to import Rust implementation
+# Fix sys.path to prioritize site-packages over source directory
 try:
-    from plugins_rust import PIIDetectorRust as _RustDetector
-    RUST_AVAILABLE = True
-    logger.debug("Rust PII filter module imported successfully")
+    import sys
+    import os
+
+    # Temporarily remove current directory from path if it contains plugins_rust source
+    original_path = sys.path.copy()
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    plugins_rust_src = os.path.join(project_root, 'plugins_rust')
+
+    # Remove source directory from path temporarily
+    filtered_path = [p for p in sys.path if not p.startswith(plugins_rust_src)]
+    sys.path = filtered_path
+
+    try:
+        from plugins_rust import PIIDetectorRust as _RustDetector
+        RUST_AVAILABLE = True
+        logger.info("🦀 Rust PII filter module imported successfully")
+    finally:
+        # Restore original path
+        sys.path = original_path
+
 except ImportError as e:
     RUST_AVAILABLE = False
     _RustDetector = None
-    logger.debug(f"Rust PII filter not available: {e}")
+    logger.warning(f"⚠️  Rust PII filter not available: {e}")
 
 
 class RustPIIDetector:
@@ -42,7 +61,7 @@ class RustPIIDetector:
         {'ssn': [{'value': '123-45-6789', 'start': 10, 'end': 21, ...}]}
     """
 
-    def __init__(self, config: PIIFilterConfig):
+    def __init__(self, config: "PIIFilterConfig"):
         """Initialize Rust-backed PII detector.
 
         Args:
@@ -52,11 +71,18 @@ class RustPIIDetector:
             ImportError: If Rust implementation is not available
             ValueError: If configuration is invalid
         """
+        # Import here to avoid circular dependency
+        from .pii_filter import PIIFilterConfig  # pylint: disable=import-outside-toplevel
+
         if not RUST_AVAILABLE:
             raise ImportError(
                 "Rust implementation not available. "
                 "Install with: pip install mcpgateway[rust]"
             )
+
+        # Validate config type
+        if not isinstance(config, PIIFilterConfig):
+            raise TypeError(f"Expected PIIFilterConfig, got {type(config)}")
 
         self.config = config
 

@@ -4,7 +4,53 @@
 // Integration tests for Rust PII filter with PyO3 bindings
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyAny, PyDict, PyList, PyString};
+use std::env;
+use std::path::PathBuf;
+
+fn add_extension_module_path(py: Python<'_>) -> PyResult<()> {
+    let target_root = env::var("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target"));
+
+    let profile = if cfg!(debug_assertions) { "debug" } else { "release" };
+    let profile_dir = target_root.join(profile);
+
+    let mut candidates = vec![profile_dir.clone(), profile_dir.join("deps")];
+
+    // If the build directory differs (e.g., release artifacts while tests run in debug), include both.
+    let alternate_profile = if profile == "debug" { "release" } else { "debug" };
+    let alternate_dir = target_root.join(alternate_profile);
+    candidates.push(alternate_dir.clone());
+    candidates.push(alternate_dir.join("deps"));
+
+    let sys = py.import("sys")?;
+    let sys_path = sys.getattr("path")?.downcast::<PyList>()?;
+
+    for path in candidates {
+        if !path.exists() {
+            continue;
+        }
+        let path_str = path.to_string_lossy();
+        let py_path = PyString::new(py, &path_str);
+        if !sys_path.contains(py_path)? {
+            sys_path.append(py_path)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn import_rust_detector(py: Python<'_>) -> PyResult<&PyAny> {
+    add_extension_module_path(py)?;
+    let module = py.import("plugins_rust")?;
+    module.getattr("PIIDetectorRust")
+}
+
+fn build_detector(py: Python<'_>, config: &PyDict) -> PyResult<PyObject> {
+    let detector_class = import_rust_detector(py)?;
+    Ok(detector_class.call1((config,))?.into())
+}
 
 /// Helper to create a Python config dict
 fn create_test_config(py: Python<'_>) -> &PyDict {
@@ -43,19 +89,8 @@ fn test_detector_initialization() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-
-        // Import the Rust detector
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .and_then(|m| m.getattr("PIIDetectorRust"))
-            .expect("Failed to import PIIDetectorRust");
-
-        // Create detector instance
-        let detector = detector_class
-            .call1((config,))
-            .expect("Failed to create detector");
-
-        assert!(detector.is_instance_of::<pyo3::types::PyAny>());
+        let detector = build_detector(py, config).expect("Failed to create detector");
+        assert!(detector.as_ref(py).is_instance_of::<PyAny>());
     });
 }
 
@@ -65,21 +100,16 @@ fn test_ssn_detection() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         // Test SSN detection
         let text = "My SSN is 123-45-6789";
         let result = detector
-            .call_method1("detect", (text,))
+            .call_method1(py, "detect", (text,))
             .expect("detect() failed");
 
         // Check that SSN was detected
-        let detections = result.downcast::<PyDict>().unwrap();
+        let detections = result.downcast::<PyDict>(py).unwrap();
         assert!(detections.contains("ssn").unwrap());
 
         let ssn_list = detections
@@ -109,17 +139,12 @@ fn test_email_detection() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         let text = "Contact me at john.doe@example.com";
-        let result = detector.call_method1("detect", (text,)).unwrap();
+        let result = detector.call_method1(py, "detect", (text,)).unwrap();
 
-        let detections = result.downcast::<PyDict>().unwrap();
+        let detections = result.downcast::<PyDict>(py).unwrap();
         assert!(detections.contains("email").unwrap());
 
         let email_list = detections
@@ -138,17 +163,12 @@ fn test_credit_card_detection() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         let text = "Credit card: 4111-1111-1111-1111";
-        let result = detector.call_method1("detect", (text,)).unwrap();
+        let result = detector.call_method1(py, "detect", (text,)).unwrap();
 
-        let detections = result.downcast::<PyDict>().unwrap();
+        let detections = result.downcast::<PyDict>(py).unwrap();
         assert!(detections.contains("credit_card").unwrap());
     });
 }
@@ -159,17 +179,12 @@ fn test_phone_detection() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         let text = "Call me at (555) 123-4567";
-        let result = detector.call_method1("detect", (text,)).unwrap();
+        let result = detector.call_method1(py, "detect", (text,)).unwrap();
 
-        let detections = result.downcast::<PyDict>().unwrap();
+        let detections = result.downcast::<PyDict>(py).unwrap();
         assert!(detections.contains("phone").unwrap());
     });
 }
@@ -180,18 +195,13 @@ fn test_masking() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         let text = "SSN: 123-45-6789";
-        let detections = detector.call_method1("detect", (text,)).unwrap();
-        let masked = detector.call_method1("mask", (text, detections)).unwrap();
+        let detections = detector.call_method1(py, "detect", (text,)).unwrap();
+        let masked = detector.call_method1(py, "mask", (text, detections)).unwrap();
 
-        let masked_str = masked.extract::<String>().unwrap();
+        let masked_str = masked.as_ref(py).extract::<String>().unwrap();
         assert!(masked_str.contains("***-**-6789"));
         assert!(!masked_str.contains("123-45-6789"));
     });
@@ -203,17 +213,12 @@ fn test_multiple_pii_types() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         let text = "SSN: 123-45-6789, Email: john@example.com, Phone: 555-1234";
-        let result = detector.call_method1("detect", (text,)).unwrap();
+        let result = detector.call_method1(py, "detect", (text,)).unwrap();
 
-        let detections = result.downcast::<PyDict>().unwrap();
+        let detections = result.downcast::<PyDict>(py).unwrap();
         assert!(detections.contains("ssn").unwrap());
         assert!(detections.contains("email").unwrap());
         assert!(detections.contains("phone").unwrap());
@@ -226,12 +231,7 @@ fn test_nested_data_processing() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         // Create nested structure
         let inner_dict = PyDict::new(py);
@@ -243,11 +243,11 @@ fn test_nested_data_processing() {
 
         // Process nested data
         let result = detector
-            .call_method1("process_nested", (outer_dict, ""))
+            .call_method1(py, "process_nested", (outer_dict, ""))
             .expect("process_nested failed");
 
         // Result is tuple: (modified, new_data, detections)
-        let result_tuple = result.downcast::<pyo3::types::PyTuple>().unwrap();
+        let result_tuple = result.downcast::<pyo3::types::PyTuple>(py).unwrap();
         assert_eq!(result_tuple.len(), 3);
 
         let modified = result_tuple.get_item(0).unwrap().extract::<bool>().unwrap();
@@ -280,12 +280,7 @@ fn test_nested_list_processing() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         // Create list with PII
         let list = PyList::new(
@@ -294,10 +289,10 @@ fn test_nested_list_processing() {
         );
 
         let result = detector
-            .call_method1("process_nested", (list, ""))
+            .call_method1(py, "process_nested", (list, ""))
             .expect("process_nested failed");
 
-        let result_tuple = result.downcast::<pyo3::types::PyTuple>().unwrap();
+        let result_tuple = result.downcast::<pyo3::types::PyTuple>(py).unwrap();
         let modified = result_tuple.get_item(0).unwrap().extract::<bool>().unwrap();
         assert!(modified);
 
@@ -317,17 +312,12 @@ fn test_aws_key_detection() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         let text = "AWS Key: AKIAIOSFODNN7EXAMPLE";
-        let result = detector.call_method1("detect", (text,)).unwrap();
+        let result = detector.call_method1(py, "detect", (text,)).unwrap();
 
-        let detections = result.downcast::<PyDict>().unwrap();
+        let detections = result.downcast::<PyDict>(py).unwrap();
         assert!(detections.contains("aws_key").unwrap());
     });
 }
@@ -359,17 +349,12 @@ fn test_no_detection_when_disabled() {
             .set_item("whitelist_patterns", Vec::<String>::new())
             .unwrap();
 
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         let text = "SSN: 123-45-6789, Email: test@example.com";
-        let result = detector.call_method1("detect", (text,)).unwrap();
+        let result = detector.call_method1(py, "detect", (text,)).unwrap();
 
-        let detections = result.downcast::<PyDict>().unwrap();
+        let detections = result.downcast::<PyDict>(py).unwrap();
         assert_eq!(
             detections.len(),
             0,
@@ -389,17 +374,12 @@ fn test_whitelist_patterns() {
         let whitelist = PyList::new(py, ["test@example\\.com"]);
         config.set_item("whitelist_patterns", whitelist).unwrap();
 
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         let text = "Email: test@example.com, Other: john@test.com";
-        let result = detector.call_method1("detect", (text,)).unwrap();
+        let result = detector.call_method1(py, "detect", (text,)).unwrap();
 
-        let detections = result.downcast::<PyDict>().unwrap();
+        let detections = result.downcast::<PyDict>(py).unwrap();
 
         if detections.contains("email").unwrap() {
             let email_list = detections
@@ -437,17 +417,12 @@ fn test_empty_string() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         let text = "";
-        let result = detector.call_method1("detect", (text,)).unwrap();
+        let result = detector.call_method1(py, "detect", (text,)).unwrap();
 
-        let detections = result.downcast::<PyDict>().unwrap();
+        let detections = result.downcast::<PyDict>(py).unwrap();
         assert_eq!(detections.len(), 0);
     });
 }
@@ -458,12 +433,7 @@ fn test_large_text_performance() {
 
     Python::with_gil(|py| {
         let config = create_test_config(py);
-        let detector_class = py
-            .import("mcpgateway_rust")
-            .unwrap()
-            .getattr("PIIDetectorRust")
-            .unwrap();
-        let detector = detector_class.call1((config,)).unwrap();
+        let detector = build_detector(py, config).unwrap();
 
         // Create large text with multiple PII instances
         let mut text = String::new();
@@ -475,10 +445,10 @@ fn test_large_text_performance() {
         }
 
         let start = std::time::Instant::now();
-        let result = detector.call_method1("detect", (text.as_str(),)).unwrap();
+        let result = detector.call_method1(py, "detect", (text.as_str(),)).unwrap();
         let duration = start.elapsed();
 
-        let detections = result.downcast::<PyDict>().unwrap();
+        let detections = result.downcast::<PyDict>(py).unwrap();
         assert!(detections.contains("ssn").unwrap());
         assert!(detections.contains("email").unwrap());
 

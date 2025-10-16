@@ -46,12 +46,18 @@ logger = logging_service.get_logger(__name__)
 # Try to import Rust-accelerated implementation
 _RUST_AVAILABLE = False
 _RustPIIDetector = None
+
 try:
     from .pii_filter_rust import RustPIIDetector as _RustPIIDetector, RUST_AVAILABLE as _RUST_AVAILABLE
     if _RUST_AVAILABLE:
         logger.info("🦀 Rust PII filter available - using high-performance implementation (5-100x speedup)")
+    else:
+        logger.info("Rust module found but RUST_AVAILABLE=False - using Python implementation")
 except ImportError as e:
-    logger.debug(f"Rust PII filter not available, using Python implementation: {e}")
+    logger.info(f"Rust PII filter not available (will use Python): {e}")
+    _RUST_AVAILABLE = False
+except Exception as e:
+    logger.warning(f"⚠️  Unexpected error loading Rust module: {e}", exc_info=True)
     _RUST_AVAILABLE = False
 
 
@@ -160,8 +166,10 @@ class PIIDetector:
         if self.config.detect_phone:
             patterns.extend(
                 [
+                    # US phone number: (123) 456-7890 or 123-456-7890 or 123.456.7890
                     PIIPattern(type=PIIType.PHONE, pattern=r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", description="US phone number", mask_strategy=MaskingStrategy.PARTIAL),
-                    PIIPattern(type=PIIType.PHONE, pattern=r"\b\+?[1-9]\d{1,14}\b", description="International phone number", mask_strategy=MaskingStrategy.PARTIAL),
+                    # International phone: must have + prefix and 10-15 digits
+                    PIIPattern(type=PIIType.PHONE, pattern=r"\b\+[1-9]\d{9,14}\b", description="International phone number", mask_strategy=MaskingStrategy.PARTIAL),
                 ]
             )
 
@@ -287,24 +295,25 @@ class PIIDetector:
             Dictionary of detected PII by type
         """
         detections = {}
+        # Track ALL ranges across ALL types to prevent overlaps (matches Rust behavior)
+        all_seen_ranges = []
 
         for pii_type, pattern_list in self.patterns.items():
             type_detections = []
-            seen_ranges = []  # Track ranges we've already detected
 
             for pattern, mask_strategy in pattern_list:
                 for match in pattern.finditer(text):
                     if not self._is_whitelisted(text, match.start(), match.end()):
-                        # Check if this overlaps with any existing detection
+                        # Check if this overlaps with any existing detection across ALL types
                         overlaps = False
-                        for start, end in seen_ranges:
+                        for start, end in all_seen_ranges:
                             if (match.start() >= start and match.start() < end) or (match.end() > start and match.end() <= end) or (match.start() <= start and match.end() >= end):
                                 overlaps = True
                                 break
 
                         if not overlaps:
                             type_detections.append({"value": match.group(), "start": match.start(), "end": match.end(), "mask_strategy": mask_strategy})
-                            seen_ranges.append((match.start(), match.end()))
+                            all_seen_ranges.append((match.start(), match.end()))
 
             if type_detections:
                 detections[pii_type] = type_detections
@@ -405,6 +414,98 @@ class PIIDetector:
             return ""
 
         return self.config.redaction_text
+
+    def process_nested(self, data: Any, path: str = "") -> tuple[bool, Any, Dict]:
+        """Process nested data structures (dicts, lists, strings) for PII.
+
+        This method recursively traverses nested structures and detects/masks
+        PII in all string values found within.
+
+        Args:
+            data: Data structure to process (dict, list, str, or other)
+            path: Current path in the structure (for logging)
+
+        Returns:
+            Tuple of (modified, new_data, detections) where:
+            - modified: True if any PII was found and masked
+            - new_data: The data structure with masked PII
+            - detections: Dictionary of all detections found (grouped by PII type)
+
+        Example:
+            >>> config = PIIFilterConfig()
+            >>> detector = PIIDetector(config)
+            >>> data = {"user": {"ssn": "123-45-6789", "name": "John"}}
+            >>> modified, new_data, detections = detector.process_nested(data)
+            >>> print(new_data)
+            {'user': {'ssn': '***-**-6789', 'name': 'John'}}
+        """
+        import copy
+        # Collect detections by PII type (matching Rust behavior)
+        type_detections: Dict[PIIType, List[Dict]] = {}
+        new_data = copy.deepcopy(data)
+        modified = self._process_nested_recursive(new_data, path, type_detections)
+        return modified, new_data, type_detections
+
+    def _process_nested_recursive(self, data: Any, path: str, type_detections: Dict[PIIType, List[Dict]]) -> bool:
+        """Recursively process nested data and modify in place.
+
+        Args:
+            data: Data to process (will be modified in place)
+            path: Current path
+            type_detections: Dict to accumulate detections by PII type
+
+        Returns:
+            True if any modifications were made
+        """
+        modified = False
+
+        if isinstance(data, str):
+            detections = self.detect(data)
+            if detections:
+                # Merge detections into type_detections
+                for pii_type, items in detections.items():
+                    if pii_type not in type_detections:
+                        type_detections[pii_type] = []
+                    type_detections[pii_type].extend(items)
+                # Can't modify string in place, caller must handle
+                return True
+            return False
+
+        elif isinstance(data, dict):
+            for key, value in data.items():
+                current_path = f"{path}.{key}" if path else key
+                if isinstance(value, str):
+                    detections = self.detect(value)
+                    if detections:
+                        # Merge detections into type_detections
+                        for pii_type, items in detections.items():
+                            if pii_type not in type_detections:
+                                type_detections[pii_type] = []
+                            type_detections[pii_type].extend(items)
+                        data[key] = self.mask(value, detections)
+                        modified = True
+                else:
+                    if self._process_nested_recursive(value, current_path, type_detections):
+                        modified = True
+
+        elif isinstance(data, list):
+            for i, item in enumerate(data):
+                current_path = f"{path}[{i}]"
+                if isinstance(item, str):
+                    detections = self.detect(item)
+                    if detections:
+                        # Merge detections into type_detections
+                        for pii_type, items in detections.items():
+                            if pii_type not in type_detections:
+                                type_detections[pii_type] = []
+                            type_detections[pii_type].extend(items)
+                        data[i] = self.mask(item, detections)
+                        modified = True
+                else:
+                    if self._process_nested_recursive(item, current_path, type_detections):
+                        modified = True
+
+        return modified
 
 
 class PIIFilterPlugin(Plugin):

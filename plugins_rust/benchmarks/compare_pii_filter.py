@@ -25,7 +25,7 @@ from dataclasses import dataclass, asdict
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from plugins.pii_filter.pii_filter_python import PIIDetector as PythonPIIDetector, PIIFilterConfig
+from plugins.pii_filter.pii_filter import PIIDetector as PythonPIIDetector, PIIFilterConfig
 
 try:
     from plugins.pii_filter.pii_filter_rust import RustPIIDetector, RUST_AVAILABLE

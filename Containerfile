@@ -1,17 +1,9 @@
 ###############################################################################
-# Rust builder stage - builds Rust plugins separately
+# Rust builder stage - builds Rust plugins in manylinux2014 container
 ###############################################################################
-FROM registry.access.redhat.com/ubi10-minimal:10.0-1755721767 AS rust-builder
+FROM quay.io/pypa/manylinux2014_x86_64:latest AS rust-builder
 
-ARG PYTHON_VERSION=3.12
-
-# Install Rust toolchain and Python development headers
-# hadolint ignore=DL3041
-RUN microdnf update -y && \
-    microdnf install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-devel gcc git curl && \
-    microdnf clean all
-
-# Install Rust
+# Install Rust toolchain
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 ENV PATH="/root/.cargo/bin:$PATH"
 
@@ -23,10 +15,11 @@ COPY plugins_rust/ /build/plugins_rust/
 # Switch to Rust plugin directory
 WORKDIR /build/plugins_rust
 
-# Build Rust plugins
-RUN python${PYTHON_VERSION} -m venv /tmp/venv && \
-    /tmp/venv/bin/pip install --upgrade pip maturin && \
-    /tmp/venv/bin/maturin build --release --compatibility linux
+# Build Rust plugins using Python 3.12 from manylinux image
+# The manylinux2014 image has Python 3.12 at /opt/python/cp312-cp312/bin/python
+RUN rm -rf target/wheels && \
+    /opt/python/cp312-cp312/bin/python -m pip install --upgrade pip maturin && \
+    /opt/python/cp312-cp312/bin/maturin build --release --compatibility manylinux2014
 
 ###############################################################################
 # Main application stage
@@ -61,8 +54,9 @@ COPY --from=rust-builder /build/plugins_rust/target/wheels/*.whl /tmp/rust-wheel
 RUN python3 -m venv /app/.venv && \
     /app/.venv/bin/python3 -m pip install --upgrade pip setuptools pdm uv && \
     /app/.venv/bin/python3 -m uv pip install ".[redis,postgres,mysql,alembic,observability]" && \
-    /app/.venv/bin/python3 -m pip install /tmp/rust-wheels/mcpgateway_rust-*-linux_x86_64.whl && \
-    rm -rf /tmp/rust-wheels
+    /app/.venv/bin/python3 -m pip install /tmp/rust-wheels/mcpgateway_rust-*-manylinux*.whl && \
+    rm -rf /tmp/rust-wheels && \
+    /app/.venv/bin/python3 -c "from plugins_rust import PIIDetectorRust; print('✓ Rust PII filter installed successfully')" || echo "⚠️  WARNING: Rust plugin not available"
 
 # update the user permissions
 RUN chown -R 1001:0 /app && \

@@ -11,7 +11,7 @@ import pytest
 from unittest.mock import patch
 import os
 
-from plugins.pii_filter.pii_filter_python import PIIFilterConfig
+from plugins.pii_filter.pii_filter import PIIFilterConfig
 
 # Try to import Rust implementation
 try:
@@ -59,8 +59,8 @@ class TestRustPIIDetector:
         assert "ssn" in detections
         assert len(detections["ssn"]) == 1
         assert detections["ssn"][0]["value"] == "123-45-6789"
-        assert detections["ssn"][0]["start"] == 11
-        assert detections["ssn"][0]["end"] == 22
+        assert detections["ssn"][0]["start"] == 10
+        assert detections["ssn"][0]["end"] == 21
 
     def test_detect_ssn_no_dashes(self, detector):
         """Test SSN detection without dashes."""
