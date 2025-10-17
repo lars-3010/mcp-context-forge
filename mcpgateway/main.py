@@ -122,6 +122,8 @@ from mcpgateway.utils.retry_manager import ResilientHttpClient
 from mcpgateway.utils.verify_credentials import require_auth, require_docs_auth_override, verify_jwt_token
 from mcpgateway.validation.jsonrpc import JSONRPCError
 
+from mcpgateway.services.metrics import setup_metrics
+
 # Import the admin routes from the new module
 from mcpgateway.version import router as version_router
 
@@ -404,6 +406,9 @@ app = FastAPI(
     root_path=settings.app_root_path,
     lifespan=lifespan,
 )
+
+# Setup metrics instrumentation
+setup_metrics(app)
 
 
 async def validate_security_configuration():
