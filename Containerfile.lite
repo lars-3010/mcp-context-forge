@@ -55,6 +55,8 @@ SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
 ARG PYTHON_VERSION
 ARG ROOTFS_PATH
+ARG TARGETPLATFORM
+ARG GRPC_PYTHON_BUILD_SYSTEM_OPENSSL='False'
 
 # ----------------------------------------------------------------------------
 # 1) Patch the OS
@@ -69,11 +71,23 @@ RUN set -euo pipefail \
     && dnf install -y \
          python${PYTHON_VERSION} \
          python${PYTHON_VERSION}-devel \
-         binutils \
+         binutils openssl-devel gcc postgresql-devel gcc-c++ \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1 \
     && dnf clean all
 
 WORKDIR /app
+
+# ----------------------------------------------------------------------------
+# s390x architecture does not support BoringSSL when building wheel grpcio.
+# Force Python whl to use OpenSSL.
+# ----------------------------------------------------------------------------
+RUN if [ "$TARGETPLATFORM" = "linux/s390x" ]; then \
+        echo "Building for s390x."; \
+        echo "export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL='True'" > /etc/profile.d/use-openssl.sh; \
+    else \
+        echo "export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL='False'" > /etc/profile.d/use-openssl.sh; \
+    fi
+RUN chmod 644 /etc/profile.d/use-openssl.sh
 
 # ----------------------------------------------------------------------------
 # Copy only the files needed for dependency installation first
@@ -96,6 +110,7 @@ COPY --from=rust-builder /build/plugins_rust/target/wheels/*.whl /tmp/rust-wheel
 #  - Remove build caches and build artifacts
 # ----------------------------------------------------------------------------
 RUN set -euo pipefail \
+    && . /etc/profile.d/use-openssl.sh \
     && python3 -m venv /app/.venv \
     && /app/.venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel pdm uv \
     && /app/.venv/bin/uv pip install ".[redis,postgres,mysql,observability]" \
