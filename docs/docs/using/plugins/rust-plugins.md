@@ -90,7 +90,10 @@ The PII Filter plugin is available in both Python and Rust implementations with 
 
 ## Installation
 
-### Option 1: Install with Rust Support (Recommended)
+!!! info "Rust Plugins are Fully Optional"
+    Rust plugins are **completely optional**. MCP Gateway works perfectly without them, using pure Python implementations. Rust plugins are only for users who want maximum performance for computationally intensive operations.
+
+### Option 1: Install with Rust Support (Recommended for Performance)
 
 ```bash
 # Install with Rust extensions (includes pre-built wheels)
@@ -102,13 +105,14 @@ cd plugins_rust
 maturin develop --release
 ```
 
-### Option 2: Use Python Fallback
+### Option 2: Use Python Implementation (Default)
 
 ```bash
-# Standard installation (Python-only)
+# Standard installation (Python-only, no Rust required)
 pip install mcpgateway
 
-# Rust plugins will gracefully fall back to Python implementations
+# Rust plugins will automatically fall back to Python implementations
+# No performance degradation for non-compute-intensive workloads
 ```
 
 ## Configuration
@@ -247,6 +251,9 @@ INFO - PII Filter: Using Python implementation (forced via MCPGATEWAY_FORCE_PYTH
 
 ## Building from Source
 
+!!! warning "Rust Toolchain Required"
+    Building Rust plugins requires the Rust toolchain. If you don't need Rust plugins, use the standard Python-only installation (`pip install mcpgateway`).
+
 ### Prerequisites
 
 - Rust 1.70+ (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
@@ -254,6 +261,29 @@ INFO - PII Filter: Using Python implementation (forced via MCPGATEWAY_FORCE_PYTH
 - maturin (`pip install maturin`)
 
 ### Build Steps
+
+#### Standard Build (Without Rust - Default)
+
+```bash
+# Install Python dependencies only (Rust builds disabled by default)
+make venv
+make install-dev
+
+# This works without Rust toolchain installed
+```
+
+#### Build with Rust Support
+
+```bash
+# Enable Rust builds with environment variable
+make install-dev ENABLE_RUST_BUILD=1
+
+# Or set it for all make commands
+export ENABLE_RUST_BUILD=1
+make install-dev
+```
+
+#### Manual Rust Plugin Build
 
 ```bash
 # Navigate to Rust plugins directory
@@ -268,24 +298,38 @@ maturin develop --release
 # Build wheel package
 maturin build --release
 
-# The wheel will be in plugins_rust/dist/
-# Install it: pip install dist/mcpgateway_rust-*.whl
+# The wheel will be in plugins_rust/target/wheels/
+# Install it: pip install target/wheels/mcpgateway_rust-*.whl
 ```
 
 ### Using Make
 
 ```bash
-# From project root
-make rust-dev              # Build and install (development mode)
-make rust-build            # Build release wheel
-make rust-test             # Run Rust unit tests
-make rust-verify           # Verify installation
+# From project root - Rust builds disabled by default
+make install-dev                           # Python-only (no Rust toolchain needed)
+
+# Enable Rust builds
+make install-dev ENABLE_RUST_BUILD=1       # Build with Rust plugins
+make rust-dev ENABLE_RUST_BUILD=1          # Build and install Rust plugins only
+make rust-build ENABLE_RUST_BUILD=1        # Build release wheel
+make rust-test ENABLE_RUST_BUILD=1         # Run Rust unit tests
+make rust-verify ENABLE_RUST_BUILD=1       # Verify installation
 
 # From plugins_rust/
 make dev                   # Build and install
 make test                  # Run tests
 make bench                 # Run benchmarks
 make bench-compare         # Compare Rust vs Python performance
+```
+
+### CI/CD Integration
+
+```bash
+# In CI/CD pipelines, Rust builds are disabled by default
+# To enable, set ENABLE_RUST_BUILD=1 in your workflow:
+
+env:
+  ENABLE_RUST_BUILD: 1    # Enable Rust builds in CI
 ```
 
 ## Performance Benchmarking

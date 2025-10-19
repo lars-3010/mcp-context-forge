@@ -14,8 +14,26 @@ MCP Gateway (ContextForge) is a production-grade gateway, proxy, and registry fo
 ```bash
 cp .env.example .env && make venv install-dev check-env    # Complete setup workflow
 make venv                          # Create fresh virtual environment with uv
-make install-dev                   # Install with development dependencies
+make install-dev                   # Install with development dependencies (Python-only by default)
 make check-env                     # Verify .env against .env.example
+```
+
+### Rust Plugins (Optional)
+```bash
+# Rust plugins are OPTIONAL and disabled by default
+# The standard install-dev uses Python implementations only
+
+# To enable Rust plugin builds (requires Rust toolchain):
+make install-dev ENABLE_RUST_BUILD=1
+
+# Or set environment variable for all commands:
+export ENABLE_RUST_BUILD=1
+make install-dev
+
+# Build/test Rust plugins independently:
+make rust-dev ENABLE_RUST_BUILD=1         # Build and install Rust plugins
+make rust-test ENABLE_RUST_BUILD=1        # Run Rust tests
+make rust-verify ENABLE_RUST_BUILD=1      # Verify Rust installation
 ```
 
 ### Development Workflow
