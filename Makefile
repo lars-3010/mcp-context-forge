@@ -16,8 +16,9 @@ SHELL := /bin/bash
 # Read values from .env.make
 -include .env.make
 
-# Rust build configuration (set to 0 to disable Rust builds)
-ENABLE_RUST_BUILD ?= 1
+# Rust build configuration (set to 1 to enable Rust builds, 0 to disable)
+# Default is disabled to avoid requiring Rust toolchain for standard builds
+ENABLE_RUST_BUILD ?= 0
 
 # Project variables
 PROJECT_NAME      = mcpgateway
@@ -134,8 +135,12 @@ install-db: venv
 .PHONY: install-dev
 install-dev: venv
 	@/bin/bash -c "source $(VENV_DIR)/bin/activate && uv pip install --group dev ."
-	@echo "🦀 Building Rust plugins..."
-	@$(MAKE) rust-dev || echo "⚠️  Rust plugins not available (optional)"
+	@if [ "$(ENABLE_RUST_BUILD)" = "1" ]; then \
+		echo "🦀 Building Rust plugins..."; \
+		$(MAKE) rust-dev || echo "⚠️  Rust plugins not available (optional)"; \
+	else \
+		echo "⏭️  Rust builds disabled (set ENABLE_RUST_BUILD=1 to enable)"; \
+	fi
 
 .PHONY: update
 update:
@@ -2222,17 +2227,21 @@ dist: clean                  ## Build wheel + sdist into ./dist (optionally incl
 	@echo '   make publish         # Publish Python package'
 	@echo '   make rust-publish    # Publish Rust wheels (if configured)'
 
-wheel:                       ## Build wheel only (Python + Rust)
+wheel:                       ## Build wheel only (Python + optionally Rust)
 	@test -d "$(VENV_DIR)" || $(MAKE) --no-print-directory venv
 	@echo "📦 Building Python wheel..."
 	@/bin/bash -eu -c "\
 	    source $(VENV_DIR)/bin/activate && \
 	    python3 -m pip install --quiet --upgrade pip build && \
 	    python3 -m build -w"
-	@echo "🦀 Building Rust wheels..."
-	@$(MAKE) rust-build
+	@if [ "$(ENABLE_RUST_BUILD)" = "1" ]; then \
+		echo "🦀 Building Rust wheels..."; \
+		$(MAKE) rust-build || { echo "⚠️  Rust build failed, continuing without Rust plugins"; exit 0; }; \
+		echo '🦀 Rust wheels written to ./plugins_rust/target/wheels/'; \
+	else \
+		echo "⏭️  Rust builds disabled (ENABLE_RUST_BUILD=0)"; \
+	fi
 	@echo '🛠  Python wheel written to ./dist'
-	@echo '🦀 Rust wheels written to ./plugins_rust/target/wheels/'
 
 sdist:                       ## Build source distribution only
 	@test -d "$(VENV_DIR)" || $(MAKE) --no-print-directory venv
