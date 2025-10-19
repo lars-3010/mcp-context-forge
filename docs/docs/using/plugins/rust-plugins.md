@@ -332,6 +332,88 @@ env:
   ENABLE_RUST_BUILD: 1    # Enable Rust builds in CI
 ```
 
+## Container Builds with Optional Rust
+
+### Building Container Images
+
+**Default Build (Python-only, faster)**
+```bash
+# Using make (respects ENABLE_RUST_BUILD flag)
+make container-build
+
+# Using docker/podman directly (without Rust)
+docker build -t mcpgateway:latest .
+podman build -t mcpgateway:latest .
+```
+
+**Build with Rust Plugins (better performance)**
+```bash
+# Using make
+make container-build ENABLE_RUST_BUILD=1
+
+# Using docker/podman directly
+docker build --build-arg ENABLE_RUST=true -t mcpgateway:rust .
+podman build --build-arg ENABLE_RUST=true -t mcpgateway:rust .
+```
+
+### Running Containers
+
+```bash
+# Run without Rust (default image)
+docker run -p 4444:4444 mcpgateway:latest
+
+# Run with Rust
+docker run -p 4444:4444 mcpgateway:rust
+```
+
+### Build Comparison
+
+| Build Type | Build Time | Image Size | PII Filter Performance |
+|------------|-----------|------------|------------------------|
+| Python-only (default) | ~3-5 min | ~450 MB | Baseline (fast enough for most use cases) |
+| With Rust | ~8-12 min | ~460 MB | 5-10x faster (for compute-intensive workloads) |
+
+**Recommendation**: Use Python-only builds for development and testing. Use Rust builds for production deployments with high-throughput PII filtering requirements.
+
+### Container CI/CD Examples
+
+**GitHub Actions**
+```yaml
+# Python-only build (default)
+- name: Build container
+  run: make container-build
+
+# With Rust support
+- name: Build container with Rust
+  run: make container-build ENABLE_RUST_BUILD=1
+```
+
+**GitLab CI**
+```yaml
+build-python:
+  stage: build
+  script:
+    - make container-build
+
+build-rust:
+  stage: build
+  script:
+    - make container-build ENABLE_RUST_BUILD=1
+```
+
+**Docker Compose**
+```yaml
+services:
+  mcpgateway:
+    build:
+      context: .
+      dockerfile: Containerfile
+      args:
+        ENABLE_RUST: "true"  # Enable Rust plugins
+    ports:
+      - "4444:4444"
+```
+
 ## Performance Benchmarking
 
 ### Built-in Benchmarks
