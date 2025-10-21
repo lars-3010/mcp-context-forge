@@ -14,6 +14,15 @@ plugin_settings:
   enable_plugin_api: true
   plugin_health_check_interval: 120
 
+# Passthrough configuration for REST passthrough endpoints
+passthrough:
+  enabled: true
+  base_path: "/passthrough"
+  default_timeout_ms: 20000
+  default_plugin_chains:
+    pre: ["deny_filter", "regex_filter", "pii_filter"]
+    post: ["pii_filter"]
+
 plugins:
   # Argument Normalizer - stabilize inputs before anything else
   - name: "ArgumentNormalizer"

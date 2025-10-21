@@ -4449,6 +4449,19 @@ if settings.llmchat_enabled:
     except ImportError:
         logger.debug("LLM Chat router not available")
 
+# Include REST Pass-through router
+if settings.passthrough_enabled:
+    try:
+        # First-Party
+        from mcpgateway.routers.rest_passthrough import router as rest_passthrough_router
+
+        app.include_router(rest_passthrough_router, tags=["REST Passthrough"])
+        logger.info("REST Pass-through router included")
+    except ImportError:
+        logger.debug("REST Pass-through router not available")
+else:
+    logger.info("REST Pass-through router disabled in configuration")
+
 # Feature flags for admin UI and API
 UI_ENABLED = settings.mcpgateway_ui_enabled
 ADMIN_API_ENABLED = settings.mcpgateway_admin_api_enabled
