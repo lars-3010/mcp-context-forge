@@ -55,6 +55,8 @@ class HookType(str, Enum):
     TOOL_POST_INVOKE = "tool_post_invoke"
     RESOURCE_PRE_FETCH = "resource_pre_fetch"
     RESOURCE_POST_FETCH = "resource_post_fetch"
+    PASSTHROUGH_PRE_REQUEST = "passthrough_pre_request"
+    PASSTHROUGH_POST_RESPONSE = "passthrough_post_response"
 
 
 class PluginMode(str, Enum):
@@ -1116,3 +1118,86 @@ class ResourcePostFetchPayload(BaseModel):
 
 ResourcePreFetchResult = PluginResult[ResourcePreFetchPayload]
 ResourcePostFetchResult = PluginResult[ResourcePostFetchPayload]
+
+
+class PassthroughPreRequestPayload(BaseModel):
+    """Payload for passthrough pre-request hooks.
+    
+    This payload contains the mapped request data before it's sent
+    to the external service via passthrough.
+    
+    Attributes:
+        method: HTTP method (GET, POST, etc.)
+        headers: Request headers
+        params: Query parameters
+        body: Request body
+        url: Target URL for the request
+        tool_id: ID of the tool making the request
+        
+    Examples:
+        >>> payload = PassthroughPreRequestPayload(
+        ...     method="GET", 
+        ...     headers={"User-Agent": "Test"},
+        ...     params={"q": "test"},
+        ...     body=None,
+        ...     url="https://api.example.com/search",
+        ...     tool_id="search_tool"
+        ... )
+        >>> payload.method
+        'GET'
+        >>> payload.tool_id
+        'search_tool'
+    """
+    
+    method: str
+    headers: Dict[str, Any] = Field(default_factory=dict)
+    params: Dict[str, Any] = Field(default_factory=dict)
+    body: Optional[Any] = None
+    url: str
+    tool_id: Optional[str] = None
+
+
+class PassthroughPostResponsePayload(BaseModel):
+    """Payload for passthrough post-response hooks.
+    
+    This payload contains the response data from the external service
+    after it's been received via passthrough.
+    
+    Attributes:
+        response: The response object from the external service
+        original_request: The original request that generated this response
+        status_code: HTTP status code
+        headers: Response headers
+        content: Response content
+        tool_id: ID of the tool that made the request
+        
+    Examples:
+        >>> from unittest.mock import Mock
+        >>> response = Mock()
+        >>> response.status_code = 200
+        >>> response.content = b'{"result": "success"}'
+        >>> request = {"method": "GET", "url": "https://api.example.com"}
+        >>> payload = PassthroughPostResponsePayload(
+        ...     response=response,
+        ...     original_request=request,
+        ...     status_code=200,
+        ...     headers={"Content-Type": "application/json"},
+        ...     content=b'{"result": "success"}',
+        ...     tool_id="search_tool"
+        ... )
+        >>> payload.status_code
+        200
+        >>> payload.tool_id
+        'search_tool'
+    """
+    
+    response: Any
+    original_request: Dict[str, Any]
+    status_code: int
+    headers: Dict[str, Any] = Field(default_factory=dict)
+    content: Optional[Any] = None
+    tool_id: Optional[str] = None
+
+
+PassthroughPreRequestResult = PluginResult[PassthroughPreRequestPayload]
+PassthroughPostResponseResult = PluginResult[PassthroughPostResponsePayload]

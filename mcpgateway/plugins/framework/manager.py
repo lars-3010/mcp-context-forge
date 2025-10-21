@@ -42,6 +42,10 @@ from mcpgateway.plugins.framework.models import (
     Config,
     GlobalContext,
     HookType,
+    PassthroughPreRequestPayload,
+    PassthroughPreRequestResult,
+    PassthroughPostResponsePayload,
+    PassthroughPostResponseResult,
     PluginCondition,
     PluginContext,
     PluginContextTable,
@@ -995,3 +999,153 @@ class PluginManager:
             del self._context_store[global_context.request_id]
 
         return result
+
+    async def passthrough_pre_request(
+        self,
+        payload: PassthroughPreRequestPayload,
+        global_context: GlobalContext,
+        local_contexts: Optional[PluginContextTable] = None,
+        violations_as_exceptions: bool = True,
+    ) -> Tuple[PassthroughPreRequestResult, PluginContextTable]:
+        """Execute passthrough pre-request hook plugins.
+
+        This method processes a passthrough request before it's sent to the external service,
+        allowing plugins to validate, transform, or block the request.
+
+        Args:
+            payload: The passthrough request payload containing method, headers, params, body, and URL
+            global_context: Global context with request_id, user, tenant information
+            local_contexts: Optional existing plugin contexts to reuse
+            violations_as_exceptions: Whether to raise exceptions for violations
+
+        Returns:
+            Tuple of (result, plugin_contexts) where result contains the processed payload
+            or violation information, and plugin_contexts contains execution state
+
+        Examples:
+            >>> # payload = PassthroughPreRequestPayload(method="GET", url="https://api.example.com", ...)
+            >>> # context = GlobalContext(request_id="123")
+            >>> # result, contexts = await manager.passthrough_pre_request(payload, context)
+            >>> # if result.continue_processing:
+            >>> #     # Use processed request
+            >>> #     processed_request = result.modified_payload
+        """
+        # Get plugins configured for this hook
+        plugins = self._registry.get_plugins_for_hook(HookType.PASSTHROUGH_PRE_REQUEST)
+
+        # Define matching function for conditional execution
+        def pre_passthrough_matches(plugin_condition: PluginCondition, payload: PassthroughPreRequestPayload) -> bool:
+            """Check if plugin condition matches the passthrough request."""
+            # For now, match all passthrough requests
+            # In the future, could add conditions based on URL patterns, tool_id, etc.
+            return True
+
+        # Execute plugins
+        result = await self._prompt_pre_executor.execute(
+            plugins, payload, global_context, pre_passthrough_request, pre_passthrough_matches, local_contexts, violations_as_exceptions
+        )
+
+        # Store context for potential post-request processing
+        self._context_store[global_context.request_id] = result[1]
+
+        return result
+
+    async def passthrough_post_response(
+        self,
+        payload: PassthroughPostResponsePayload,
+        global_context: GlobalContext,
+        local_contexts: Optional[PluginContextTable] = None,
+        violations_as_exceptions: bool = True,
+    ) -> Tuple[PassthroughPostResponseResult, PluginContextTable]:
+        """Execute passthrough post-response hook plugins.
+
+        This method processes a passthrough response after it's received from the external service,
+        allowing plugins to validate, transform, or enrich the response.
+
+        Args:
+            payload: The passthrough response payload containing response data and original request
+            global_context: Global context with request_id, user, tenant information
+            local_contexts: Optional plugin contexts from pre-request processing
+            violations_as_exceptions: Whether to raise exceptions for violations
+
+        Returns:
+            Tuple of (result, plugin_contexts) where result contains the processed response
+            or violation information, and plugin_contexts contains execution state
+
+        Examples:
+            >>> # payload = PassthroughPostResponsePayload(response=response, original_request=request, ...)
+            >>> # context = GlobalContext(request_id="123")
+            >>> # contexts = self._context_store.get("123")  # From pre-request
+            >>> # result, _ = await manager.passthrough_post_response(payload, context, contexts)
+            >>> # if result.continue_processing:
+            >>> #     # Use processed response
+            >>> #     final_response = result.modified_payload.response
+        """
+        # Get plugins configured for this hook
+        plugins = self._registry.get_plugins_for_hook(HookType.PASSTHROUGH_POST_RESPONSE)
+
+        # Define matching function for conditional execution
+        def post_passthrough_matches(plugin_condition: PluginCondition, payload: PassthroughPostResponsePayload) -> bool:
+            """Check if plugin condition matches the passthrough response."""
+            # For now, match all passthrough responses
+            # In the future, could add conditions based on status codes, content types, etc.
+            return True
+
+        # Execute plugins
+        result = await self._resource_post_executor.execute(
+            plugins, payload, global_context, post_passthrough_response, post_passthrough_matches, local_contexts, violations_as_exceptions
+        )
+
+        # Clean up stored context after post-response
+        if global_context.request_id in self._context_store:
+            del self._context_store[global_context.request_id]
+
+        return result
+
+
+# Hook execution functions for passthrough processing
+
+async def pre_passthrough_request(plugin: PluginRef, payload: PassthroughPreRequestPayload, context: PluginContext) -> PassthroughPreRequestResult:
+    """Execute a plugin's passthrough pre-request hook.
+
+    Args:
+        plugin: Plugin reference containing the plugin instance
+        payload: Passthrough request payload
+        context: Plugin execution context
+
+    Returns:
+        Result containing processed payload or violation information
+    """
+    logger.debug(f"Executing passthrough pre-request hook for plugin: {plugin.config.name}")
+    
+    # Check if plugin has the passthrough pre-request method
+    if hasattr(plugin.instance, 'passthrough_pre_request'):
+        result = await plugin.instance.passthrough_pre_request(payload, context)
+        return result
+    
+    # Fallback to generic hook if available
+    logger.warning(f"Plugin {plugin.config.name} does not have passthrough_pre_request method")
+    return PassthroughPreRequestResult()
+
+
+async def post_passthrough_response(plugin: PluginRef, payload: PassthroughPostResponsePayload, context: PluginContext) -> PassthroughPostResponseResult:
+    """Execute a plugin's passthrough post-response hook.
+
+    Args:
+        plugin: Plugin reference containing the plugin instance
+        payload: Passthrough response payload
+        context: Plugin execution context
+
+    Returns:
+        Result containing processed payload or violation information
+    """
+    logger.debug(f"Executing passthrough post-response hook for plugin: {plugin.config.name}")
+    
+    # Check if plugin has the passthrough post-response method
+    if hasattr(plugin.instance, 'passthrough_post_response'):
+        result = await plugin.instance.passthrough_post_response(payload, context)
+        return result
+    
+    # Fallback to generic hook if available
+    logger.warning(f"Plugin {plugin.config.name} does not have passthrough_post_response method")
+    return PassthroughPostResponseResult()
