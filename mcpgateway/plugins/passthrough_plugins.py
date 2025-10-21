@@ -246,73 +246,46 @@ async def _handle_response_shape(context: Dict[str, Any], data: Any, **kwargs) -
     return data
 
 
-async def on_passthrough_request(
-    context: Dict[str, Any],
-    mapped_request: Dict[str, Any],
-    chain: Optional[List[str]] = None
-) -> Dict[str, Any]:
+async def on_passthrough_request(payload: PassthroughPreRequestPayload, chain: Optional[List[str]] = None) -> PassthroughPreRequestPayload:
     """
-    Execute pre-processing plugin chain on passthrough request.
+    Process passthrough request using the plugin framework.
     
     Args:
-        context: Request context (tool_id, user, etc.)
-        mapped_request: Mapped request dict with method, headers, params, body
-        chain: Plugin chain to execute (defaults to config)
+        payload: Passthrough pre-request payload containing request context and data
+        chain: Optional list of plugin names to apply in order
         
     Returns:
-        Processed request data
+        Modified payload after plugin processing
     """
-    if not chain:
-        # Use default pre-processing chain from config
-        chain = ["deny_filter", "pii_filter", "regex_filter", "resource_filter", "rate_limit"]
-        
-    logger.debug(f"Executing pre-request plugin chain: {chain}")
+    from ..plugins.framework.manager import get_plugin_manager
     
     try:
-        return await execute_plugin_chain_with_framework(
-            chain, context, mapped_request, 
-            HookType.PASSTHROUGH_PRE_REQUEST,  # Use the new passthrough-specific hook
-            request_type="pre"
-        )
+        plugin_manager = get_plugin_manager()
+        return await plugin_manager.passthrough_pre_request(payload, chain)
     except Exception as e:
-        logger.error(f"Error in passthrough request processing: {e}", exc_info=True)
-        return mapped_request
+        logger.error(f"Error in passthrough request processing: {e}")
+        raise
 
 
-async def on_passthrough_response(
-    context: Dict[str, Any],
-    mapped_request: Dict[str, Any],
-    response: Any,
-    chain: Optional[List[str]] = None
-) -> Any:
+async def on_passthrough_response(payload: PassthroughPostResponsePayload, chain: Optional[List[str]] = None) -> PassthroughPostResponsePayload:
     """
-    Execute post-processing plugin chain on passthrough response.
+    Process passthrough response using the plugin framework.
     
     Args:
-        context: Request context (tool_id, user, etc.)  
-        mapped_request: Original mapped request for reference
-        response: Response object to process
-        chain: Plugin chain to execute (defaults to config)
+        payload: Passthrough post-response payload containing request/response context and data
+        chain: Optional list of plugin names to apply in order
         
     Returns:
-        Processed response
+        Modified payload after plugin processing
     """
-    if not chain:
-        # Use default post-processing chain from config
-        chain = ["pii_filter", "response_shape"]
-        
-    logger.debug(f"Executing post-response plugin chain: {chain}")
+    from ..plugins.framework.manager import get_plugin_manager
     
     try:
-        return await execute_plugin_chain_with_framework(
-            chain, context, response,
-            HookType.PASSTHROUGH_POST_RESPONSE,  # Use the new passthrough-specific hook
-            request_type="post", 
-            original_request=mapped_request
-        )
+        plugin_manager = get_plugin_manager()
+        return await plugin_manager.passthrough_post_response(payload, chain)
     except Exception as e:
-        logger.error(f"Error in passthrough response processing: {e}", exc_info=True)
-        return response
+        logger.error(f"Error in passthrough response processing: {e}")
+        raise
 
 
 async def get_available_plugins() -> List[str]:

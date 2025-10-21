@@ -48,8 +48,19 @@ from mcpgateway.models import TextContent
 from mcpgateway.models import Tool as PydanticTool
 from mcpgateway.models import ToolResult
 from mcpgateway.observability import create_span
-from mcpgateway.plugins.framework import GlobalContext, HttpHeaderPayload, PluginError, PluginManager, PluginViolationError, ToolPostInvokePayload, ToolPreInvokePayload
+from mcpgateway.plugins.framework import (
+    GlobalContext, 
+    HttpHeaderPayload, 
+    PassthroughPreRequestPayload,
+    PassthroughPostResponsePayload,
+    PluginError, 
+    PluginManager, 
+    PluginViolationError, 
+    ToolPostInvokePayload, 
+    ToolPreInvokePayload
+)
 from mcpgateway.plugins.framework.constants import GATEWAY_METADATA, TOOL_METADATA
+from mcpgateway.plugins.passthrough_plugins import on_passthrough_request, on_passthrough_response
 from mcpgateway.schemas import ToolCreate, ToolRead, ToolUpdate, TopPerformer
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.oauth_manager import OAuthManager
@@ -988,11 +999,85 @@ class ToolService:
 
                     # Use the tool's request_type rather than defaulting to POST.
                     method = tool.request_type.upper()
+                    
+                    # === PASSTHROUGH PLUGIN INTEGRATION ===
+                    # Create passthrough pre-request payload
+                    pre_request_payload = PassthroughPreRequestPayload(
+                        request_id=request_id,
+                        user=global_context.user,
+                        tenant_id=global_context.tenant_id,
+                        tool_id=str(tool.id),
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        method=method,
+                        url=final_url,
+                        headers=headers.copy(),
+                        params=payload.copy() if method == "GET" else {},
+                        body=payload if method != "GET" else None
+                    )
+                    
+                    # Apply passthrough pre-request plugins
+                    try:
+                        # Use tool-specific plugin chains if configured, otherwise use defaults
+                        pre_chain = tool.plugin_chain_pre if hasattr(tool, 'plugin_chain_pre') and tool.plugin_chain_pre else None
+                        
+                        # Apply passthrough pre-request processing
+                        processed_payload = await on_passthrough_request(
+                            payload=pre_request_payload,
+                            chain=pre_chain
+                        )
+                        
+                        # Update final_url, headers, and payload from processed request
+                        final_url = processed_payload.url
+                        headers = processed_payload.headers
+                        if method == "GET":
+                            payload = processed_payload.params
+                        else:
+                            payload = processed_payload.body
+                            
+                    except Exception as e:
+                        logger.error(f"Passthrough pre-request processing failed: {e}")
+                        raise ToolInvocationError(f"Request processing failed: {str(e)}")
+                    
+                    # Make the HTTP request
                     if method == "GET":
                         response = await self._http_client.get(final_url, params=payload, headers=headers)
                     else:
                         response = await self._http_client.request(method, final_url, json=payload, headers=headers)
                     response.raise_for_status()
+                    
+                    # === PASSTHROUGH POST-RESPONSE PROCESSING ===
+                    try:
+                        # Use tool-specific plugin chains if configured, otherwise use defaults
+                        post_chain = tool.plugin_chain_post if hasattr(tool, 'plugin_chain_post') and tool.plugin_chain_post else None
+                        
+                        # Create passthrough post-response payload
+                        post_response_payload = PassthroughPostResponsePayload(
+                            request_id=request_id,
+                            user=global_context.user,
+                            tenant_id=global_context.tenant_id,
+                            tool_id=str(tool.id),
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                            method=method,
+                            url=final_url,
+                            headers=headers,
+                            params=payload.copy() if method == "GET" else {},
+                            body=payload if method != "GET" else None,
+                            response=response
+                        )
+                        
+                        # Apply passthrough post-response processing
+                        processed_payload = await on_passthrough_response(
+                            payload=post_response_payload,
+                            chain=post_chain
+                        )
+                        
+                        # Use processed response if modified
+                        if processed_payload.response != response:
+                            response = processed_payload.response
+                            
+                    except Exception as e:
+                        logger.error(f"Passthrough post-response processing failed: {e}")
+                        # Don't fail the request for post-processing errors, just log them
 
                     # Handle 204 No Content responses that have no body
                     if response.status_code == 204:
