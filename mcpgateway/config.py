@@ -334,6 +334,13 @@ class Settings(BaseSettings):
     mcpgateway_a2a_max_retries: int = 3
     mcpgateway_a2a_metrics_enabled: bool = True
 
+    # gRPC Support Configuration (EXPERIMENTAL - disabled by default)
+    mcpgateway_grpc_enabled: bool = Field(default=False, description="Enable gRPC to MCP translation support (experimental feature)")
+    mcpgateway_grpc_reflection_enabled: bool = Field(default=True, description="Enable gRPC server reflection by default")
+    mcpgateway_grpc_max_message_size: int = Field(default=4194304, description="Maximum gRPC message size in bytes (4MB)")
+    mcpgateway_grpc_timeout: int = Field(default=30, description="Default gRPC call timeout in seconds")
+    mcpgateway_grpc_tls_enabled: bool = Field(default=False, description="Enable TLS for gRPC connections by default")
+
     # MCP Server Catalog Configuration
     mcpgateway_catalog_enabled: bool = Field(default=True, description="Enable MCP server catalog feature")
     mcpgateway_catalog_file: str = Field(default="mcp-catalog.yml", description="Path to catalog configuration file")
@@ -368,6 +375,13 @@ class Settings(BaseSettings):
     hsts_max_age: int = Field(default=31536000)  # 1 year
     hsts_include_subdomains: bool = Field(default=True)
     remove_server_headers: bool = Field(default=True)
+
+    # Response Compression Configuration
+    compression_enabled: bool = Field(default=True, description="Enable response compression (Brotli, Zstd, GZip)")
+    compression_minimum_size: int = Field(default=500, ge=0, description="Minimum response size in bytes to compress (0 = compress all)")
+    compression_gzip_level: int = Field(default=6, ge=1, le=9, description="GZip compression level (1=fastest, 9=best compression)")
+    compression_brotli_quality: int = Field(default=4, ge=0, le=11, description="Brotli compression quality (0-3=fast, 4-9=balanced, 10-11=max)")
+    compression_zstd_level: int = Field(default=3, ge=1, le=22, description="Zstd compression level (1-3=fast, 4-9=balanced, 10+=slow)")
 
     # For allowed_origins, strip '' to ensure we're passing on valid JSON via env
     # Tell pydantic *not* to touch this env var - our validator will.
@@ -1239,6 +1253,43 @@ Disallow: /
 
     # Passthrough headers configuration
     default_passthrough_headers: List[str] = Field(default_factory=list)
+
+    # ===================================
+    # Pagination Configuration
+    # ===================================
+
+    # Default number of items per page for paginated endpoints
+    pagination_default_page_size: int = Field(default=50, ge=1, le=1000, description="Default number of items per page")
+
+    # Maximum allowed items per page (prevents abuse)
+    pagination_max_page_size: int = Field(default=500, ge=1, le=10000, description="Maximum allowed items per page")
+
+    # Minimum items per page
+    pagination_min_page_size: int = Field(default=1, ge=1, description="Minimum items per page")
+
+    # Threshold for switching from offset to cursor-based pagination
+    pagination_cursor_threshold: int = Field(default=10000, ge=1, description="Threshold for cursor-based pagination")
+
+    # Enable cursor-based pagination globally
+    pagination_cursor_enabled: bool = Field(default=True, description="Enable cursor-based pagination")
+
+    # Default sort field for paginated queries
+    pagination_default_sort_field: str = Field(default="created_at", description="Default sort field")
+
+    # Default sort order for paginated queries
+    pagination_default_sort_order: str = Field(default="desc", pattern="^(asc|desc)$", description="Default sort order")
+
+    # Maximum offset allowed for offset-based pagination (prevents abuse)
+    pagination_max_offset: int = Field(default=100000, ge=0, description="Maximum offset for pagination")
+
+    # Cache pagination counts for performance (seconds)
+    pagination_count_cache_ttl: int = Field(default=300, ge=0, description="Cache TTL for pagination counts")
+
+    # Enable pagination links in API responses
+    pagination_include_links: bool = Field(default=True, description="Include pagination links")
+
+    # Base URL for pagination links (defaults to request URL)
+    pagination_base_url: Optional[str] = Field(default=None, description="Base URL for pagination links")
 
     def __init__(self, **kwargs):
         """Initialize Settings with environment variable parsing.

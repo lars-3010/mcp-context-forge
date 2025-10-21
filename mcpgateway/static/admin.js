@@ -1,3 +1,89 @@
+// Add three fields to passthrough section on Advanced button click
+function handleAddPassthrough() {
+    const passthroughContainer = safeGetElement("passthrough-container");
+    if (!passthroughContainer) {
+        console.error("Passthrough container not found");
+        return;
+    }
+
+    // Toggle visibility
+    if (
+        passthroughContainer.style.display === "none" ||
+        passthroughContainer.style.display === ""
+    ) {
+        passthroughContainer.style.display = "block";
+        // Add fields only if not already present
+        if (!document.getElementById("query-mapping-field")) {
+            const queryDiv = document.createElement("div");
+            queryDiv.className = "mb-4";
+            queryDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">Query Mapping (JSON)</label>
+                <textarea id="query-mapping-field" name="query_mapping" class="mt-1 block w-full h-40 rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-black text-white" placeholder="{}"></textarea>
+            `;
+            passthroughContainer.appendChild(queryDiv);
+        }
+        if (!document.getElementById("header-mapping-field")) {
+            const headerDiv = document.createElement("div");
+            headerDiv.className = "mb-4";
+            headerDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">Header Mapping (JSON)</label>
+                <textarea id="header-mapping-field" name="header_mapping" class="mt-1 block w-full h-40 rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-black text-white" placeholder="{}"></textarea>
+            `;
+            passthroughContainer.appendChild(headerDiv);
+        }
+        if (!document.getElementById("timeout-ms-field")) {
+            const timeoutDiv = document.createElement("div");
+            timeoutDiv.className = "mb-4";
+            timeoutDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">timeout_ms (number)</label>
+                <input type="number" id="timeout-ms-field" name="timeout_ms" class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-300" placeholder="30000" min="0" />
+            `;
+            passthroughContainer.appendChild(timeoutDiv);
+        }
+        if (!document.getElementById("expose-passthrough-field")) {
+            const exposeDiv = document.createElement("div");
+            exposeDiv.className = "mb-4";
+            exposeDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">Expose Passthrough</label>
+                <select id="expose-passthrough-field" name="expose_passthrough" class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-300">
+                    <option value="true" selected>True</option>
+                    <option value="false">False</option>
+                </select>
+            `;
+            passthroughContainer.appendChild(exposeDiv);
+        }
+        if (!document.getElementById("allowlist-field")) {
+            const allowlistDiv = document.createElement("div");
+            allowlistDiv.className = "mb-4";
+            allowlistDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">Allowlist (comma-separated hosts/schemes)</label>
+                <input type="text" id="allowlist-field" name="allowlist" class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-300" placeholder="[example.com, https://api.example.com]" />
+            `;
+            passthroughContainer.appendChild(allowlistDiv);
+        }
+        if (!document.getElementById("plugin-chain-pre-field")) {
+            const pluginPreDiv = document.createElement("div");
+            pluginPreDiv.className = "mb-4";
+            pluginPreDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">Plugin Chain Pre</label>
+                <input type="text" id="plugin-chain-pre-field" name="plugin_chain_pre" class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-300" placeholder="[]" />
+            `;
+            passthroughContainer.appendChild(pluginPreDiv);
+        }
+        if (!document.getElementById("plugin-chain-post-field")) {
+            const pluginPostDiv = document.createElement("div");
+            pluginPostDiv.className = "mb-4";
+            pluginPostDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">Plugin Chain Post (optional, override defaults)</label>
+                <input type="text" id="plugin-chain-post-field" name="plugin_chain_post" class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-300" placeholder="[]" />
+            `;
+            passthroughContainer.appendChild(pluginPostDiv);
+        }
+    } else {
+        passthroughContainer.style.display = "none";
+    }
+}
+
 // Make URL field read-only for integration type MCP
 function updateEditToolUrl() {
     const editTypeField = document.getElementById("edit-tool-type");
@@ -2183,6 +2269,10 @@ async function editTool(toolId) {
             JSON.stringify(tool.inputSchema || {}),
             "Schema",
         );
+        const outputSchemaValidation = validateJson(
+            JSON.stringify(tool.outputSchema || {}),
+            "Output Schema",
+        );
         const annotationsValidation = validateJson(
             JSON.stringify(tool.annotations || {}),
             "Annotations",
@@ -2190,6 +2280,7 @@ async function editTool(toolId) {
 
         const headersField = safeGetElement("edit-tool-headers");
         const schemaField = safeGetElement("edit-tool-schema");
+        const outputSchemaField = safeGetElement("edit-tool-output-schema");
         const annotationsField = safeGetElement("edit-tool-annotations");
 
         if (headersField && headersValidation.valid) {
@@ -2201,6 +2292,13 @@ async function editTool(toolId) {
         }
         if (schemaField && schemaValidation.valid) {
             schemaField.value = JSON.stringify(schemaValidation.value, null, 2);
+        }
+        if (outputSchemaField && outputSchemaValidation.valid) {
+            outputSchemaField.value = JSON.stringify(
+                outputSchemaValidation.value,
+                null,
+                2,
+            );
         }
         if (annotationsField && annotationsValidation.valid) {
             annotationsField.value = JSON.stringify(
@@ -2222,6 +2320,12 @@ async function editTool(toolId) {
                 JSON.stringify(schemaValidation.value, null, 2),
             );
             window.editToolSchemaEditor.refresh();
+        }
+        if (window.editToolOutputSchemaEditor && outputSchemaValidation.valid) {
+            window.editToolOutputSchemaEditor.setValue(
+                JSON.stringify(outputSchemaValidation.value, null, 2),
+            );
+            window.editToolOutputSchemaEditor.refresh();
         }
 
         // Prefill integration type from DB and set request types accordingly
@@ -3348,12 +3452,12 @@ async function viewPrompt(promptName) {
 /**
  * SECURE: Edit Prompt function with validation
  */
-async function editPrompt(promptName) {
+async function editPrompt(promptId) {
     try {
-        console.log(`Editing prompt: ${promptName}`);
+        console.log(`Editing prompt: ${promptId}`);
 
         const response = await fetchWithTimeout(
-            `${window.ROOT_PATH}/admin/prompts/${encodeURIComponent(promptName)}`,
+            `${window.ROOT_PATH}/admin/prompts/${encodeURIComponent(promptId)}`,
         );
 
         if (!response.ok) {
@@ -3409,7 +3513,22 @@ async function editPrompt(promptName) {
         // Set form action and populate fields with validation
         const editForm = safeGetElement("edit-prompt-form");
         if (editForm) {
-            editForm.action = `${window.ROOT_PATH}/admin/prompts/${encodeURIComponent(promptName)}/edit`;
+            editForm.action = `${window.ROOT_PATH}/admin/prompts/${encodeURIComponent(promptId)}/edit`;
+            // Add or update hidden team_id input if present in URL
+            const teamId = new URL(window.location.href).searchParams.get(
+                "team_id",
+            );
+            if (teamId) {
+                let teamInput = safeGetElement("edit-prompt-team-id");
+                if (!teamInput) {
+                    teamInput = document.createElement("input");
+                    teamInput.type = "hidden";
+                    teamInput.name = "team_id";
+                    teamInput.id = "edit-prompt-team-id";
+                    editForm.appendChild(teamInput);
+                }
+                teamInput.value = teamId;
+            }
         }
 
         // Validate prompt name
@@ -6487,19 +6606,18 @@ const promptTestState = {
 /**
  * Test a prompt by opening the prompt test modal
  */
-async function testPrompt(promptName) {
+async function testPrompt(promptId) {
     try {
-        console.log(`Testing prompt: ${promptName}`);
+        console.log(`Testing prompt ID: ${promptId}`);
 
         // Debouncing to prevent rapid clicking
         const now = Date.now();
-        const lastRequest =
-            promptTestState.lastRequestTime.get(promptName) || 0;
+        const lastRequest = promptTestState.lastRequestTime.get(promptId) || 0;
         const timeSinceLastRequest = now - lastRequest;
         const debounceDelay = 1000;
 
         if (timeSinceLastRequest < debounceDelay) {
-            console.log(`Prompt ${promptName} test request debounced`);
+            console.log(`Prompt ${promptId} test request debounced`);
             return;
         }
 
@@ -6511,7 +6629,7 @@ async function testPrompt(promptName) {
 
         // Update button state
         const testButton = document.querySelector(
-            `[onclick*="testPrompt('${promptName}')"]`,
+            `[onclick*="testPrompt('${promptId}')"]`,
         );
         if (testButton) {
             if (testButton.disabled) {
@@ -6526,8 +6644,8 @@ async function testPrompt(promptName) {
         }
 
         // Record request time and mark as active
-        promptTestState.lastRequestTime.set(promptName, now);
-        promptTestState.activeRequests.add(promptName);
+        promptTestState.lastRequestTime.set(promptId, now);
+        promptTestState.activeRequests.add(promptId);
 
         // Fetch prompt details
         const controller = new AbortController();
@@ -6536,7 +6654,7 @@ async function testPrompt(promptName) {
         try {
             // Fetch prompt details from the prompts endpoint (view mode)
             const response = await fetch(
-                `${window.ROOT_PATH}/admin/prompts/${encodeURIComponent(promptName)}`,
+                `${window.ROOT_PATH}/admin/prompts/${encodeURIComponent(promptId)}`,
                 {
                     method: "GET",
                     headers: {
@@ -6563,7 +6681,7 @@ async function testPrompt(promptName) {
             const descElement = safeGetElement("prompt-test-modal-description");
 
             if (titleElement) {
-                titleElement.textContent = `Test Prompt: ${prompt.name || promptName}`;
+                titleElement.textContent = `Test Prompt: ${prompt.name || promptId}`;
             }
             if (descElement) {
                 if (prompt.description) {
@@ -6600,7 +6718,7 @@ async function testPrompt(promptName) {
     } finally {
         // Always restore button state
         const testButton = document.querySelector(
-            `[onclick*="testPrompt('${promptName}')"]`,
+            `[onclick*="testPrompt('${promptId}')"]`,
         );
         if (testButton) {
             testButton.disabled = false;
@@ -6609,7 +6727,7 @@ async function testPrompt(promptName) {
         }
 
         // Clean up state
-        promptTestState.activeRequests.delete(promptName);
+        promptTestState.activeRequests.delete(promptId);
     }
 }
 
@@ -7328,6 +7446,10 @@ async function viewTool(toolId) {
               <strong class="text-gray-700 dark:text-gray-300">Input Schema:</strong>
               <pre class="mt-1 bg-gray-100 p-3 rounded text-xs dark:bg-gray-800 dark:text-gray-200 tool-schema overflow-x-auto"></pre>
             </div>
+            <div>
+              <strong class="text-gray-700 dark:text-gray-300">Output Schema:</strong>
+              <pre class="mt-1 bg-gray-100 p-3 rounded text-xs dark:bg-gray-800 dark:text-gray-200 tool-output-schema overflow-x-auto"></pre>
+            </div>
           </div>
 
           <!-- Metrics Section -->
@@ -7465,6 +7587,10 @@ async function viewTool(toolId) {
             setTextSafely(
                 ".tool-schema",
                 JSON.stringify(tool.inputSchema || {}, null, 2),
+            );
+            setTextSafely(
+                ".tool-output-schema",
+                JSON.stringify(tool.outputSchema || {}, null, 2),
             );
 
             // Set auth fields safely
@@ -7897,7 +8023,13 @@ async function handlePromptFormSubmit(e) {
 async function handleEditPromptFormSubmit(e) {
     e.preventDefault();
     const form = e.target;
+
     const formData = new FormData(form);
+    // Add team_id from URL if present (like handleEditToolFormSubmit)
+    const teamId = new URL(window.location.href).searchParams.get("team_id");
+    if (teamId) {
+        formData.set("team_id", teamId);
+    }
 
     try {
         // Validate inputs
@@ -8903,14 +9035,16 @@ function initializeToolSelects() {
 }
 
 function initializeEventListeners() {
-    console.log("Setting up event listeners...");
+    console.log("🎯 Setting up event listeners...");
 
     setupTabNavigation();
     setupHTMXHooks();
+    console.log("✅ HTMX hooks registered");
     setupAuthenticationToggles();
     setupFormHandlers();
     setupSchemaModeHandlers();
     setupIntegrationTypeHandlers();
+    console.log("✅ All event listeners initialized");
 }
 
 function setupTabNavigation() {
@@ -9071,6 +9205,11 @@ function setupFormHandlers() {
     const paramButton = safeGetElement("add-parameter-btn");
     if (paramButton) {
         paramButton.addEventListener("click", handleAddParameter);
+    }
+
+    const passthroughButton = safeGetElement("add-passthrough-btn");
+    if (passthroughButton) {
+        passthroughButton.addEventListener("click", handleAddPassthrough);
     }
 
     const serverForm = safeGetElement("add-server-form");
@@ -13973,6 +14112,65 @@ window.submitApiKeyForm = function (event) {
         })
         .catch((error) => {
             alert("Error registering server: " + error);
+        });
+};
+
+// gRPC Services Functions
+
+/**
+ * Toggle visibility of TLS certificate/key fields based on TLS checkbox
+ */
+window.toggleGrpcTlsFields = function () {
+    const tlsEnabled =
+        document.getElementById("grpc-tls-enabled")?.checked || false;
+    const certField = document.getElementById("grpc-tls-cert-field");
+    const keyField = document.getElementById("grpc-tls-key-field");
+
+    if (tlsEnabled) {
+        certField?.classList.remove("hidden");
+        keyField?.classList.remove("hidden");
+    } else {
+        certField?.classList.add("hidden");
+        keyField?.classList.add("hidden");
+    }
+};
+
+/**
+ * View gRPC service methods in a modal or alert
+ * @param {string} serviceId - The gRPC service ID
+ */
+window.viewGrpcMethods = function (serviceId) {
+    const rootPath = window.ROOT_PATH || "";
+
+    fetch(`${rootPath}/grpc/${serviceId}/methods`, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + (getCookie("jwt_token") || ""),
+        },
+    })
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.methods && data.methods.length > 0) {
+                let methodsList = "gRPC Methods:\n\n";
+                data.methods.forEach((method) => {
+                    methodsList += `${method.full_name}\n`;
+                    methodsList += `  Input: ${method.input_type || "N/A"}\n`;
+                    methodsList += `  Output: ${method.output_type || "N/A"}\n`;
+                    if (method.client_streaming || method.server_streaming) {
+                        methodsList += `  Streaming: ${method.client_streaming ? "Client" : ""} ${method.server_streaming ? "Server" : ""}\n`;
+                    }
+                    methodsList += "\n";
+                });
+                alert(methodsList);
+            } else {
+                alert(
+                    "No methods discovered for this service. Try re-reflecting the service.",
+                );
+            }
+        })
+        .catch((error) => {
+            alert("Error fetching methods: " + error);
         });
 };
 
