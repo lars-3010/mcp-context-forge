@@ -323,7 +323,7 @@ class Settings(BaseSettings):
     mcpgateway_bulk_import_enabled: bool = True
     mcpgateway_bulk_import_max_tools: int = 200
     mcpgateway_bulk_import_rate_limit: int = 10
-
+    
     # UI Tool Test Configuration
     mcpgateway_ui_tool_test_timeout: int = Field(default=60000, description="Tool test timeout in milliseconds for the admin UI")
 
@@ -825,6 +825,9 @@ class Settings(BaseSettings):
         "image/jpeg",
         "image/gif",
     }
+
+    # Rest Passthrough
+    passthrough_enabled: bool = True
 
     # Tools
     tool_timeout: int = 60  # seconds

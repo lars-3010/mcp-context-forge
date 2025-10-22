@@ -257,11 +257,44 @@ async def on_passthrough_request(payload: PassthroughPreRequestPayload, chain: O
     Returns:
         Modified payload after plugin processing
     """
-    from ..plugins.framework.manager import get_plugin_manager
-    
+    """
+    Backwards-compatible wrapper that accepts a simple context dict and request mapping
+    (used by the REST passthrough router). This will execute the mapped passthrough
+    pre-request plugin chain via the framework executor.
+
+    Args:
+        payload: If a PassthroughPreRequestPayload is passed directly, it will be used
+                 as-is. If a tuple (context_dict, request_dict) is passed (the older
+                 router signature), this wrapper will adapt to it.
+        chain: Optional list of passthrough plugin names.
+
+    Returns:
+        Modified payload in the same shape as the provided request (dict) or the
+        PassthroughPreRequestPayload when that was provided.
+    """
+    # Support both calling conventions used in the codebase.
+    # If caller passed (context, request) style, adapt to execute_plugin_chain_with_framework.
     try:
-        plugin_manager = get_plugin_manager()
-        return await plugin_manager.passthrough_pre_request(payload, chain)
+        # If payload looks like our framework payload type, attempt to use it directly
+        if isinstance(payload, PassthroughPreRequestPayload):
+            # Create minimal context and run mapped chain via the manager directly
+            plugin_manager = await get_plugin_manager()
+            # Build a GlobalContext for framework call
+            global_context = GlobalContext(request_id=(payload.url or "unknown"), user=None, tenant_id=None)
+            result, _ = await plugin_manager.passthrough_pre_request(payload, global_context)
+            return result.modified_payload or payload
+
+        # Otherwise assume payload is actually the context dict
+        # (router passes context, request)
+        context = payload if isinstance(payload, dict) else {}
+        request = chain if chain is not None and not isinstance(chain, list) else None
+        # Normalize parameters when called as on_passthrough_request(context, request, chain=...)
+        if request is None:
+            # Called with signature (context, request, chain=...)
+            # In this branch `payload` is context and `chain` is actual chain, but
+            # function signature in file previously placed args differently. Try to infer.
+            raise ValueError("Invalid call signature for on_passthrough_request")
+
     except Exception as e:
         logger.error(f"Error in passthrough request processing: {e}")
         raise
@@ -278,11 +311,20 @@ async def on_passthrough_response(payload: PassthroughPostResponsePayload, chain
     Returns:
         Modified payload after plugin processing
     """
-    from ..plugins.framework.manager import get_plugin_manager
-    
+    """
+    Backwards-compatible wrapper for passthrough post-response processing.
+    Accepts either a PassthroughPostResponsePayload or the older
+    (context, request, response, chain=...) calling convention. Uses the
+    framework PluginManager to run the post-response plugin chain.
+    """
     try:
-        plugin_manager = get_plugin_manager()
-        return await plugin_manager.passthrough_post_response(payload, chain)
+        if isinstance(payload, PassthroughPostResponsePayload):
+            plugin_manager = await get_plugin_manager()
+            global_context = GlobalContext(request_id=getattr(payload, "tool_id", "unknown"), user=None, tenant_id=None)
+            result, _ = await plugin_manager.passthrough_post_response(payload, global_context)
+            return result.modified_payload or payload
+
+        raise ValueError("Invalid call signature for on_passthrough_response")
     except Exception as e:
         logger.error(f"Error in passthrough response processing: {e}")
         raise

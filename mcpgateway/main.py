@@ -98,6 +98,7 @@ from mcpgateway.schemas import (
     ToolRead,
     ToolUpdate,
 )
+from mcpgateway.routers.rest_passthrough import router as rest_passthrough_router
 from mcpgateway.services.a2a_service import A2AAgentError, A2AAgentNameConflictError, A2AAgentNotFoundError, A2AAgentService
 from mcpgateway.services.completion_service import CompletionService
 from mcpgateway.services.export_service import ExportError, ExportService
@@ -4450,15 +4451,11 @@ if settings.llmchat_enabled:
         logger.debug("LLM Chat router not available")
 
 # Include REST Pass-through router
-if settings.passthrough_enabled:
-    try:
-        # First-Party
-        from mcpgateway.routers.rest_passthrough import router as rest_passthrough_router
+passthrough_enabled_flag = settings.passthrough_enabled
 
+if passthrough_enabled_flag:
         app.include_router(rest_passthrough_router, tags=["REST Passthrough"])
         logger.info("REST Pass-through router included")
-    except ImportError:
-        logger.debug("REST Pass-through router not available")
 else:
     logger.info("REST Pass-through router disabled in configuration")
 

@@ -60,7 +60,7 @@ from mcpgateway.plugins.framework import (
     ToolPreInvokePayload
 )
 from mcpgateway.plugins.framework.constants import GATEWAY_METADATA, TOOL_METADATA
-from mcpgateway.plugins.passthrough_plugins import on_passthrough_request, on_passthrough_response
+from mcpgateway.plugins.framework.manager import on_passthrough_request, on_passthrough_response
 from mcpgateway.schemas import ToolCreate, ToolRead, ToolUpdate, TopPerformer
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.oauth_manager import OAuthManager
@@ -1001,31 +1001,43 @@ class ToolService:
                     method = tool.request_type.upper()
                     
                     # === PASSTHROUGH PLUGIN INTEGRATION ===
-                    # Create passthrough pre-request payload
+                    # Create passthrough pre-request payload (framework model expects only the
+                    # request mapping: method, headers, params, body, url and tool_id. Global
+                    # context carries request_id/user/tenant information.)
                     pre_request_payload = PassthroughPreRequestPayload(
-                        request_id=request_id,
-                        user=global_context.user,
-                        tenant_id=global_context.tenant_id,
-                        tool_id=str(tool.id),
-                        timestamp=datetime.now(timezone.utc).isoformat(),
                         method=method,
-                        url=final_url,
                         headers=headers.copy(),
                         params=payload.copy() if method == "GET" else {},
-                        body=payload if method != "GET" else None
+                        body=payload if method != "GET" else None,
+                        url=final_url,
+                        tool_id=str(tool.id),
                     )
                     
                     # Apply passthrough pre-request plugins
                     try:
                         # Use tool-specific plugin chains if configured, otherwise use defaults
-                        pre_chain = tool.plugin_chain_pre if hasattr(tool, 'plugin_chain_pre') and tool.plugin_chain_pre else None
-                        
-                        # Apply passthrough pre-request processing
-                        processed_payload = await on_passthrough_request(
-                            payload=pre_request_payload,
-                            chain=pre_chain
-                        )
-                        
+                        pre_chain = tool.plugin_chain_pre if hasattr(tool, "plugin_chain_pre") and tool.plugin_chain_pre else None
+
+                        # If we have a plugin manager instance, prefer it (returns a PluginResult)
+                        if self._plugin_manager:
+                            pre_result, _ = await self._plugin_manager.passthrough_pre_request(
+                                payload=pre_request_payload,
+                                global_context=global_context,
+                                local_contexts=None,
+                                violations_as_exceptions=True,
+                            )
+
+                            if not pre_result.continue_processing:
+                                # Blocked by plugin
+                                reason = pre_result.violation.reason if pre_result.violation else "blocked by plugin"
+                                logger.warning(f"Passthrough request blocked by plugin: {reason}")
+                                raise ToolInvocationError(f"Request blocked: {reason}")
+
+                            processed_payload = pre_result.modified_payload or pre_request_payload
+                        else:
+                            # Fallback to legacy wrapper
+                            processed_payload = await on_passthrough_request(payload=pre_request_payload, chain=pre_chain)
+
                         # Update final_url, headers, and payload from processed request
                         final_url = processed_payload.url
                         headers = processed_payload.headers
@@ -1033,7 +1045,10 @@ class ToolService:
                             payload = processed_payload.params
                         else:
                             payload = processed_payload.body
-                            
+
+                    except (PluginError, PluginViolationError):
+                        # Let plugin-related exceptions propagate
+                        raise
                     except Exception as e:
                         logger.error(f"Passthrough pre-request processing failed: {e}")
                         raise ToolInvocationError(f"Request processing failed: {str(e)}")
@@ -1050,29 +1065,43 @@ class ToolService:
                         # Use tool-specific plugin chains if configured, otherwise use defaults
                         post_chain = tool.plugin_chain_post if hasattr(tool, 'plugin_chain_post') and tool.plugin_chain_post else None
                         
-                        # Create passthrough post-response payload
+                        # Create passthrough post-response payload. The framework model expects
+                        # the response and an `original_request` mapping instead of request_id/user metadata.
                         post_response_payload = PassthroughPostResponsePayload(
-                            request_id=request_id,
-                            user=global_context.user,
-                            tenant_id=global_context.tenant_id,
+                            response=response,
+                            original_request={
+                                "method": method,
+                                "url": final_url,
+                                "headers": headers,
+                                "params": payload.copy() if method == "GET" else {},
+                                "body": payload if method != "GET" else None,
+                            },
+                            status_code=getattr(response, "status_code", getattr(response, "status", 200)),
+                            headers=getattr(response, "headers", {}) or {},
+                            content=getattr(response, "content", None),
                             tool_id=str(tool.id),
-                            timestamp=datetime.now(timezone.utc).isoformat(),
-                            method=method,
-                            url=final_url,
-                            headers=headers,
-                            params=payload.copy() if method == "GET" else {},
-                            body=payload if method != "GET" else None,
-                            response=response
                         )
                         
                         # Apply passthrough post-response processing
-                        processed_payload = await on_passthrough_response(
-                            payload=post_response_payload,
-                            chain=post_chain
-                        )
-                        
+                        if self._plugin_manager:
+                            post_result, _ = await self._plugin_manager.passthrough_post_response(
+                                payload=post_response_payload,
+                                global_context=global_context,
+                                local_contexts=None,
+                                violations_as_exceptions=False,
+                            )
+
+                            if not post_result.continue_processing:
+                                reason = post_result.violation.reason if post_result.violation else "blocked by plugin"
+                                logger.warning(f"Passthrough response blocked by plugin: {reason}")
+                                raise ToolInvocationError(f"Response blocked: {reason}")
+
+                            processed_payload = post_result.modified_payload or post_response_payload
+                        else:
+                            processed_payload = await on_passthrough_response(payload=post_response_payload, chain=post_chain)
+
                         # Use processed response if modified
-                        if processed_payload.response != response:
+                        if getattr(processed_payload, "response", None) is not None and processed_payload.response != response:
                             response = processed_payload.response
                             
                     except Exception as e:
@@ -1183,7 +1212,7 @@ class ToolService:
                         if tool_gateway:
                             gateway_metadata = PydanticGateway.model_validate(tool_gateway)
                             global_context.metadata[GATEWAY_METADATA] = gateway_metadata
-                        pre_result, context_table = await self._plugin_manager.tool_pre_invoke(
+                            pre_result, context_table = await self._plugin_manager.tool_pre_invoke(
                             payload=ToolPreInvokePayload(name=name, args=arguments, headers=HttpHeaderPayload(headers)),
                             global_context=global_context,
                             local_contexts=None,

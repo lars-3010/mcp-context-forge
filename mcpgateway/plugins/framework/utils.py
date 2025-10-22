@@ -316,3 +316,8 @@ def post_resource_matches(payload: ResourcePostFetchPayload, conditions: list[Pl
         if index < len(conditions) - 1:
             current_result = True
     return current_result
+    
+    def post_passthrough_matches(payload: PassthroughPostResponsePayload, conditions: list[PluginCondition], global_ctx: GlobalContext) -> bool:
+            return True
+    def pre_passthrough_matches(payload: PassthroughPreRequestPayload, conditions: list[PluginCondition], global_ctx: GlobalContext) -> bool:
+            return True

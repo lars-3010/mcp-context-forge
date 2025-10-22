@@ -13,7 +13,7 @@ the base plugin layer including configurations, and contexts.
 from enum import Enum
 import os
 from pathlib import Path
-from typing import Any, Generic, Optional, Self, TypeVar
+from typing import Any, Dict, Generic, Optional, Self, TypeVar
 
 # Third-Party
 from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator, PrivateAttr, RootModel, ValidationInfo

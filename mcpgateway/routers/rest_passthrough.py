@@ -39,7 +39,7 @@ import httpx
 from mcpgateway.services.tool_service import ToolNotFoundError, ToolService
 from mcpgateway.db import get_db
 from mcpgateway.auth import require_auth
-from mcpgateway.plugins.passthrough_plugins import on_passthrough_request, on_passthrough_response
+from mcpgateway.plugins.framework.manager import on_passthrough_request, on_passthrough_response
 from mcpgateway.utils.passthrough_config import get_passthrough_config
 
 logger = logging.getLogger(__name__)
@@ -219,7 +219,7 @@ async def passthrough_endpoint(
     
     # Apply pre-processing plugins
     try:
-        mapped_request = on_passthrough_request(context, mapped_request, chain=pre_chain)
+        mapped_request = await on_passthrough_request(context, mapped_request, chain=pre_chain)
     except ValueError as e:
         logger.warning(f"Pre-plugin chain blocked request for tool {tool_id}: {e}")
         raise HTTPException(status_code=403, detail=str(e))
@@ -256,7 +256,7 @@ async def passthrough_endpoint(
     
     # Apply post-processing plugins
     try:
-        resp = on_passthrough_response(context, mapped_request, resp, chain=post_chain)
+        resp = await on_passthrough_response(context, mapped_request, resp, chain=post_chain)
     except Exception as e:
         logger.error(f"Post-plugin chain error for tool {tool_id}: {e}")
         # Don't fail on post-plugin errors, just log them
@@ -312,8 +312,8 @@ async def passthrough_health_check() -> Dict[str, Any]:
     config_healthy = len(warnings) == 0
     
     # Get plugin information
-    available_plugins = get_available_plugins()
-    plugin_info = get_plugin_info()
+    available_plugins = await get_available_plugins()
+    plugin_info = await get_plugin_info()
     
     return {
         "status": "healthy" if (passthrough_config.enabled and config_healthy) else "degraded",
