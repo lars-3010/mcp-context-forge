@@ -73,6 +73,7 @@ from mcpgateway.models import InitializeResult, ListResourceTemplatesResult, Log
 from mcpgateway.observability import init_telemetry
 from mcpgateway.plugins.framework import PluginError, PluginManager, PluginViolationError
 from mcpgateway.routers.well_known import router as well_known_router
+from mcpgateway.routers import passthrough
 from mcpgateway.schemas import (
     A2AAgentCreate,
     A2AAgentRead,
