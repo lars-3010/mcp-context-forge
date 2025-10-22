@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 # First-Party
 from mcpgateway.config import settings
 from mcpgateway.db import EmailUser, SessionLocal
-from mcpgateway.utils.verify_credentials import verify_jwt_token
+from mcpgateway.utils.verify_credentials import verify_jwt_token, require_auth
 
 # Security scheme
 bearer_scheme = HTTPBearer(auto_error=False)

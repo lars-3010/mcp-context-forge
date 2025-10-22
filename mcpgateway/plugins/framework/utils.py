@@ -18,6 +18,8 @@ from types import ModuleType
 from mcpgateway.plugins.framework.models import (
     GlobalContext,
     PluginCondition,
+    PassthroughPostResponsePayload,
+    PassthroughPreRequestPayload,
     PromptPosthookPayload,
     PromptPrehookPayload,
     ResourcePostFetchPayload,
@@ -317,7 +319,42 @@ def post_resource_matches(payload: ResourcePostFetchPayload, conditions: list[Pl
             current_result = True
     return current_result
     
-    def post_passthrough_matches(payload: PassthroughPostResponsePayload, conditions: list[PluginCondition], global_ctx: GlobalContext) -> bool:
+
+def post_passthrough_matches(payload: PassthroughPostResponsePayload, conditions: list[PluginCondition], context: GlobalContext) -> bool:
+    """Check for a match on passthrough post-response hooks.
+
+    This mirrors the other *_matches helpers and currently defaults to True when no
+    conditions are provided and otherwise checks PluginCondition.tools and user/server/tenant matches.
+    """
+    current_result = True
+    for index, condition in enumerate(conditions):
+        if not matches(condition, context):
+            current_result = False
+
+        # For passthrough response, plugins may express interest via tools (tool_id)
+        if condition.tools and getattr(payload, "tool_id", None) not in condition.tools:
+            current_result = False
+        if current_result:
             return True
-    def pre_passthrough_matches(payload: PassthroughPreRequestPayload, conditions: list[PluginCondition], global_ctx: GlobalContext) -> bool:
+        if index < len(conditions) - 1:
+            current_result = True
+    return current_result
+
+
+def pre_passthrough_matches(payload: PassthroughPreRequestPayload, conditions: list[PluginCondition], context: GlobalContext) -> bool:
+    """Check for a match on passthrough pre-request hooks.
+
+    Similar behavior to post_passthrough_matches but uses the request payload.
+    """
+    current_result = True
+    for index, condition in enumerate(conditions):
+        if not matches(condition, context):
+            current_result = False
+
+        if condition.tools and getattr(payload, "tool_id", None) not in condition.tools:
+            current_result = False
+        if current_result:
             return True
+        if index < len(conditions) - 1:
+            current_result = True
+    return current_result

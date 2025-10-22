@@ -483,7 +483,7 @@ async def pre_passthrough_request(plugin: PluginRef, payload: PassthroughPreRequ
     """
     logger.debug(f"Executing passthrough pre-request hook for plugin: {plugin.config.name}")
     # Prefer plugin.plugin interface (consistent with other hooks)
-    if hasattr(plugin.plugin, "passthrough_pre_request"):
+    if hasattr(plugin.plugin, "on_passthrough_request"):
         return await plugin.plugin.passthrough_pre_request(payload, context)
 
     logger.warning(f"Plugin {plugin.name} does not implement passthrough_pre_request")
@@ -508,16 +508,6 @@ async def post_passthrough_response(plugin: PluginRef, payload: PassthroughPostR
     logger.warning(f"Plugin {plugin.name} does not implement passthrough_post_response")
     return PassthroughPostResponseResult()
 
-
-# # New unified passthrough hook adapters used by the executor
-# async def on_passthrough_request_plugin(plugin: PluginRef, payload: PassthroughPreRequestPayload, context: PluginContext) -> PassthroughPreRequestResult:
-#     """Adapter to call a plugin's passthrough pre-request hook (used by executor)."""
-#     return await pre_passthrough_request(plugin, payload, context)
-
-
-# async def on_passthrough_response_plugin(plugin: PluginRef, payload: PassthroughPostResponsePayload, context: PluginContext) -> PassthroughPostResponseResult:
-#     """Adapter to call a plugin's passthrough post-response hook (used by executor)."""
-#     return await post_passthrough_response(plugin, payload, context)
 
 
 class PluginManager:
@@ -871,90 +861,7 @@ class PluginManager:
         return result
 
 
-    async def on_passthrough_request(payload: PassthroughPreRequestPayload | dict, chain: Optional[list[str]] = None) -> PassthroughPreRequestResult | PassthroughPreRequestPayload:
-        """Backwards-compatible wrapper to execute passthrough pre-request processing.
 
-        Accepts either a PassthroughPreRequestPayload (preferred) or the older
-        (context_dict, request_dict) calling convention where `payload` is a
-        context mapping and `chain` is actually the request mapping.
-
-        Returns the modified payload (framework payload) or raises exceptions
-        from the underlying manager when violations_as_exceptions is True.
-        """
-        # If caller passed a framework payload, use the singleton manager to execute
-        if isinstance(payload, PassthroughPreRequestPayload):
-            manager = PluginManager()
-            if not manager.initialized:
-                # initialize manager with default config if needed
-                await manager.initialize()
-            # Minimal global context; callers should supply richer GlobalContext when available
-            global_ctx = GlobalContext(request_id=(payload.url or "unknown"))
-            result, _ = await manager.passthrough_pre_request(payload, global_ctx)
-            return result.modified_payload or payload
-
-        # Otherwise assume (context, request) calling convention
-        context = payload if isinstance(payload, dict) else {}
-        request = chain if chain is not None and isinstance(chain, dict) else None
-        if request is None:
-            raise ValueError("Invalid call signature for on_passthrough_request")
-
-        # Use the execute path: map items and run through manager
-        manager = PluginManager()
-        if not manager.initialized:
-            await manager.initialize()
-
-        global_ctx = GlobalContext(request_id=context.get("request_id", "unknown"), user=context.get("user"), tenant_id=context.get("tenant_id"))
-
-        payload_obj = PassthroughPreRequestPayload(
-            method=request.get("method", "GET"),
-            headers=request.get("headers", {}),
-            params=request.get("params", {}),
-            body=request.get("body"),
-            url=request.get("url", ""),
-            tool_id=context.get("tool_id"),
-        )
-
-        result, _ = await manager.passthrough_pre_request(payload_obj, global_ctx)
-        return result.modified_payload or payload_obj
-
-
-    async def on_passthrough_response(payload: PassthroughPostResponsePayload | dict, chain: Optional[list[str]] = None) -> PassthroughPostResponseResult | PassthroughPostResponsePayload:
-        """Backwards-compatible wrapper to execute passthrough post-response processing.
-
-        Accepts either a PassthroughPostResponsePayload or the older
-        (context, request, response) style where `payload` is a context dict and
-        `chain` is the response mapping.
-        """
-        if isinstance(payload, PassthroughPostResponsePayload):
-            manager = PluginManager()
-            if not manager.initialized:
-                await manager.initialize()
-            global_ctx = GlobalContext(request_id=getattr(payload, "tool_id", "unknown"))
-            result, _ = await manager.passthrough_post_response(payload, global_ctx)
-            return result.modified_payload or payload
-
-        context = payload if isinstance(payload, dict) else {}
-        response = chain if chain is not None and not isinstance(chain, list) else None
-        if response is None:
-            raise ValueError("Invalid call signature for on_passthrough_response")
-
-        manager = PluginManager()
-        if not manager.initialized:
-            await manager.initialize()
-
-        global_ctx = GlobalContext(request_id=context.get("request_id", "unknown"), user=context.get("user"), tenant_id=context.get("tenant_id"))
-
-        payload_obj = PassthroughPostResponsePayload(
-            response=response,
-            original_request=context.get("original_request", {}),
-            status_code=getattr(response, "status_code", getattr(response, "status", 200)),
-            headers=getattr(response, "headers", {}) or {},
-            content=getattr(response, "content", None),
-            tool_id=context.get("tool_id"),
-        )
-
-        result, _ = await manager.passthrough_post_response(payload_obj, global_ctx)
-        return result.modified_payload or payload_obj
 
     async def tool_pre_invoke(
         self, payload: ToolPreInvokePayload, global_context: GlobalContext, local_contexts: Optional[PluginContextTable] = None, violations_as_exceptions: bool = False

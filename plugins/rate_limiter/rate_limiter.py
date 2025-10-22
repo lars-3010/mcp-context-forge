@@ -30,6 +30,8 @@ from mcpgateway.plugins.framework import (
     PromptPrehookResult,
     ToolPreInvokePayload,
     ToolPreInvokeResult,
+    PassthroughPreRequestPayload,
+    PassthroughPreRequestResult,
 )
 
 
@@ -204,3 +206,5 @@ class RateLimiterPlugin(Plugin):
                 ),
             )
         return ToolPreInvokeResult(metadata=meta)
+
+    

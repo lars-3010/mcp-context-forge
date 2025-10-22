@@ -246,88 +246,73 @@ async def _handle_response_shape(context: Dict[str, Any], data: Any, **kwargs) -
     return data
 
 
-async def on_passthrough_request(payload: PassthroughPreRequestPayload, chain: Optional[List[str]] = None) -> PassthroughPreRequestPayload:
+async def on_passthrough_request(
+    context: Dict[str, Any],
+    mapped_request: Dict[str, Any],
+    chain: Optional[List[str]] = None
+) -> Dict[str, Any]:
     """
-    Process passthrough request using the plugin framework.
+    Execute pre-processing plugin chain on passthrough request.
     
     Args:
-        payload: Passthrough pre-request payload containing request context and data
-        chain: Optional list of plugin names to apply in order
+        context: Request context (tool_id, user, etc.)
+        mapped_request: Mapped request dict with method, headers, params, body
+        chain: Plugin chain to execute (defaults to config)
         
     Returns:
-        Modified payload after plugin processing
+        Processed request data
     """
-    """
-    Backwards-compatible wrapper that accepts a simple context dict and request mapping
-    (used by the REST passthrough router). This will execute the mapped passthrough
-    pre-request plugin chain via the framework executor.
-
-    Args:
-        payload: If a PassthroughPreRequestPayload is passed directly, it will be used
-                 as-is. If a tuple (context_dict, request_dict) is passed (the older
-                 router signature), this wrapper will adapt to it.
-        chain: Optional list of passthrough plugin names.
-
-    Returns:
-        Modified payload in the same shape as the provided request (dict) or the
-        PassthroughPreRequestPayload when that was provided.
-    """
-    # Support both calling conventions used in the codebase.
-    # If caller passed (context, request) style, adapt to execute_plugin_chain_with_framework.
+    if not chain:
+        # Use default pre-processing chain from config
+        chain = ["deny_filter", "pii_filter", "regex_filter", "resource_filter", "rate_limit"]
+        
+    logger.debug(f"Executing pre-request plugin chain: {chain}")
+    
     try:
-        # If payload looks like our framework payload type, attempt to use it directly
-        if isinstance(payload, PassthroughPreRequestPayload):
-            # Create minimal context and run mapped chain via the manager directly
-            plugin_manager = await get_plugin_manager()
-            # Build a GlobalContext for framework call
-            global_context = GlobalContext(request_id=(payload.url or "unknown"), user=None, tenant_id=None)
-            result, _ = await plugin_manager.passthrough_pre_request(payload, global_context)
-            return result.modified_payload or payload
-
-        # Otherwise assume payload is actually the context dict
-        # (router passes context, request)
-        context = payload if isinstance(payload, dict) else {}
-        request = chain if chain is not None and not isinstance(chain, list) else None
-        # Normalize parameters when called as on_passthrough_request(context, request, chain=...)
-        if request is None:
-            # Called with signature (context, request, chain=...)
-            # In this branch `payload` is context and `chain` is actual chain, but
-            # function signature in file previously placed args differently. Try to infer.
-            raise ValueError("Invalid call signature for on_passthrough_request")
-
+        return await execute_plugin_chain_with_framework(
+            chain, context, mapped_request, 
+            HookType.PASSTHROUGH_PRE_REQUEST,  # Use the new passthrough-specific hook
+            request_type="pre"
+        )
     except Exception as e:
-        logger.error(f"Error in passthrough request processing: {e}")
-        raise
+        logger.error(f"Error in passthrough request processing: {e}", exc_info=True)
+        return mapped_request
 
 
-async def on_passthrough_response(payload: PassthroughPostResponsePayload, chain: Optional[List[str]] = None) -> PassthroughPostResponsePayload:
+async def on_passthrough_response(
+    context: Dict[str, Any],
+    mapped_request: Dict[str, Any],
+    response: Any,
+    chain: Optional[List[str]] = None
+) -> Any:
     """
-    Process passthrough response using the plugin framework.
+    Execute post-processing plugin chain on passthrough response.
     
     Args:
-        payload: Passthrough post-response payload containing request/response context and data
-        chain: Optional list of plugin names to apply in order
+        context: Request context (tool_id, user, etc.)  
+        mapped_request: Original mapped request for reference
+        response: Response object to process
+        chain: Plugin chain to execute (defaults to config)
         
     Returns:
-        Modified payload after plugin processing
+        Processed response
     """
-    """
-    Backwards-compatible wrapper for passthrough post-response processing.
-    Accepts either a PassthroughPostResponsePayload or the older
-    (context, request, response, chain=...) calling convention. Uses the
-    framework PluginManager to run the post-response plugin chain.
-    """
+    if not chain:
+        # Use default post-processing chain from config
+        chain = ["pii_filter", "response_shape"]
+        
+    logger.debug(f"Executing post-response plugin chain: {chain}")
+    
     try:
-        if isinstance(payload, PassthroughPostResponsePayload):
-            plugin_manager = await get_plugin_manager()
-            global_context = GlobalContext(request_id=getattr(payload, "tool_id", "unknown"), user=None, tenant_id=None)
-            result, _ = await plugin_manager.passthrough_post_response(payload, global_context)
-            return result.modified_payload or payload
-
-        raise ValueError("Invalid call signature for on_passthrough_response")
+        return await execute_plugin_chain_with_framework(
+            chain, context, response,
+            HookType.PASSTHROUGH_POST_RESPONSE,  # Use the new passthrough-specific hook
+            request_type="post", 
+            original_request=mapped_request
+        )
     except Exception as e:
-        logger.error(f"Error in passthrough response processing: {e}")
-        raise
+        logger.error(f"Error in passthrough response processing: {e}", exc_info=True)
+        return response
 
 
 async def get_available_plugins() -> List[str]:

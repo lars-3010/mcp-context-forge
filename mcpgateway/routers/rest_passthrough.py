@@ -205,8 +205,13 @@ async def passthrough_endpoint(
     query_params = mapped_request["params"]
     body = mapped_request["body"]
 
-    # Run pre-plugins (prefer tool-level chain if present)
+    # Run pre-plugins (require tool-level chain to be present for passthrough)
     tool_pre_chain = getattr(tool, "plugin_chain_pre", None)
+    # Enforce that plugin_chain_pre is provided and is a non-empty list of strings
+    if not tool_pre_chain:
+        raise HTTPException(status_code=400, detail="Tool must define a non-empty 'plugin_chain_pre' to enable passthrough pre-processing")
+    if not isinstance(tool_pre_chain, list) or not all(isinstance(p, str) for p in tool_pre_chain):
+        raise HTTPException(status_code=400, detail="Tool 'plugin_chain_pre' must be a list of plugin name strings")
     pre_chain = passthrough_config.get_pre_chain(tool_pre_chain)
     
     # Prepare context for plugins
@@ -250,8 +255,11 @@ async def passthrough_endpoint(
             content=body,
         )
 
-    # Run post-plugins (prefer tool-level chain if present)
+    # Run post-plugins (tool-level chain is optional; fall back to defaults)
     tool_post_chain = getattr(tool, "plugin_chain_post", None)
+    if tool_post_chain is not None and (not isinstance(tool_post_chain, list) or not all(isinstance(p, str) for p in tool_post_chain)):
+        logger.warning(f"Tool {tool_id} has invalid 'plugin_chain_post'; falling back to default post chain")
+        tool_post_chain = None
     post_chain = passthrough_config.get_post_chain(tool_post_chain)
     
     # Apply post-processing plugins

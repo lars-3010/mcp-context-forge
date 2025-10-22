@@ -60,7 +60,6 @@ from mcpgateway.plugins.framework import (
     ToolPreInvokePayload
 )
 from mcpgateway.plugins.framework.constants import GATEWAY_METADATA, TOOL_METADATA
-from mcpgateway.plugins.framework.manager import on_passthrough_request, on_passthrough_response
 from mcpgateway.schemas import ToolCreate, ToolRead, ToolUpdate, TopPerformer
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.oauth_manager import OAuthManager
@@ -1034,10 +1033,6 @@ class ToolService:
                                 raise ToolInvocationError(f"Request blocked: {reason}")
 
                             processed_payload = pre_result.modified_payload or pre_request_payload
-                        else:
-                            # Fallback to legacy wrapper
-                            processed_payload = await on_passthrough_request(payload=pre_request_payload, chain=pre_chain)
-
                         # Update final_url, headers, and payload from processed request
                         final_url = processed_payload.url
                         headers = processed_payload.headers
@@ -1097,9 +1092,6 @@ class ToolService:
                                 raise ToolInvocationError(f"Response blocked: {reason}")
 
                             processed_payload = post_result.modified_payload or post_response_payload
-                        else:
-                            processed_payload = await on_passthrough_response(payload=post_response_payload, chain=post_chain)
-
                         # Use processed response if modified
                         if getattr(processed_payload, "response", None) is not None and processed_payload.response != response:
                             response = processed_payload.response
