@@ -1024,6 +1024,7 @@ class ToolService:
                                 global_context=global_context,
                                 local_contexts=None,
                                 violations_as_exceptions=True,
+                                plugin_chain=pre_chain,
                             )
 
                             if not pre_result.continue_processing:
@@ -1084,6 +1085,7 @@ class ToolService:
                                 global_context=global_context,
                                 local_contexts=None,
                                 violations_as_exceptions=False,
+                                plugin_chain=post_chain,
                             )
 
                             if not post_result.continue_processing:

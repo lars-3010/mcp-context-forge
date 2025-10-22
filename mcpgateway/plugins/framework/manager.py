@@ -1061,6 +1061,7 @@ class PluginManager:
         global_context: GlobalContext,
         local_contexts: Optional[PluginContextTable] = None,
         violations_as_exceptions: bool = True,
+        plugin_chain: Optional[list[str]] = None,
     ) -> Tuple[PassthroughPreRequestResult, PluginContextTable]:
         """Execute passthrough pre-request hook plugins.
 
@@ -1088,7 +1089,18 @@ class PluginManager:
         # Get plugins configured for this hook
         plugins = self._registry.get_plugins_for_hook(HookType.PASSTHROUGH_PRE_REQUEST)
 
-        
+        # If a plugin_chain was provided, try to filter the plugins to that list.
+        # Note: the plugin_chain is expected to contain plugin names as registered in the framework.
+        if plugin_chain:
+            try:
+                filtered = [p for p in plugins if p.name in set(plugin_chain)]
+                # Fall back to full list if filtering yields nothing
+                if filtered:
+                    plugins = filtered
+            except Exception:
+                # If anything goes wrong while filtering, keep full plugin list
+                pass
+
         # Execute plugins using the passthrough executor and in-file hook
         result = await self._pre_passthrough_executor.execute(
             plugins, payload, global_context, pre_passthrough_request, pre_passthrough_matches, local_contexts, violations_as_exceptions
@@ -1106,6 +1118,7 @@ class PluginManager:
         global_context: GlobalContext,
         local_contexts: Optional[PluginContextTable] = None,
         violations_as_exceptions: bool = True,
+        plugin_chain: Optional[list[str]] = None,
     ) -> Tuple[PassthroughPostResponseResult, PluginContextTable]:
         """Execute passthrough post-response hook plugins.
 
@@ -1134,7 +1147,15 @@ class PluginManager:
         # Get plugins configured for this hook
         plugins = self._registry.get_plugins_for_hook(HookType.PASSTHROUGH_POST_RESPONSE)
 
-        
+        # If a plugin_chain was provided, filter the plugin list
+        if plugin_chain:
+            try:
+                filtered = [p for p in plugins if p.name in set(plugin_chain)]
+                if filtered:
+                    plugins = filtered
+            except Exception:
+                pass
+
         # Execute plugins using the passthrough post executor and in-file hook
         result = await self._post_passthrough_executor.execute(
             plugins, payload, global_context, post_passthrough_response, post_passthrough_matches, local_contexts, violations_as_exceptions

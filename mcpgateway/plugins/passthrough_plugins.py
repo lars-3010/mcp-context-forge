@@ -164,7 +164,7 @@ async def execute_plugin_chain_with_framework(
         
         # Execute through framework
         try:
-            result, _ = await plugin_manager.passthrough_pre_request(payload, global_context)
+            result, _ = await plugin_manager.passthrough_pre_request(payload, global_context, plugin_chain=mapped_chain)
             if result.continue_processing and result.modified_payload:
                 # Extract modified data back to original format
                 modified = result.modified_payload
@@ -194,7 +194,7 @@ async def execute_plugin_chain_with_framework(
         
         # Execute through framework
         try:
-            result, _ = await plugin_manager.passthrough_post_response(payload, global_context)
+            result, _ = await plugin_manager.passthrough_post_response(payload, global_context, plugin_chain=mapped_chain)
             if result.continue_processing and result.modified_payload:
                 # Use the modified response
                 result_data = result.modified_payload.response
