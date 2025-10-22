@@ -40,7 +40,7 @@ print(json.dumps(env_vars))
 sys.stdout.flush()
 """
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(script_content)
             f.flush()
             os.chmod(f.name, 0o755)
@@ -61,7 +61,7 @@ print(sys.stdin.readline().strip())
 sys.stdout.flush()
 """
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(script_content)
             f.flush()
             os.chmod(f.name, 0o755)
@@ -241,7 +241,12 @@ sys.stdout.flush()
         # Process should be terminated and cleaned up
         assert endpoint._proc is None  # Process object should be cleaned up
         # Pump task might still exist but should be finished/cancelled
-        if endpoint._pump_task is not None:
+        if endpoint._pump_task is not None:  # type: ignore[unreachable]
+            # Wait a bit for the task to complete if it's still running
+            for _ in range(10):  # Try up to 10 times (1 second total)
+                if endpoint._pump_task.done():
+                    break
+                await asyncio.sleep(0.1)
             assert endpoint._pump_task.done()  # Task should be finished
 
     @pytest.mark.asyncio
@@ -259,6 +264,7 @@ sys.stdout.flush()
         })
 
         endpoint = StdIOEndpoint(f"{sys.executable} {test_script}", pubsub, env_vars)
+
         await endpoint.start()
 
         try:
@@ -278,7 +284,7 @@ sys.stdout.flush()
     async def test_empty_env_vars(self, echo_script):
         """Test with empty environment variables dictionary."""
         pubsub = _PubSub()
-        env_vars = {}
+        env_vars: dict[str, str] = {}
 
         endpoint = StdIOEndpoint(f"python3 {echo_script}", pubsub, env_vars)
         await endpoint.start()
@@ -384,9 +390,10 @@ sys.stdout.flush()
         # Mock the wait method to be awaitable
         async def mock_wait():
             return 0
+
         mock_process.wait = mock_wait
 
-        with patch('asyncio.create_subprocess_exec') as mock_create_subprocess:
+        with patch("asyncio.create_subprocess_exec") as mock_create_subprocess:
             mock_create_subprocess.return_value = mock_process
 
             endpoint = StdIOEndpoint("echo hello", pubsub, env_vars)
@@ -397,14 +404,14 @@ sys.stdout.flush()
             call_args = mock_create_subprocess.call_args
 
             # Check that env parameter was passed
-            assert 'env' in call_args.kwargs
-            env = call_args.kwargs['env']
+            assert "env" in call_args.kwargs
+            env = call_args.kwargs["env"]
 
             # Check that our environment variables are included
-            assert env['GITHUB_TOKEN'] == 'test-token'
+            assert env["GITHUB_TOKEN"] == "test-token"
 
             # Check that base environment is preserved
-            assert 'PATH' in env  # PATH should be preserved from os.environ
+            assert "PATH" in env  # PATH should be preserved from os.environ
 
             # Don't call stop() as it will try to wait for the mock process
             # Just verify the start() worked correctly
@@ -415,7 +422,7 @@ sys.stdout.flush()
         pubsub = _PubSub()
         env_vars = {"GITHUB_TOKEN": "test-token"}
 
-        with patch('asyncio.create_subprocess_exec') as mock_create_subprocess:
+        with patch("asyncio.create_subprocess_exec") as mock_create_subprocess:
             # Mock subprocess creation failure
             mock_create_subprocess.side_effect = OSError("Command not found")
 
@@ -436,7 +443,7 @@ sys.stdout.flush()
         mock_process.stdout = None
         mock_process.pid = 12345
 
-        with patch('asyncio.create_subprocess_exec') as mock_create_subprocess:
+        with patch("asyncio.create_subprocess_exec") as mock_create_subprocess:
             mock_create_subprocess.return_value = mock_process
 
             endpoint = StdIOEndpoint("echo hello", pubsub, env_vars)
@@ -457,7 +464,7 @@ print(sys.stdin.readline().strip())
 sys.stdout.flush()
 """
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(script_content)
             f.flush()
             os.chmod(f.name, 0o755)
