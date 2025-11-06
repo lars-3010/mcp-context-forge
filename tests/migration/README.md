@@ -53,17 +53,17 @@ This policy ensures migration compatibility across supported versions while keep
 
 ```bash
 # Run complete migration test suite
-make migration-test-all
+task migration-test-all
 
 # Run specific database tests
-make migration-test-sqlite      # SQLite container tests
-make migration-test-postgres    # PostgreSQL compose tests
-make migration-test-performance # Performance benchmarking
+task migration-test-sqlite      # SQLite container tests
+task migration-test-postgres    # PostgreSQL compose tests
+task migration-test-performance # Performance benchmarking
 
 # Environment management
-make migration-setup           # Setup test environment
-make migration-cleanup         # Clean up containers/volumes
-make migration-debug          # Debug failed migrations
+task migration-setup           # Setup test environment
+task migration-cleanup         # Clean up containers/volumes
+task migration-debug          # Debug failed migrations
 ```
 
 ## Test Architecture
@@ -120,7 +120,7 @@ python3 tests/migration/version_status.py
 
 2. **Add version metadata** to `RELEASE_INFO` dict
 3. **Create test data** in `fixtures/test_data_sets/v0_7_0_sample.json`
-4. **Pull container image**: `make migration-setup`
+4. **Pull container image**: `task migration-setup`
 
 The n-2 policy will automatically adjust to test the new supported versions.
 
@@ -281,7 +281,7 @@ All components include comprehensive logging. Set log level:
 ```bash
 # Enable debug logging
 export LOG_LEVEL=DEBUG
-make test-migration-sqlite
+task test-migration-sqlite
 ```
 
 ### Container Inspection
@@ -310,7 +310,7 @@ psql -h localhost -p 5432 -U mcpgateway -d mcpgateway_test
 
 ```bash
 # Check application migration status
-make migration-debug
+task migration-debug
 
 # Application health and API checks in container
 docker exec <container_id> python3 -c "import urllib.request; resp = urllib.request.urlopen('http://localhost:4444/health'); print(resp.read().decode())"
@@ -377,7 +377,7 @@ Ensure container images are available:
 
 ```bash
 # Build and tag images
-make docker-prod
+task docker-prod
 docker tag mcp-context-forge:latest ghcr.io/ibm/mcp-context-forge:latest
 
 # For testing multiple versions
@@ -435,7 +435,7 @@ docker exec <container_id> env | grep HOST
 ### Getting Help
 
 1. Check verbose logs in `tests/migration/logs/`
-2. Run `make migration-debug` for diagnostic info
+2. Run `task migration-debug` for diagnostic info
 3. Use `pytest -vvv` for maximum verbosity
 4. Inspect generated HTML reports in `tests/migration/reports/`
 

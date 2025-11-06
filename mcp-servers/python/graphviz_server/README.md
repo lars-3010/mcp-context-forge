@@ -42,10 +42,10 @@ A comprehensive MCP server for creating, editing, and rendering Graphviz graphs.
 
 ```bash
 # Install in development mode
-make dev-install
+task dev-install
 
 # Or install normally
-make install
+task install
 ```
 
 ## Usage
@@ -54,7 +54,7 @@ make install
 
 ```bash
 # Start the server
-make dev
+task dev
 
 # Or directly
 python -m graphviz_server.server_fastmcp
@@ -65,7 +65,7 @@ python -m graphviz_server.server_fastmcp
 Expose the server over HTTP for REST API access:
 
 ```bash
-make serve-http
+task serve-http
 ```
 
 ### MCP Client Configuration
@@ -265,13 +265,13 @@ The FastMCP implementation provides:
 
 ```bash
 # Format code
-make format
+task format
 
 # Run tests
-make test
+task test
 
 # Lint code
-make lint
+task lint
 ```
 
 ## Validation

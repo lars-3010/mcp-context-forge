@@ -17,7 +17,7 @@
 - REST API with OpenAPI documentation for direct HTTP access
 - Single static binary (~2 MiB)
 - Build-time version & date via `main.appVersion`, `main.buildDate`
-- Cross-platform builds via `make cross`
+- Cross-platform builds via `task cross`
 - Dockerfile for lightweight container
 - Linting (`golangci-lint`, `staticcheck`) and pre-commit support
 - Unit tests with HTML coverage & Go benchmarks
@@ -30,13 +30,13 @@ git clone git@github.com:IBM/mcp-context-forge.git
 cd mcp-servers/go/fast-time-server
 
 # Build & run over stdio
-make run
+task run
 
 # HTTP JSON-RPC on port 8080
-make run-http
+task run-http
 
 # SSE endpoint on port 8080
-make run-sse
+task run-sse
 
 # REST API on port 8080
 ./fast-time-server -transport=rest
@@ -268,14 +268,14 @@ hey -n 1000 -c 100 -o csv http://localhost:8080/http > results.csv
 ## Docker
 
 ```bash
-make docker-build
-make docker-run           # HTTP mode
+task docker-build
+task docker-run           # HTTP mode
 ```
 
 ## Cross-Compilation
 
 ```bash
-make cross
+task cross
 ```
 
 Binaries appear under `dist/fast-time-server-<os>-<arch>`.
@@ -284,14 +284,14 @@ Binaries appear under `dist/fast-time-server-<os>-<arch>`.
 
 | Task                 | Command                     |
 | -------------------- | --------------------------- |
-| Format & tidy        | `make fmt tidy`             |
-| Lint & vet           | `make lint staticcheck vet` |
-| Run pre-commit hooks | `make pre-commit`           |
+| Format & tidy        | `task fmt tidy`             |
+| Lint & vet           | `task lint staticcheck vet` |
+| Run pre-commit hooks | `task pre-commit`           |
 
 ## Testing & Benchmarking
 
 ```bash
-make test       # Unit tests (race detection)
-make coverage   # HTML coverage report
-make bench      # Go benchmarks
+task test       # Unit tests (race detection)
+task coverage   # HTML coverage report
+task bench      # Go benchmarks
 ```

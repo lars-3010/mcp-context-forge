@@ -175,13 +175,13 @@ IBM_VERIFY_GROUP_MAPPING={"CN=Developers,OU=Groups": "dev-team-uuid", "CN=Admini
 
 ```bash
 # Development
-make dev
+task dev
 
 # Or directly with uvicorn
 uvicorn mcpgateway.main:app --reload --host 0.0.0.0 --port 8000
 
 # Production
-make serve
+task serve
 ```
 
 ### 4.2 Verify IBM Security Verify SSO is Enabled

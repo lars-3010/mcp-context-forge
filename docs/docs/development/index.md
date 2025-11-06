@@ -32,8 +32,8 @@ Development tools:
 Code style and consistency is enforced via:
 
 ```bash
-make lint          # runs ruff, mypy, black, isort
-make pre-commit    # runs pre-commit hooks on staged files
+task lint          # runs ruff, mypy, black, isort
+task pre-commit    # runs pre-commit hooks on staged files
 ```
 
 As well as GitHub Actions code scanning.
@@ -52,7 +52,7 @@ Test coverage includes:
 Use:
 
 ```bash
-make test                  # run full suite
+task test                  # run full suite
 python3 -m pytest tests/unit     # run only unit tests
 python3 -m pytest tests/e2e      # run end-to-end scenarios
 ```
@@ -66,8 +66,8 @@ CI will fail your PR if code does not pass lint checks.
 You should manually run:
 
 ```bash
-make lint
-make pre-commit
+task lint
+task pre-commit
 ```
 
 Enable hooks with:
@@ -83,8 +83,8 @@ pre-commit install
 Build and run with Podman or Docker:
 
 ```bash
-make podman            # build production image
-make podman-run-ssl    # run with self-signed TLS at https://localhost:4444
+task podman            # build production image
+task podman-run-ssl    # run with self-signed TLS at https://localhost:4444
 ```
 
 ---

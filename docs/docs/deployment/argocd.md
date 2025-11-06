@@ -173,12 +173,12 @@ The repository ships with ready-made targets:
 
 | Target                      | Action                                                                 |
 | --------------------------- | ---------------------------------------------------------------------- |
-| `make argocd-install`       | Installs Argo CD server into the current cluster                       |
-| `make argocd-forward`       | Port-forwards UI/API on [http://localhost:8083](http://localhost:8083) |
-| `make argocd-app-bootstrap` | Creates & auto-syncs the *mcp-gateway* application                     |
-| `make argocd-app-sync`      | Forces a manual sync                                                   |
+| `task argocd-install`       | Installs Argo CD server into the current cluster                       |
+| `task argocd-forward`       | Port-forwards UI/API on [http://localhost:8083](http://localhost:8083) |
+| `task argocd-app-bootstrap` | Creates & auto-syncs the *mcp-gateway* application                     |
+| `task argocd-app-sync`      | Forces a manual sync                                                   |
 
-Run `make help` to list them all.
+Run `task help` to list them all.
 
 ---
 

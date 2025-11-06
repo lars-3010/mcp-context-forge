@@ -33,20 +33,20 @@ brew install --cask mactex
 
 ```bash
 # Install in development mode
-make dev-install
+task dev-install
 
 # Or install normally
-make install
+task install
 ```
 
 ### Running the Server
 
 ```bash
 # Stdio mode (for Claude Desktop, IDEs)
-make dev
+task dev
 
 # HTTP mode (via MCP Gateway)
-make serve-http
+task serve-http
 ```
 
 ## Available Tools
@@ -237,7 +237,7 @@ Create documents from built-in templates.
 
 ```bash
 # Start the LaTeX server via HTTP
-make serve-http
+task serve-http
 
 # Register with MCP Gateway
 curl -X POST http://localhost:8000/gateways \

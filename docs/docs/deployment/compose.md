@@ -27,10 +27,10 @@ docker pull ghcr.io/ibm/mcp-context-forge:0.8.0
 
 | Target             | Image                   | Dockerfile             | Notes                         |
 | ------------------ | ----------------------- | ---------------------- | ----------------------------- |
-| `make podman`      | `mcpgateway:latest`     | **Containerfile**      | Rootless Podman, dev-oriented |
-| `make podman-prod` | `mcpgateway:latest`     | **Containerfile.lite** | Ultra-slim UBI 9-micro build  |
-| `make docker`      | `mcpgateway:latest`     | **Containerfile**      | Docker Desktop / CI runners   |
-| `make docker-prod` | `mcpgateway:latest`     | **Containerfile.lite** | Same multi-stage "lite" build |
+| `task podman`      | `mcpgateway:latest`     | **Containerfile**      | Rootless Podman, dev-oriented |
+| `task podman-prod` | `mcpgateway:latest`     | **Containerfile.lite** | Ultra-slim UBI 9-micro build  |
+| `task docker`      | `mcpgateway:latest`     | **Containerfile**      | Docker Desktop / CI runners   |
+| `task docker-prod` | `mcpgateway:latest`     | **Containerfile.lite** | Same multi-stage "lite" build |
 
 Remember to tag the image or configure the correct image in `docker-compose.yml`
 
@@ -62,7 +62,7 @@ docker build -t mcpgateway:latest -f Containerfile.lite .
 ### With Make
 
 ```bash
-make compose-up                   # auto-detects engine
+task compose-up                   # auto-detects engine
 COMPOSE_ENGINE=docker make compose-up   # force Docker
 COMPOSE_ENGINE=podman make compose-up   # force Podman
 ```
@@ -90,7 +90,7 @@ COMPOSE_ENGINE=podman make compose-up   # force Podman
 curl http://localhost:4444/health    # {"status":"ok"}
 ```
 
-* **Logs:** `make compose-logs` or raw `docker compose logs -f gateway`.
+* **Logs:** `task compose-logs` or raw `docker compose logs -f gateway`.
 
 ---
 
@@ -121,13 +121,13 @@ Named volumes (`pgdata`, `mariadbdata`, `mysqldata`, `mongodata`) isolate persis
 
 | Task               | Make                   | Manual (engine-agnostic)                        |
 | ------------------ | ---------------------- | ----------------------------------------------- |
-| Start / create     | `make compose-up`      | `<engine> compose up -d`                        |
-| Re-create changed  | `make compose-restart` | `<engine> compose up -d --pull=missing --build` |
-| Tail logs          | `make compose-logs`    | `<engine> compose logs -f`                      |
-| Shell into gateway | `make compose-shell`   | `<engine> compose exec gateway /bin/sh`         |
-| Stop               | `make compose-stop`    | `<engine> compose stop`                         |
-| Remove containers  | `make compose-down`    | `<engine> compose down`                         |
-| **Nuke volumes**   | `make compose-clean`   | `<engine> compose down -v`                      |
+| Start / create     | `task compose-up`      | `<engine> compose up -d`                        |
+| Re-create changed  | `task compose-restart` | `<engine> compose up -d --pull=missing --build` |
+| Tail logs          | `task compose-logs`    | `<engine> compose logs -f`                      |
+| Shell into gateway | `task compose-shell`   | `<engine> compose exec gateway /bin/sh`         |
+| Stop               | `task compose-stop`    | `<engine> compose stop`                         |
+| Remove containers  | `task compose-down`    | `<engine> compose down`                         |
+| **Nuke volumes**   | `task compose-clean`   | `<engine> compose down -v`                      |
 
 `<engine>` = `docker`, `podman`, or `podman-compose` as shown earlier.
 

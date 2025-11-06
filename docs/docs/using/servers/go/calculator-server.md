@@ -272,19 +272,19 @@ go build -o calculator-server ./cmd/server
 
 ```bash
 # Install dependencies
-make deps
+task deps
 
 # Build for current platform
-make build
+task build
 
 # Run the server
-make run
+task run
 
 # Run tests
-make test
+task test
 
 # Check code quality
-make quality
+task quality
 ```
 
 ## Configuration
@@ -375,13 +375,13 @@ curl -X POST http://localhost:8081/mcp \
 
 ```bash
 # Run all tests
-make test
+task test
 
 # Run with coverage
-make coverage
+task coverage
 
 # Run benchmarks
-make benchmark
+task benchmark
 
 # Run specific test suites
 go test ./tests/basic_test.go -v
@@ -428,9 +428,9 @@ go version  # Should be 1.21+
 **Build errors:**
 ```bash
 # Clean and rebuild
-make clean
-make deps
-make build
+task clean
+task deps
+task build
 ```
 
 **Test failures:**

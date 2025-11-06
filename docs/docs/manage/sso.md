@@ -187,7 +187,7 @@ SSO_TRUSTED_DOMAINS=["yourcompany.com", "github.com"]
 
 ```bash
 # Restart gateway to load SSO configuration
-make dev
+task dev
 # or
 docker-compose restart gateway
 ```

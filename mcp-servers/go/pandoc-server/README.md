@@ -53,7 +53,7 @@ cd pandoc-server
 go mod download
 
 # Build the server
-make build
+task build
 ```
 
 ### Using Docker
@@ -86,13 +86,13 @@ python3 -m mcpgateway.translate --stdio "./dist/pandoc-server" --port 9000
 
 ```bash
 # Run tests
-make test
+task test
 
 # Format code
-make fmt
+task fmt
 
 # Tidy dependencies
-make tidy
+task tidy
 ```
 
 ## Example Usage
@@ -137,6 +137,6 @@ Use the `list-formats` tool to see all available formats on your system.
 
 Contributions are welcome! Please ensure:
 
-1. Code passes all tests: `make test`
-2. Code is properly formatted: `make fmt`
-3. Dependencies are tidied: `make tidy`
+1. Code passes all tests: `task test`
+2. Code is properly formatted: `task fmt`
+3. Dependencies are tidied: `task tidy`

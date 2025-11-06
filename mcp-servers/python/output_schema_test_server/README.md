@@ -44,7 +44,7 @@ The server demonstrates three types of output schemas:
 
 ```bash
 # From the server directory
-make install
+task install
 
 # Or with pip directly
 pip install -e .
@@ -55,13 +55,13 @@ pip install -e .
 ### Run with stdio (for local testing)
 
 ```bash
-make dev
+task dev
 ```
 
 ### Run with HTTP
 
 ```bash
-make serve-http
+task serve-http
 # Server runs on http://0.0.0.0:9100/mcp/
 ```
 
@@ -69,10 +69,10 @@ make serve-http
 
 ```bash
 # Start HTTP server first
-make serve-http
+task serve-http
 
 # In another terminal, run tests
-make test-tools
+task test-tools
 ```
 
 This will:
@@ -199,19 +199,19 @@ Register as a gateway peer (see Testing section above).
 
 ```bash
 # Install with dev dependencies
-make dev-install
+task dev-install
 
 # Format code
-make format
+task format
 
 # Run linters
-make lint
+task lint
 
 # Run tests
-make test
+task test
 
 # Clean caches
-make clean
+task clean
 ```
 
 ## License

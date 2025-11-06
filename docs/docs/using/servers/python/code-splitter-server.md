@@ -19,23 +19,23 @@ The Code Splitter MCP Server provides AST-based code analysis and splitting for 
 
 ```bash
 # Basic installation with FastMCP
-make install
+task install
 
 # Installation with development dependencies
-make dev-install
+task dev-install
 ```
 
 ### Running the Server
 
 ```bash
 # Start the FastMCP server
-make dev
+task dev
 
 # Or directly
 python -m code_splitter_server.server_fastmcp
 
 # HTTP bridge for REST API access
-make serve-http
+task serve-http
 ```
 
 ## Available Tools
@@ -215,7 +215,7 @@ Extract only class definitions from code.
 
 ```bash
 # Start the code splitter server via HTTP
-make serve-http
+task serve-http
 
 # Register with MCP Gateway
 curl -X POST http://localhost:8000/gateways \

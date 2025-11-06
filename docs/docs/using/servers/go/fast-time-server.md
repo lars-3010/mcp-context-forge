@@ -66,7 +66,7 @@ python3 -m mcpgateway.translate \
 ```bash
 git clone https://github.com/IBM/mcp-context-forge.git
 cd mcp-servers/go/fast-time-server
-make build
+task build
 ```
 
 ### Using Go Install
@@ -1238,38 +1238,38 @@ networks:
 
 ```bash
 # Build binary
-make build
+task build
 
 # Run tests
-make test
+task test
 
 # Generate coverage report
-make coverage
+task coverage
 
 # Run linters
-make lint staticcheck
+task lint staticcheck
 
 # Build for multiple platforms
-make cross
+task cross
 ```
 
 ### Running Different Modes
 
 ```bash
 # Development with hot reload
-make run
+task run
 
 # HTTP mode
-make run-http
+task run-http
 
 # SSE mode
-make run-sse
+task run-sse
 
 # Dual mode
-make run-dual
+task run-dual
 
 # REST mode
-make run-rest
+task run-rest
 ```
 
 ### Docker Usage Examples

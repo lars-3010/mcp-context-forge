@@ -6,9 +6,9 @@ MCP Gateway includes a built-in Admin UI for managing all entities in real time 
 
 ## 🖥️ Accessing the UI
 
-After launching the gateway (`make serve` or `make podman-run`), open your browser and go to:
+After launching the gateway (`task serve` or `task podman-run`), open your browser and go to:
 
-[http://localhost:4444/admin](http://localhost:4444/admin) - or the corresponding URL / port / protocol (ex: https when launching with `make podman-run-ssl`)
+[http://localhost:4444/admin](http://localhost:4444/admin) - or the corresponding URL / port / protocol (ex: https when launching with `task podman-run-ssl`)
 
 Login using the `BASIC_AUTH_USER` and `BASIC_AUTH_PASSWORD` set in your `.env`.
 
@@ -56,6 +56,6 @@ This token is reused for all Admin API calls from within the UI.
 
 ## 🔄 Live Reloading (Dev Only)
 
-If running in development mode (`DEV_MODE=true` or `make run`), changes to templates and routes reload automatically.
+If running in development mode (`DEV_MODE=true` or `task run`), changes to templates and routes reload automatically.
 
 ---

@@ -970,10 +970,10 @@ mcpplugins bootstrap --destination ./my-security-plugin
 # Plugin development workflow
 cd ./my-security-plugin
 cp .env.template .env
-make install-dev                 # Install dependencies
-make test                        # Run tests
-make build                       # Build container (external plugins)
-make start                       # Start development server
+task install-dev                 # Install dependencies
+task test                        # Run tests
+task build                       # Build container (external plugins)
+task start                       # Start development server
 
 # Verify external plugin MCP endpoint
 npx @modelcontextprotocol/inspector

@@ -27,10 +27,10 @@ A comprehensive MCP server for creating, editing, and analyzing Microsoft Excel 
 
 ```bash
 # Install in development mode
-make dev-install
+task dev-install
 
 # Or install normally
-make install
+task install
 ```
 
 ## Usage
@@ -38,13 +38,13 @@ make install
 ### Stdio Mode (for Claude Desktop, IDEs)
 
 ```bash
-make dev
+task dev
 ```
 
 ### HTTP Mode (via MCP Gateway)
 
 ```bash
-make serve-http
+task serve-http
 ```
 
 ### Test Tools
@@ -61,13 +61,13 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_wor
 
 ```bash
 # Format code
-make format
+task format
 
 # Run tests
-make test
+task test
 
 # Lint code
-make lint
+task lint
 ```
 
 ## Requirements

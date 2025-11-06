@@ -378,7 +378,7 @@ models:
 ```bash
 # Validate your custom configuration
 export MCP_EVAL_MODELS_CONFIG="./my-models.yaml"
-make validate-models
+task validate-models
 
 # Check specific aspects
 export MCP_EVAL_MODELS_CONFIG="./my-models.yaml"

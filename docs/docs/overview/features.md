@@ -213,7 +213,7 @@ adding auth, caching, federation, and an HTMX-powered Admin UI.
 
 ??? summary "Highlights"
 
-    * **Makefile targets** - `make dev`, `make test`, `make lint`
+    * **Makefile targets** - `task dev`, `task test`, `task lint`
     * **400+ unit tests** - Pytest + HTTPX TestClient
     * **VS Code Dev Container** - Python 3.11 + Docker/Podman CLI
     * **Plug-in friendly** - drop-in FastAPI routers or Pydantic models

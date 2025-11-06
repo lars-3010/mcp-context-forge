@@ -14,54 +14,54 @@ All MCP repositories must include a `Makefile` with the following standard targe
 
 ### ✅ Required Make Targets
 
-Make targets are grouped by functionality. Use `make help` to see them all in your terminal.
+Make targets are grouped by functionality. Use `task help` to see them all in your terminal.
 
 #### 🌱 VIRTUAL ENVIRONMENT & INSTALLATION
 
 | Target           | Description |
 |------------------|-------------|
-| `make venv`      | Create a new Python virtual environment in `~/.venv/<project>`. |
-| `make activate`  | Output the command to activate the virtual environment. |
-| `make install`   | Install all dependencies using `uv` from `pyproject.toml`. |
-| `make clean`     | Remove virtualenv, Python artifacts, build files, and containers. |
+| `task venv`      | Create a new Python virtual environment in `~/.venv/<project>`. |
+| `task activate`  | Output the command to activate the virtual environment. |
+| `task install`   | Install all dependencies using `uv` from `pyproject.toml`. |
+| `task clean`     | Remove virtualenv, Python artifacts, build files, and containers. |
 
 #### ▶️ RUN SERVER & TESTING
 
 | Target               | Description |
 |----------------------|-------------|
-| `make serve`         | Run the MCP server locally (e.g., `mcp-time-server`). |
-| `make test`          | Run all unit and integration tests with `pytest`. |
-| `make test-curl`     | Run public API integration tests using a `curl` script. |
+| `task serve`         | Run the MCP server locally (e.g., `mcp-time-server`). |
+| `task test`          | Run all unit and integration tests with `pytest`. |
+| `task test-curl`     | Run public API integration tests using a `curl` script. |
 
 #### 📚 DOCUMENTATION & SBOM
 
 | Target         | Description |
 |----------------|-------------|
-| `make docs`    | Generate project documentation and SBOM using `handsdown`. |
-| `make sbom`    | Create a software bill of materials (SBOM) and scan dependencies. |
+| `task docs`    | Generate project documentation and SBOM using `handsdown`. |
+| `task sbom`    | Create a software bill of materials (SBOM) and scan dependencies. |
 
 #### 🔍 LINTING & STATIC ANALYSIS
 
 | Target               | Description |
 |----------------------|-------------|
-| `make lint`          | Run all linters (e.g., `ruff check`, `black`, `isort`). |
+| `task lint`          | Run all linters (e.g., `ruff check`, `black`, `isort`). |
 
 #### 🐳 CONTAINER BUILD & RUN
 
 | Target               | Description |
 |----------------------|-------------|
-| `make podman`        | Build a production-ready container image with Podman. |
-| `make podman-run`    | Run the container locally and expose it on port 8080. |
-| `make podman-stop`   | Stop and remove the running container. |
-| `make podman-test`   | Test the container with a `curl` script. |
+| `task podman`        | Build a production-ready container image with Podman. |
+| `task podman-run`    | Run the container locally and expose it on port 8080. |
+| `task podman-stop`   | Stop and remove the running container. |
+| `task podman-test`   | Test the container with a `curl` script. |
 
 #### 🛡️ SECURITY & PACKAGE SCANNING
 
 | Target         | Description |
 |----------------|-------------|
-| `make trivy`   | Scan the container image for vulnerabilities using [Trivy](https://aquasecurity.github.io/trivy/). |
+| `task trivy`   | Scan the container image for vulnerabilities using [Trivy](https://aquasecurity.github.io/trivy/). |
 
-> **Tip:** These commands should work out-of-the-box after cloning a repo and running `make venv install serve`.
+> **Tip:** These commands should work out-of-the-box after cloning a repo and running `task venv install serve`.
 
 ## 🐳 Containerfile
 
@@ -71,7 +71,7 @@ Each repo must include a `Containerfile` (Podman-compatible, Docker-compatible) 
 
 - Must start from a secure base (e.g., latest Red Hat UBI10 minimal image `registry.access.redhat.com/ubi10-minimal:10.0-1755721767`)
 - Should use `uv` or `pdm` to install dependencies via `pyproject.toml`
-- Must run the server using the same entry point as `make serve`
+- Must run the server using the same entry point as `task serve`
 - Should expose relevant ports (`EXPOSE 8080`)
 - Should define a non-root user for runtime
 

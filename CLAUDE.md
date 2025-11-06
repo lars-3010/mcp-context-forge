@@ -14,38 +14,44 @@ virtual servers, multi-transport protocols, and an optional Admin UI.
 
 ### Setup & Installation
 ```bash
-cp .env.example .env && make venv install-dev check-env    # Complete setup workflow
-make venv                          # Create fresh virtual environment with uv
-make install-dev                   # Install with development dependencies
-make check-env                     # Verify .env against .env.example
+cp .env.example .env && task setup              # Complete setup workflow
+task venv                          # Create fresh virtual environment with uv
+task install-dev                   # Install with development dependencies
+task check-env                     # Verify .env against .env.example
 ```
 
 ### Development Workflow
 ```bash
-make dev                          # Start development server (port 8000) with autoreload
-make serve                        # Production server (gunicorn, port 4444)
+task dev                          # Start development server (port 8000) with autoreload
+task serve                        # Production server (gunicorn, port 4444)
 ```
 
 ### Code Quality Pipeline
 ```bash
 # After writing code (auto-format & cleanup)
-make autoflake isort black pre-commit
+task format                       # Run autoflake, isort, black, and pre-commit
 
 # Before committing (comprehensive quality checks)
-make flake8 bandit interrogate pylint verify
+task verify                       # Complete quality pipeline (format + lint + test + security)
+
+# Individual linters
+task flake8 bandit interrogate pylint
 
 # Web assets
-make lint-web                     # HTML/CSS/JS linting
+task lint-web                     # HTML/CSS/JS linting
 ```
 
 ### Testing & Coverage
 ```bash
 # Complete testing workflow
-make doctest test htmlcov smoketest lint-web flake8 bandit interrogate pylint verify
+task test                         # Run full test suite with coverage
+task doctest                      # Run doctests in source code
+task smoketest                    # End-to-end container testing
 
-# Core testing
-make doctest test htmlcov         # Doctests + unit tests + coverage (→ docs/docs/coverage/index.html)
-make smoketest                    # End-to-end container testing
+# Specific test types
+task test-unit                    # Unit tests only
+task test-integration             # Integration tests only
+task test-e2e                     # End-to-end tests only
 
 # Testing individual files (using uv environment manager)
 uv run pytest --cov-report=annotate tests/unit/mcpgateway/test_translate.py
@@ -194,14 +200,16 @@ python3 -m mcpgateway.translate --stdio "uvx mcp-server-git" --port 9000
 
 ### Container Operations
 ```bash
-make container-build                   # Build using auto-detected runtime (Docker/Podman)
-make container-run-ssl-host            # Run with TLS on port 4444 and host networking
-make container-stop                    # Stop & remove container
-make container-logs                    # Show container logs
+task container-build                   # Build using auto-detected runtime (Docker/Podman)
+task container-run-ssl-host            # Run with TLS on port 4444 and host networking
+task container-stop                    # Stop & remove container
+task container-logs                    # Show container logs
+```
 
 ### Security & Quality Assurance
 ```bash
-make security-scan                   # Trivy + Grype vulnerability scans
+task security-scan                   # Trivy + Grype vulnerability scans
+task container-scan                  # Scan container for vulnerabilities
 ```
 
 ### Plugin Development
@@ -236,8 +244,8 @@ make security-scan                   # Trivy + Grype vulnerability scans
 
 ### CLI Tools Available
 - `gh` for GitHub operations: `gh issue view 586`, `gh pr create`
-- `make` for all build/test operations
-- uv for managing virtual environments
+- `task` for all build/test operations (see `task --list` for all available tasks)
+- `uv` for managing virtual environments
 - Standard development tools: pytest, black, isort, etc.
 
 ## Quick Reference
@@ -248,16 +256,22 @@ make security-scan                   # Trivy + Grype vulnerability scans
 - `mcpgateway/models.py` - SQLAlchemy ORM models
 - `mcpgateway/schemas.py` - Pydantic validation schemas
 - `pyproject.toml` - Project configuration and dependencies
-- `Makefile` - Comprehensive build and development automation
+- `Taskfile.yml` - Comprehensive build and development automation
+- `scripts/` - Reusable shell scripts for complex operations
 - `.env.example` - Environment variable template
 
 ### Most Common Commands
 ```bash
 # Development cycle
-make autoflake isort black pre-commit
+task format                       # Auto-format code (autoflake + isort + black)
 
 # Complete quality pipeline
-make doctest test htmlcov smoketest lint-web flake8 bandit interrogate pylint verify
+task verify                       # Format + lint + test + security
+
+# Quick workflows
+task all                         # Complete setup and quality check
+task quick                       # Quick validation (format + test-fast)
+task ci                          # Run CI pipeline locally
 ```
 
 ## Documentation Quick Links

@@ -16,7 +16,7 @@ PLUGINS_CLI_MARKUP_MODE=rich
 
 2. Configure plugins in `plugins/config.yaml` (see [Configuration](#configuration) section)
 
-3. Restart the gateway: `make dev`
+3. Restart the gateway: `task dev`
 
 ## Plugin Architecture
 
@@ -342,7 +342,7 @@ async def test_tool_pre_invoke(plugin):
 ### Integration Testing
 ```bash
 # Test with live gateway
-make dev
+task dev
 curl -X POST http://localhost:4444/tools/invoke \
   -H "Content-Type: application/json" \
   -d '{"name": "test_tool", "arguments": {}}'

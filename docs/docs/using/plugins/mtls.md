@@ -18,7 +18,7 @@ The MCP Gateway includes Makefile targets to manage the complete certificate inf
 
 ```bash
 # Generate complete mTLS infrastructure (recommended)
-make certs-mcp-all
+task certs-mcp-all
 
 # This automatically:
 # 1. Creates a Certificate Authority (CA)
@@ -47,7 +47,7 @@ certs/mcp/
 
 ### Makefile Targets
 
-#### `make certs-mcp-all`
+#### `task certs-mcp-all`
 
 Generate complete mTLS infrastructure. This is the **recommended** command for setting up mTLS.
 
@@ -59,16 +59,16 @@ Generate complete mTLS infrastructure. This is the **recommended** command for s
 **Usage**:
 ```bash
 # Use default config file (plugins/external/config.yaml)
-make certs-mcp-all
+task certs-mcp-all
 
 # Use custom config file
-make certs-mcp-all MCP_PLUGIN_CONFIG=path/to/custom-config.yaml
+task certs-mcp-all MCP_PLUGIN_CONFIG=path/to/custom-config.yaml
 
 # Custom certificate validity (in days)
-make certs-mcp-all MCP_CERT_DAYS=365
+task certs-mcp-all MCP_CERT_DAYS=365
 
 # Combine both options
-make certs-mcp-all MCP_PLUGIN_CONFIG=config.yaml MCP_CERT_DAYS=730
+task certs-mcp-all MCP_PLUGIN_CONFIG=config.yaml MCP_CERT_DAYS=730
 ```
 
 **Config file format** (`plugins/external/config.yaml`):
@@ -89,7 +89,7 @@ plugins:
 
 **Fallback behavior**: If the config file doesn't exist or PyYAML is not installed, example certificates are generated for `example-plugin-a` and `example-plugin-b`.
 
-#### `make certs-mcp-ca`
+#### `task certs-mcp-ca`
 
 Generate the Certificate Authority (CA) for plugin mTLS. This is typically called automatically by other targets.
 
@@ -101,17 +101,17 @@ Generate the Certificate Authority (CA) for plugin mTLS. This is typically calle
 **Usage**:
 ```bash
 # Generate CA (one-time setup)
-make certs-mcp-ca
+task certs-mcp-ca
 
 # Custom validity
-make certs-mcp-ca MCP_CERT_DAYS=1825
+task certs-mcp-ca MCP_CERT_DAYS=1825
 ```
 
 **Safety**: Won't overwrite existing CA. To regenerate, delete `certs/mcp/ca/` first.
 
 **⚠️  Warning**: The CA private key (`ca.key`) is critical. Protect it carefully!
 
-#### `make certs-mcp-gateway`
+#### `task certs-mcp-gateway`
 
 Generate the gateway client certificate used by the MCP Gateway to authenticate to plugin servers.
 
@@ -124,15 +124,15 @@ Generate the gateway client certificate used by the MCP Gateway to authenticate 
 **Usage**:
 ```bash
 # Generate gateway client certificate
-make certs-mcp-gateway
+task certs-mcp-gateway
 
 # Custom validity
-make certs-mcp-gateway MCP_CERT_DAYS=365
+task certs-mcp-gateway MCP_CERT_DAYS=365
 ```
 
 **Safety**: Won't overwrite existing certificate.
 
-#### `make certs-mcp-plugin`
+#### `task certs-mcp-plugin`
 
 Generate a server certificate for a specific plugin.
 
@@ -148,17 +148,17 @@ Generate a server certificate for a specific plugin.
 **Usage**:
 ```bash
 # Generate certificate for specific plugin
-make certs-mcp-plugin PLUGIN_NAME=MyCustomPlugin
+task certs-mcp-plugin PLUGIN_NAME=MyCustomPlugin
 
 # Custom validity
-make certs-mcp-plugin PLUGIN_NAME=MyPlugin MCP_CERT_DAYS=365
+task certs-mcp-plugin PLUGIN_NAME=MyPlugin MCP_CERT_DAYS=365
 ```
 
 **Required**: `PLUGIN_NAME` parameter must be provided.
 
 **Use case**: Add a new plugin after running `certs-mcp-all`, or generate certificates manually.
 
-#### `make certs-mcp-check`
+#### `task certs-mcp-check`
 
 Check expiry dates of all MCP certificates.
 
@@ -168,7 +168,7 @@ Check expiry dates of all MCP certificates.
 
 **Usage**:
 ```bash
-make certs-mcp-check
+task certs-mcp-check
 ```
 
 **Output example**:
@@ -507,7 +507,7 @@ For production deployments, follow these security best practices to ensure robus
 | --- | --- | --- | --- |
 | **Certificate Verification** | Keep hostname and certificate chain verification enabled. | **YAML**: `check_hostname: true` and valid `ca_bundle`<br>**Environment**: `PLUGINS_CLIENT_MTLS_CHECK_HOSTNAME="true"` and valid `PLUGINS_CLIENT_MTLS_CA_BUNDLE` or `PLUGINS_SERVER_SSL_CA_CERTS` | Only disable in trusted, local test setups. |
 | **CA Management** | Use a dedicated CA for gateway ↔ plugin certificates. | **YAML**: `ca_bundle: certs/mcp/gateway/ca.crt`<br>**Environment**: `PLUGINS_SERVER_SSL_CA_CERTS` or `PLUGINS_CLIENT_MTLS_CA_BUNDLE` | Ensures trust is limited to your deployment's CA. |
-| **Certificate Rotation** | Regenerate and redeploy certificates periodically. | **Local/Docker**: Use Makefile targets: `make certs-mcp-all`, `make certs-mcp-check`<br>**Kubernetes**: Use [cert-manager](https://cert-manager.io/) for automated certificate lifecycle management | Recommended: short-lived certs (e.g. 90–180 days). Configure with `MCP_CERT_DAYS` variable for Makefile targets. |
+| **Certificate Rotation** | Regenerate and redeploy certificates periodically. | **Local/Docker**: Use Makefile targets: `task certs-mcp-all`, `task certs-mcp-check`<br>**Kubernetes**: Use [cert-manager](https://cert-manager.io/) for automated certificate lifecycle management | Recommended: short-lived certs (e.g. 90–180 days). Configure with `MCP_CERT_DAYS` variable for Makefile targets. |
 | **Key Protection** | Limit read access to private key files. | **YAML**: `keyfile` paths (e.g., `server.key`, `client.key`)<br>**Environment**: `PLUGINS_SERVER_SSL_KEYFILE` or `PLUGINS_CLIENT_MTLS_KEYFILE`<br>**File permissions**: `600` (owner read/write only) | Keys should be owned and readable only by the service account. |
 | **TLS Version Enforcement** | Enforce TLS 1.2 or newer. | Controlled by Python's `ssl` defaults or runtime settings. | No additional configuration required; defaults are secure. |
 | **Health Endpoint Exposure** | Bind health endpoints to localhost only. | **YAML**: `server_settings.host: 127.0.0.1`<br>**Environment**: `PLUGINS_SERVER_HOST="127.0.0.1"` | Prevents unauthenticated HTTP access from external hosts. Health check server (port+1000) is HTTP-only. |
@@ -520,10 +520,10 @@ For production deployments, follow these security best practices to ensure robus
 When deploying plugin mTLS in production:
 
 1. **Generate Certificates**:
-   - **Local/Docker**: Use `make certs-mcp-all` to create complete certificate infrastructure
+   - **Local/Docker**: Use `task certs-mcp-all` to create complete certificate infrastructure
    - **Kubernetes**: Deploy [cert-manager](https://cert-manager.io/) and configure Certificate resources for automated issuance and renewal
 2. **Verify Expiration**:
-   - **Local/Docker**: Run `make certs-mcp-check` regularly to monitor certificate validity
+   - **Local/Docker**: Run `task certs-mcp-check` regularly to monitor certificate validity
    - **Kubernetes**: cert-manager automatically monitors and renews certificates before expiration
 3. **Secure Private Keys**: Ensure all `.key` files have `600` permissions and are owned by service accounts (or stored in Kubernetes Secrets with appropriate RBAC)
 4. **Enable Hostname Verification**: Set `check_hostname: true` or `PLUGINS_CLIENT_MTLS_CHECK_HOSTNAME="true"` unless using IP addresses
@@ -540,7 +540,7 @@ After deployment, verify your mTLS configuration:
 
 ```bash
 # 1. Check certificate expiration dates
-make certs-mcp-check
+task certs-mcp-check
 
 # 2. Verify file permissions on private keys
 find certs/mcp -name "*.key" -exec ls -la {} \;

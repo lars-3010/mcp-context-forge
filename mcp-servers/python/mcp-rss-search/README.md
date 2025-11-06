@@ -35,20 +35,20 @@ Advanced RSS feed parsing, searching, filtering, and statistical analysis server
 ```bash
 # Basic installation
 cd mcp-servers/python/mcp-rss-search
-make install
+task install
 
 # With AI similarity and hybrid search (recommended!)
-make install-similarity
+task install-similarity
 ```
 
 ### Running the Server
 
 ```bash
 # Stdio mode (for Claude Desktop, Cursor, etc.)
-make dev
+task dev
 
 # HTTP mode (REST API on port 9100)
-make serve-http
+task serve-http
 ```
 
 ### First Example
@@ -136,13 +136,13 @@ Add to `claude_desktop_config.json`:
 cd mcp-servers/python/mcp-rss-search
 
 # Basic installation (keyword search only)
-make install
+task install
 
 # With AI similarity and hybrid search
-make install-similarity
+task install-similarity
 
 # With development tools
-make dev-install
+task dev-install
 ```
 
 ### Using pip/uv directly
@@ -806,7 +806,7 @@ When running in HTTP mode, the server supports JSON-RPC 2.0 protocol.
 ### Start HTTP Server
 
 ```bash
-make serve-http
+task serve-http
 # Server runs on http://0.0.0.0:9100/mcp/
 ```
 
@@ -920,7 +920,7 @@ The server supports standard MCP protocol via stdio. Refer to your client's docu
 
 ```bash
 # Run all tests with coverage
-make test
+task test
 
 # Run specific test
 pytest tests/test_server.py::TestRSSParser::test_fetch_feed_success -v
@@ -934,10 +934,10 @@ open htmlcov/index.html
 
 ```bash
 # Format code
-make format
+task format
 
 # Lint code
-make lint
+task lint
 
 # Type checking
 mypy src/mcp_rss_search
@@ -947,16 +947,16 @@ mypy src/mcp_rss_search
 
 ```bash
 # Create virtual environment
-make venv
+task venv
 
 # Install development dependencies
-make dev-install
+task dev-install
 
 # Run development server with auto-reload
-make dev
+task dev
 
 # Run all quality checks
-make test lint format
+task test lint format
 ```
 
 ## Troubleshooting
@@ -980,7 +980,7 @@ pip install -e .
 ```bash
 pip install -e ".[similarity]"
 # Or
-make install-similarity
+task install-similarity
 ```
 
 ### Issue: Slow first run

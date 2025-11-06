@@ -20,10 +20,10 @@ The Python Sandbox MCP Server provides a highly secure environment for executing
 
 ```bash
 # Install in development mode with sandbox dependencies
-make dev-install
+task dev-install
 
 # Or install normally
-make install
+task install
 ```
 
 ### Configuration
@@ -42,10 +42,10 @@ vi .env
 
 ```bash
 # Stdio mode (for Claude Desktop, IDEs)
-make dev
+task dev
 
 # HTTP mode (via MCP Gateway)
-make serve-http
+task serve-http
 ```
 
 ## Available Tools
@@ -230,7 +230,7 @@ Get sandbox capabilities and configuration.
 
 ```bash
 # Start the Python sandbox server via HTTP
-make serve-http
+task serve-http
 
 # Register with MCP Gateway
 curl -X POST http://localhost:8000/gateways \
@@ -336,10 +336,10 @@ For maximum security with container isolation:
 
 ```bash
 # Build the sandbox container
-make build-sandbox
+task build-sandbox
 
 # Test the container
-make test-sandbox
+task test-sandbox
 ```
 
 ### gVisor Installation (Recommended)

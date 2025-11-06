@@ -17,8 +17,8 @@ Follow this guide when you need to add or update markdown pages under `docs/` an
 
 ```bash
 cd docs
-make venv     # First-time only, installs dependencies into a venv under `~/.venv/mcpgateway-docs`
-make serve    # http://localhost:8000 (auto-reload on save)
+task venv     # First-time only, installs dependencies into a venv under `~/.venv/mcpgateway-docs`
+task serve    # http://localhost:8000 (auto-reload on save)
 ```
 
 *The `serve` target automatically creates a project-local virtual environment (under `~/.venv/mcpgateway-docs`) the first time you run it and installs all doc dependencies before starting **MkDocs** in live-reload mode.*
@@ -99,7 +99,7 @@ Guidelines:
 3. You can nest `.pages` files in deeper folders - rules apply hierarchically.
 4. Avoid circular references: do **not** include files from *other* directories.
 
-After saving a `.pages` file, simply refresh the browser running `make serve`; MkDocs will hot-reload and the navigation tree will update instantly.
+After saving a `.pages` file, simply refresh the browser running `task serve`; MkDocs will hot-reload and the navigation tree will update instantly.
 
 ---
 
@@ -110,10 +110,10 @@ After saving a `.pages` file, simply refresh the browser running `make serve`; M
 From the **repository root** run **all** lint & QA checks before pushing:
 
 ```bash
-make spellcheck           # Spell-check the codebase
-make spellcheck-sort      # Sort local spellcheck dictionary
-make markdownlint         # Lint Markdown files with markdownlint (requires markdownlint-cli)
-make pre-commit           # Run all configured pre-commit hooks
+task spellcheck           # Spell-check the codebase
+task spellcheck-sort      # Sort local spellcheck dictionary
+task markdownlint         # Lint Markdown files with markdownlint (requires markdownlint-cli)
+task pre-commit           # Run all configured pre-commit hooks
 ```
 
 > These targets are defined in the top-level `Makefile`. Make sure you're in the repository root when running these targets.
@@ -124,9 +124,9 @@ make pre-commit           # Run all configured pre-commit hooks
 
 ```bash
 cd docs
-make clean       # remove generated site/
-make git-clean   # remove ignored files per .gitignore
-make git-scrub   # blow away *all* untracked files - use with care!
+task clean       # remove generated site/
+task git-clean   # remove ignored files per .gitignore
+task git-scrub   # blow away *all* untracked files - use with care!
 ```
 
 ---
@@ -137,7 +137,7 @@ make git-scrub   # blow away *all* untracked files - use with care!
 
 ```bash
 cd docs
-make build    # outputs HTML into docs/site/
+task build    # outputs HTML into docs/site/
 ```
 
 The `build` target produces a fully-static site (used by CI for docs previews and by GitHub Pages).
@@ -146,9 +146,9 @@ The `build` target produces a fully-static site (used by CI for docs previews an
 
 ## 📤 Publishing (CI)
 
-We do not currently run a dedicated docs-build workflow in CI. Build locally with `make build` (or the `make doctest`/`make lint` suite from the repo root) before opening a PR that touches docs-heavy changes.
+We do not currently run a dedicated docs-build workflow in CI. Build locally with `task build` (or the `task doctest`/`task lint` suite from the repo root) before opening a PR that touches docs-heavy changes.
 
-Publishing to GitHub Pages remains a manual maintainer task via `make deploy`.
+Publishing to GitHub Pages remains a manual maintainer task via `task deploy`.
 
 ---
 

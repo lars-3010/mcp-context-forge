@@ -27,19 +27,19 @@ git clone git@github.com:IBM/mcp-context-forge.git
 cd mcp-context-forge/mcp-servers/go/system-monitor-server
 
 # Build & run over stdio
-make run
+task run
 
 # HTTP JSON-RPC on port 8080
-make run-http
+task run-http
 
 # SSE endpoint on port 8080
-make run-sse
+task run-sse
 
 # REST API on port 8080
-make run-rest
+task run-rest
 
 # Dual mode (MCP + REST) on port 8080
-make run-dual
+task run-dual
 ```
 
 ## Installation
@@ -49,7 +49,7 @@ make run-dual
 ```bash
 git clone git@github.com:IBM/mcp-context-forge.git
 cd mcp-context-forge/mcp-servers/go/system-monitor-server
-make install
+task install
 ```
 
 ### Claude Desktop Integration
@@ -204,29 +204,29 @@ echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"check_service_hea
 ## Docker
 
 ```bash
-make docker-build
-make docker-run           # HTTP mode
-make docker-run-sse       # SSE mode
+task docker-build
+task docker-run           # HTTP mode
+task docker-run-sse       # SSE mode
 ```
 
 ## Development
 
 | Task                 | Command                     |
 | -------------------- | --------------------------- |
-| Format & tidy        | `make fmt tidy`             |
-| Lint & vet           | `make lint staticcheck vet` |
-| Run pre-commit hooks | `make pre-commit`           |
-| Run all checks       | `make check`                |
+| Format & tidy        | `task fmt tidy`             |
+| Lint & vet           | `task lint staticcheck vet` |
+| Run pre-commit hooks | `task pre-commit`           |
+| Run all checks       | `task check`                |
 
 ## Testing & Benchmarking
 
 ```bash
-make test       # Unit tests (race detection)
-make coverage   # HTML coverage report → dist/coverage.html
-make bench      # Go benchmarks
+task test       # Unit tests (race detection)
+task coverage   # HTML coverage report → dist/coverage.html
+task bench      # Go benchmarks
 
 # Test MCP tools
-make test-mcp   # Test all MCP tools via stdio
+task test-mcp   # Test all MCP tools via stdio
 ```
 
 ## Cross-Compilation
@@ -262,7 +262,7 @@ Run with debug logging:
 2. Create a feature branch
 3. Make your changes
 4. Add tests
-5. Run `make check`
+5. Run `task check`
 6. Submit a pull request
 
 ## License

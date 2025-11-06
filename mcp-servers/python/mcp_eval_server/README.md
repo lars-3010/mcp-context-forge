@@ -47,7 +47,7 @@ pip install -e ".[dev]"
 # 🔥 Launch MCP server for Claude Desktop, MCP clients
 python -m mcp_eval_server.server
 # or
-make dev
+task dev
 
 # 🏥 Health check (automatic on port 8080)
 curl http://localhost:8080/health   # ✅ Liveness probe
@@ -60,7 +60,7 @@ curl http://localhost:8080/metrics  # 📊 Performance metrics
 # 🚀 Launch REST API server with FastAPI
 python -m mcp_eval_server.rest_server --port 8080 --host 0.0.0.0
 # or
-make serve-rest
+task serve-rest
 
 # 📚 Interactive API documentation
 open http://localhost:8080/docs
@@ -73,7 +73,7 @@ curl http://localhost:8080/tools/categories
 #### **🔄 HTTP Bridge Mode (MCP over HTTP)**
 ```bash
 # 🌍 MCP protocol over HTTP with Server-Sent Events
-make serve-http
+task serve-http
 
 # 📡 Access via JSON-RPC over HTTP on port 9000
 curl -X POST -H 'Content-Type: application/json' \
@@ -290,28 +290,28 @@ curl http://localhost:8080/readyz    # Alternative readiness
 ### **Docker Deployment**
 ```bash
 # Build container
-make build
+task build
 
 # Run with environment
-make run
+task run
 
 # Or use docker-compose
-make compose-up
+task compose-up
 ```
 
 ### **Development Setup**
 ```bash
 # Install development dependencies
-make dev-install
+task dev-install
 
 # Run development server
-make dev
+task dev
 
 # Run tests
-make test
+task test
 
 # Check code quality
-make lint
+task lint
 ```
 
 ## 🎮 **Usage Examples**
@@ -511,9 +511,9 @@ export MCP_EVAL_MODELS_CONFIG="./my-custom-models.yaml"
 export DEFAULT_JUDGE_MODEL="my-custom-judge"
 
 # Copy default config for customization
-make copy-config                    # Copies to ./custom-config/
-make show-config                    # Show current configuration status
-make validate-config                # Validate configuration syntax
+task copy-config                    # Copies to ./custom-config/
+task show-config                    # Show current configuration status
+task validate-config                # Validate configuration syntax
 ```
 
 ### **Model Configuration with Capabilities**
@@ -836,57 +836,57 @@ benchmarks:
 
 | Mode | Command | Protocol | Port | Auth | Use Case |
 |------|---------|----------|------|------|----------|
-| **MCP Server** | `make dev` | stdio | none | none | Claude Desktop, MCP clients |
-| **REST API** | `make serve-rest` | HTTP REST | 8080 | none | Direct HTTP API integration |
-| **REST Public** | `make serve-rest-public` | HTTP REST | 8080 | none | Public REST API access |
-| **HTTP Bridge** | `make serve-http` | JSON-RPC/HTTP | 9000 | none | MCP over HTTP, local testing |
-| **HTTP Public** | `make serve-http-public` | JSON-RPC/HTTP | 9000 | none | MCP over HTTP, remote access |
-| **Container** | `make run` | HTTP | 8080 | none | Docker deployment |
+| **MCP Server** | `task dev` | stdio | none | none | Claude Desktop, MCP clients |
+| **REST API** | `task serve-rest` | HTTP REST | 8080 | none | Direct HTTP API integration |
+| **REST Public** | `task serve-rest-public` | HTTP REST | 8080 | none | Public REST API access |
+| **HTTP Bridge** | `task serve-http` | JSON-RPC/HTTP | 9000 | none | MCP over HTTP, local testing |
+| **HTTP Public** | `task serve-http-public` | JSON-RPC/HTTP | 9000 | none | MCP over HTTP, remote access |
+| **Container** | `task run` | HTTP | 8080 | none | Docker deployment |
 
 ### **Immediate Quick Start**
 
 #### **Option 1: MCP Server (stdio)**
 ```bash
 # 1. Run MCP server (for Claude Desktop, etc.)
-make dev                    # Shows connection info + starts server
+task dev                    # Shows connection info + starts server
 
 # 2. Test basic functionality
-make example               # Run evaluation example
-make test-mcp             # Test MCP protocol
+task example               # Run evaluation example
+task test-mcp             # Test MCP protocol
 ```
 
 #### **Option 2: REST API Server (FastAPI)**
 ```bash
 # 1. Run native REST API server
-make serve-rest          # Starts on http://localhost:8080
+task serve-rest          # Starts on http://localhost:8080
 
 # 2. Test REST API endpoints
-make test-rest           # Test all REST endpoints
+task test-rest           # Test all REST endpoints
 
 # 3. View interactive documentation
 open http://localhost:8080/docs    # Swagger UI
 open http://localhost:8080/redoc   # ReDoc
 
 # 4. Get connection info
-make rest-info           # Show complete REST API guide
+task rest-info           # Show complete REST API guide
 ```
 
 #### **Option 3: HTTP Bridge (MCP over HTTP)**
 ```bash
 # 1. Run MCP protocol over HTTP
-make serve-http          # Starts on http://localhost:9000
+task serve-http          # Starts on http://localhost:9000
 
 # 2. Test HTTP endpoints
-make test-http           # Test MCP JSON-RPC endpoints
+task test-http           # Test MCP JSON-RPC endpoints
 
 # 3. Get connection info
-make http-info           # Show complete HTTP bridge guide
+task http-info           # Show complete HTTP bridge guide
 ```
 
 #### **Option 4: Docker Deployment**
 ```bash
 # Build and deploy
-make build && make run
+task build && make run
 ```
 
 ### **Integration Examples**
@@ -908,7 +908,7 @@ result = await client.call_tool("judge.evaluate_response", {
 #### **REST API Integration**
 ```bash
 # Start REST API server
-make serve-rest
+task serve-rest
 
 # Check server health
 curl http://localhost:8080/health
@@ -940,7 +940,7 @@ curl -X POST http://localhost:8080/judge/evaluate \
 #### **HTTP Bridge Integration (MCP over HTTP)**
 ```bash
 # Start HTTP bridge server
-make serve-http
+task serve-http
 
 # List available tools (JSON-RPC)
 curl -X POST \

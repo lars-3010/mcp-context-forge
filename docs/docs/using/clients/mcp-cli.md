@@ -61,7 +61,7 @@ git clone https://github.com/IBM/mcp-context-forge
 cd mcp-context-forge
 
 # Install and start the gateway
-make venv install serve
+task venv install serve
 # Gateway will be available at http://localhost:4444
 ```
 
@@ -555,7 +555,7 @@ Your MCP Context Forge Gateway provides these tool categories:
 
 - [ ] Install mcp-cli: `pip install -e ".[cli,dev]"`
 - [ ] Install MCP Context Forge Gateway
-- [ ] Start gateway: `make serve` (runs on localhost:4444)
+- [ ] Start gateway: `task serve` (runs on localhost:4444)
 - [ ] Create `server_config.json` with correct Python path
 - [ ] Generate JWT token for authentication
 - [ ] Test connection: `mcp-cli ping --server mcpgateway-wrapper`

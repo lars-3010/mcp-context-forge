@@ -19,30 +19,30 @@ The Chunker MCP Server provides advanced text chunking capabilities with multipl
 
 ```bash
 # Basic installation with core functionality
-make install
+task install
 
 # With NLP libraries (NLTK and spaCy)
-make install-nlp
+task install-nlp
 
 # With LangChain support
-make install-langchain
+task install-langchain
 
 # Full installation (recommended - includes all features)
-make install-full
+task install-full
 ```
 
 ### Running the Server
 
 ```bash
 # FastMCP server (recommended)
-make dev-fastmcp
+task dev-fastmcp
 
 # Original MCP server
-make dev
+task dev
 
 # HTTP bridge for REST API access
-make serve-http-fastmcp  # FastMCP version
-make serve-http          # Original version
+task serve-http-fastmcp  # FastMCP version
+task serve-http          # Original version
 ```
 
 ## Available Tools
@@ -198,7 +198,7 @@ To integrate with MCP Gateway, expose the server over HTTP:
 
 ```bash
 # Start the chunker server via HTTP
-make serve-http-fastmcp
+task serve-http-fastmcp
 
 # Register with MCP Gateway
 curl -X POST http://localhost:8000/gateways \

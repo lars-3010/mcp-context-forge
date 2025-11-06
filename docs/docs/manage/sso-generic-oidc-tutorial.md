@@ -375,10 +375,10 @@ curl https://your-provider.com/.well-known/openid-configuration | jq .
 
 ```bash
 # Development
-make dev
+task dev
 
 # Production
-make serve
+task serve
 
 # Docker
 docker-compose restart gateway

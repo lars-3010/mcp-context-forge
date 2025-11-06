@@ -248,7 +248,7 @@ plugin_settings:
 
 2. Ensure `.env` contains: `PLUGINS_ENABLED=true` and `PLUGIN_CONFIG_FILE=plugins/config.yaml`.
 
-3. Start the gateway: `make dev` (or `make serve`).
+3. Start the gateway: `task dev` (or `task serve`).
 
 That's it — the gateway now runs the enabled plugins at the selected hook points.
 

@@ -46,14 +46,14 @@ Before you read code or leave comments, **always** verify the PR builds and test
 ### 3.1 Local Build
 
 ```bash
-make install-dev serve   # Install into a fresh venv, and test it runs locally
+task install-dev serve   # Install into a fresh venv, and test it runs locally
 ```
 
 ### 3.2 Container Build and testing with Postgres and Redis (compose)
 
 ```bash
-make docker-prod      # Build the lite runtime image locally
-make compose-up       # Spins up the Docker Compose stack (PostgreSQL + Redis)
+task docker-prod      # Build the lite runtime image locally
+task compose-up       # Spins up the Docker Compose stack (PostgreSQL + Redis)
 
 # Test the basics
 curl http://localhost:4444/health         # {"status":"healthy"}
@@ -61,19 +61,19 @@ export MCPGATEWAY_BEARER_TOKEN=$(python3 -m mcpgateway.utils.create_jwt_token --
 curl -s -H "Authorization: Bearer $MCPGATEWAY_BEARER_TOKEN" http://localhost:4444/version | jq -c '.database, .redis'
 
 # Add an MCP server to http://localhost:4444 then check logs:
-make compose-logs
+task compose-logs
 ```
 
 ### 3.3 Automated Tests
 
 ```bash
-make test           # or `pytest`
+task test           # or `pytest`
 ```
 
 ### 3.4 Lint & Static Analysis
 
 ```bash
-make lint           # runs ruff, mypy, black --check, eslint, etc.
+task lint           # runs ruff, mypy, black --check, eslint, etc.
 ```
 
 > **If any step fails**, request changes and paste the relevant error logs.

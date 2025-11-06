@@ -374,13 +374,13 @@ SSO_KEYCLOAK_CLIENT_ID=mcp-gateway-prod
 
 ```bash
 # Development
-make dev
+task dev
 
 # Or directly with uvicorn
 uvicorn mcpgateway.main:app --reload --host 0.0.0.0 --port 8000
 
 # Production
-make serve
+task serve
 ```
 
 ### 7.2 Verify Keycloak SSO is Enabled

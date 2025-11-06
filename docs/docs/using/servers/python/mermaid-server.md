@@ -27,23 +27,23 @@ npm install -g @mermaid-js/mermaid-cli
 
 ```bash
 # Install in development mode
-make dev-install
+task dev-install
 
 # Or install normally
-make install
+task install
 ```
 
 ### Running the Server
 
 ```bash
 # Start the FastMCP server
-make dev
+task dev
 
 # Or directly
 python -m mermaid_server.server_fastmcp
 
 # HTTP bridge for REST API access
-make serve-http
+task serve-http
 ```
 
 ## Available Tools
@@ -219,7 +219,7 @@ Get diagram templates.
 
 ```bash
 # Start the Mermaid server via HTTP
-make serve-http
+task serve-http
 
 # Register with MCP Gateway
 curl -X POST http://localhost:8000/gateways \

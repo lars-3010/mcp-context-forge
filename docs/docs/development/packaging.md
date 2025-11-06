@@ -9,7 +9,7 @@ This guide covers how to package MCP Gateway for deployment in various environme
 Build an OCI-compliant container image using:
 
 ```bash
-make podman        # builds using Containerfile with Podman
+task podman        # builds using Containerfile with Podman
 # or manually
 podman build -t mcpgateway:latest -f Containerfile .
 ```
@@ -17,7 +17,7 @@ podman build -t mcpgateway:latest -f Containerfile .
 Or with Docker (if Podman is not available):
 
 ```bash
-make docker        # builds using Containerfile with Docker
+task docker        # builds using Containerfile with Docker
 # or manually
 docker build -t mcpgateway:latest -f Containerfile .
 ```
@@ -29,7 +29,7 @@ A lite image is also available for use in production, see `Containerfile.lite`
 ## 🔐 Run with TLS (self-signed)
 
 ```bash
-make podman-run-ssl
+task podman-run-ssl
 ```
 
 This uses self-signed certs from `./certs/` and runs HTTPS on port `4444`.
@@ -39,7 +39,7 @@ This uses self-signed certs from `./certs/` and runs HTTPS on port `4444`.
 ## 🛠 Container Run (HTTP)
 
 ```bash
-make podman-run
+task podman-run
 ```
 
 This runs the container without TLS on port `4444`.
@@ -63,7 +63,7 @@ You can bump the version manually or automate it via Git tags or CI/CD.
 If you need to ship ZIPs or wheels use the project build tooling:
 
 ```bash
-make dist
+task dist
 # or
 python3 -m build
 ```

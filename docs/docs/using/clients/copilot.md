@@ -18,7 +18,7 @@ HTTP or require local stdio, you can insert the bundled **`mcpgateway.wrapper`**
 
 * **VS Code ≥ 1.99**
 * `"chat.mcp.enabled": true` in your *settings.json*
-* An MCP Gateway running (`make serve`, Docker, or container image)
+* An MCP Gateway running (`task serve`, Docker, or container image)
 * A JWT or Basic credentials (`admin` / `changeme` in dev)
 
 ---

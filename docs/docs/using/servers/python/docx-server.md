@@ -20,10 +20,10 @@ The DOCX MCP Server provides comprehensive capabilities for creating, editing, a
 
 ```bash
 # Install in development mode
-make dev-install
+task dev-install
 
 # Or install normally
-make install
+task install
 ```
 
 ### Prerequisites
@@ -36,13 +36,13 @@ make install
 
 ```bash
 # Start the FastMCP server
-make dev
+task dev
 
 # Or directly
 python -m docx_server.server_fastmcp
 
 # HTTP bridge for REST API access
-make serve-http
+task serve-http
 ```
 
 ## Available Tools
@@ -247,7 +247,7 @@ Extract all text content from a document.
 
 ```bash
 # Start the DOCX server via HTTP
-make serve-http
+task serve-http
 
 # Register with MCP Gateway
 curl -X POST http://localhost:8000/gateways \

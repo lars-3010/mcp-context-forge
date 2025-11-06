@@ -5,10 +5,10 @@ Comprehensive performance testing suite for MCP Gateway with load testing, serve
 ## Quick Start
 
 ```bash
-make install          # Install dependencies (hey)
-make test            # Run standard performance test
-make test-gateway-core  # Test gateway internals
-make test-database   # Test database connection pool
+task install          # Install dependencies (hey)
+task test            # Run standard performance test
+task test-gateway-core  # Test gateway internals
+task test-database   # Test database connection pool
 ```
 
 Results go to `results/{profile}_{timestamp}/`, reports to `reports/`.
@@ -17,47 +17,47 @@ Results go to `results/{profile}_{timestamp}/`, reports to `reports/`.
 
 ### Basic Testing
 ```bash
-make test            # Standard test (10K requests, 50 concurrent)
-make quick           # Quick smoke test (100 requests)
-make heavy           # Heavy load (50K requests, 200 concurrent)
+task test            # Standard test (10K requests, 50 concurrent)
+task quick           # Quick smoke test (100 requests)
+task heavy           # Heavy load (50K requests, 200 concurrent)
 ```
 
 ### New Comprehensive Tests
 ```bash
-make test-gateway-core    # 11 gateway core tests (health, admin API, etc.)
-make test-database        # 4 database connection pool tests
-make test-all-scenarios   # Run all test scenarios
+task test-gateway-core    # 11 gateway core tests (health, admin API, etc.)
+task test-database        # 4 database connection pool tests
+task test-all-scenarios   # Run all test scenarios
 ```
 
 ### Server Profiles
 ```bash
-make test-optimized       # 8 workers, 2 threads - high throughput
-make test-memory          # 4 workers, 8 threads - many connections
-make test-io              # 6 workers, 50 DB pool - I/O heavy
+task test-optimized       # 8 workers, 2 threads - high throughput
+task test-memory          # 4 workers, 8 threads - many connections
+task test-io              # 6 workers, 50 DB pool - I/O heavy
 ```
 
 ### Infrastructure
 ```bash
-make test-production      # 4 instances with nginx load balancer
-make test-scaling         # Test with 4 instances
-make compare-postgres     # Compare PostgreSQL 15 vs 17
+task test-production      # 4 instances with nginx load balancer
+task test-scaling         # Test with 4 instances
+task compare-postgres     # Compare PostgreSQL 15 vs 17
 ```
 
 ### Baseline Management
 ```bash
-make baseline             # Save current as baseline
-make compare              # Compare with baseline
-make list-baselines       # List all baselines
+task baseline             # Save current as baseline
+task compare              # Compare with baseline
+task list-baselines       # List all baselines
 
 # Save specific results
-make save-baseline BASELINE=my-test RESULTS=results/medium_20241010_123456
+task save-baseline BASELINE=my-test RESULTS=results/medium_20241010_123456
 ```
 
 ### Cleanup
 ```bash
-make clean                # Clean result files
-make clean-results        # Remove all result directories
-make clean-all            # Deep clean (results + baselines + reports)
+task clean                # Clean result files
+task clean-results        # Remove all result directories
+task clean-all            # Deep clean (results + baselines + reports)
 ```
 
 ## Available Profiles
@@ -92,9 +92,9 @@ make clean-all            # Deep clean (results + baselines + reports)
 ### Find Optimal Configuration
 ```bash
 # Test all server profiles
-make test-minimal
-make test-standard
-make test-optimized
+task test-minimal
+task test-standard
+task test-optimized
 
 # Compare results, choose best cost/performance
 ```
@@ -102,7 +102,7 @@ make test-optimized
 ### Plan Database Upgrade
 ```bash
 # Compare PostgreSQL versions
-make compare-postgres
+task compare-postgres
 
 # Or manually:
 ./run-advanced.sh -p medium --postgres-version 15-alpine --save-baseline pg15.json
@@ -122,10 +122,10 @@ make compare-postgres
 ### Regression Testing
 ```bash
 # Before code changes
-make baseline-production
+task baseline-production
 
 # After changes
-make compare
+task compare
 
 # Automatically fails if regressions detected
 ```
@@ -244,7 +244,7 @@ Edit `config.yaml` to customize:
 
 ### Services Not Starting
 ```bash
-make check                    # Check health
+task check                    # Check health
 docker-compose logs gateway   # View logs
 ```
 
@@ -263,8 +263,8 @@ source .auth_token            # Load token
 
 ### Cleanup
 ```bash
-make clean-results            # Remove old test runs
-make clean-all                # Deep clean everything
+task clean-results            # Remove old test runs
+task clean-all                # Deep clean everything
 ```
 
 ## What's New (v2.1)
@@ -281,22 +281,22 @@ make clean-all                # Deep clean everything
 
 ```bash
 # List everything
-make help                     # Show all commands
-make list-profiles            # Show load/server/infra profiles
-make list-baselines           # Show saved baselines
+task help                     # Show all commands
+task list-profiles            # Show load/server/infra profiles
+task list-baselines           # Show saved baselines
 
 # Testing
-make test                     # Standard test
-make test-gateway-core        # Gateway tests (NEW)
-make test-database            # DB tests (NEW)
+task test                     # Standard test
+task test-gateway-core        # Gateway tests (NEW)
+task test-database            # DB tests (NEW)
 
 # Comparison
-make baseline                 # Save baseline
-make compare                  # Compare with baseline
+task baseline                 # Save baseline
+task compare                  # Compare with baseline
 
 # Cleanup
-make clean                    # Clean files
-make clean-results            # Clean directories
+task clean                    # Clean files
+task clean-results            # Clean directories
 ```
 
 ## Documentation
@@ -306,4 +306,4 @@ make clean-results            # Clean directories
 
 ---
 
-**Ready?** Run `make test` or `make help`
+**Ready?** Run `task test` or `task help`

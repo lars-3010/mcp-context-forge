@@ -360,8 +360,8 @@ These manual tests complement the automated test suites:
 
 ```bash
 # Run automated tests
-make test                    # Unit and integration tests
-make smoketest              # End-to-end Docker tests
+task test                    # Unit and integration tests
+task smoketest              # End-to-end Docker tests
 
 # Run performance tests
 cd tests/performance

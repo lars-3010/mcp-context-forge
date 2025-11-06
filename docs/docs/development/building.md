@@ -15,7 +15,7 @@ Follow these instructions to set up your development environment, build the gate
 ## 🔧 One-Liner Setup (Recommended)
 
 ```bash
-make venv install-dev serve
+task venv install-dev serve
 ```
 
 This will:
@@ -47,14 +47,14 @@ This installs:
 You can run the gateway with:
 
 ```bash
-make serve         # production-mode (Gunicorn) on http://localhost:4444
-make dev           # hot-reload (Uvicorn) on http://localhost:8000
-make run           # executes ./run.sh with your current .env settings
+task serve         # production-mode (Gunicorn) on http://localhost:4444
+task dev           # hot-reload (Uvicorn) on http://localhost:8000
+task run           # executes ./run.sh with your current .env settings
 RELOAD=true make run   # enable auto-reload via run.sh (same as ./run.sh --reload)
 ./run.sh --help    # view all supported flags
 ```
 
-Use `make dev` during development for auto-reload on port 8000.
+Use `task dev` during development for auto-reload on port 8000.
 
 ---
 

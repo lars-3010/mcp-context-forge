@@ -277,7 +277,7 @@ For enterprise production deployments, use asymmetric JWT with proper secret man
 
 ```bash
 # Option 1: Use Makefile (Recommended)
-make certs-jwt                   # Generates certs/jwt/{private,public}.pem
+task certs-jwt                   # Generates certs/jwt/{private,public}.pem
 
 # Create Kubernetes secret for JWT keys
 kubectl create secret generic jwt-keys \

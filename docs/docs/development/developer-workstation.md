@@ -24,7 +24,7 @@ This guide helps you to set up your local environment for contributing to the Mo
     -   macOS: `brew install make`.
     -   Linux: `sudo apt-get install make` or `sudo dnf install make`.
     -   Windows: Install via [Chocolatey](https://chocolatey.org/) (`choco install make`) or use WSL2.
-    -   Verify: `make --version`.
+    -   Verify: `task --version`.
 -   **(Optional) uv, ruff, mypy, isort**
     -   Install: `pip install uv ruff mypy isort`.
     -   Usage: Run `ruff check .` or `mypy .` for linting/type checking.
@@ -102,8 +102,8 @@ This guide helps you to set up your local environment for contributing to the Mo
 ```bash
 # Build docs in an isolated environment
 cd docs
-make venv          # first run only; installs MkDocs + plugins
-make serve         # http://127.0.0.1:8000 with live reload
+task venv          # first run only; installs MkDocs + plugins
+task serve         # http://127.0.0.1:8000 with live reload
 ```
 
 ## Signing commits

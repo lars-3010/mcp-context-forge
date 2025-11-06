@@ -322,7 +322,7 @@ JWT_AUDIENCE_VERIFICATION=true
 
 ```bash
 # Option 1: Use Makefile (Recommended)
-make certs-jwt                   # Generates certs/jwt/{private,public}.pem with proper permissions
+task certs-jwt                   # Generates certs/jwt/{private,public}.pem with proper permissions
 
 # Option 2: Manual generation
 mkdir -p certs/jwt
@@ -350,7 +350,7 @@ JWT_AUDIENCE_VERIFICATION=true
 
 ```bash
 # Option 1: Use Makefile (Recommended)
-make certs-jwt-ecdsa             # Generates certs/jwt/{ec_private,ec_public}.pem with proper permissions
+task certs-jwt-ecdsa             # Generates certs/jwt/{ec_private,ec_public}.pem with proper permissions
 
 # Option 2: Manual generation
 mkdir -p certs/jwt

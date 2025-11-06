@@ -104,7 +104,7 @@ REQUIRE_TOKEN_EXPIRATION=true
 **RSA Key Generation:**
 ```bash
 # Option 1: Use Makefile (Recommended for development/local)
-make certs-jwt                   # Generates ./certs/jwt/{private,public}.pem with secure permissions
+task certs-jwt                   # Generates ./certs/jwt/{private,public}.pem with secure permissions
 
 # Option 2: Manual generation (Production with custom paths)
 mkdir -p /secure/certs/jwt
@@ -118,7 +118,7 @@ chown mcpgateway:mcpgateway /secure/certs/jwt/*.pem
 **ECDSA Key Generation (Alternative):**
 ```bash
 # Option 1: Use Makefile (Recommended for development/local)
-make certs-jwt-ecdsa             # Generates ./certs/jwt/{ec_private,ec_public}.pem with secure permissions
+task certs-jwt-ecdsa             # Generates ./certs/jwt/{ec_private,ec_public}.pem with secure permissions
 
 # Option 2: Manual generation (Production with custom paths)
 mkdir -p /secure/certs/jwt
@@ -130,7 +130,7 @@ chmod 644 /secure/certs/jwt/ec_public.pem
 
 **Combined Generation (SSL + JWT):**
 ```bash
-make certs-all                   # Generates both TLS certificates and JWT RSA keys
+task certs-all                   # Generates both TLS certificates and JWT RSA keys
 ```
 
 **Security Requirements:**
@@ -406,13 +406,13 @@ LOG_ROTATION_ENABLED=false   # Enable only when log files are needed
 
 ```bash
 # Development (with security checks)
-make security-all && make test && make run
+task security-all && make test && make run
 
 # Production build
-make docker-prod
+task docker-prod
 
 # Security audit
-make security-report
+task security-report
 ```
 
 Remember: **Security is a shared responsibility**. MCP Gateway provides *some* security controls, but you must properly configure and integrate it within a comprehensive security architecture.

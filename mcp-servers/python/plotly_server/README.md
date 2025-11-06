@@ -37,10 +37,10 @@ Advanced data visualization server using Plotly for creating interactive charts 
 
 ```bash
 # Install in development mode with Plotly dependencies
-make dev-install
+task dev-install
 
 # Or install normally
-make install
+task install
 pip install plotly pandas numpy kaleido
 ```
 
@@ -50,7 +50,7 @@ pip install plotly pandas numpy kaleido
 
 ```bash
 # Start the server
-make dev
+task dev
 
 # Or directly
 python -m plotly_server.server_fastmcp
@@ -61,7 +61,7 @@ python -m plotly_server.server_fastmcp
 Expose the server over HTTP for REST API access:
 
 ```bash
-make serve-http
+task serve-http
 ```
 
 ### MCP Client Configuration
@@ -190,13 +190,13 @@ The FastMCP implementation provides:
 
 ```bash
 # Format code
-make format
+task format
 
 # Run tests
-make test
+task test
 
 # Lint code
-make lint
+task lint
 ```
 
 ## Notes

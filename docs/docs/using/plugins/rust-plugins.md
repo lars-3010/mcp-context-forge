@@ -276,16 +276,16 @@ maturin build --release
 
 ```bash
 # From project root
-make rust-dev              # Build and install (development mode)
-make rust-build            # Build release wheel
-make rust-test             # Run Rust unit tests
-make rust-verify           # Verify installation
+task rust-dev              # Build and install (development mode)
+task rust-build            # Build release wheel
+task rust-test             # Run Rust unit tests
+task rust-verify           # Verify installation
 
 # From plugins_rust/
-make dev                   # Build and install
-make test                  # Run tests
-make bench                 # Run benchmarks
-make bench-compare         # Compare Rust vs Python performance
+task dev                   # Build and install
+task test                  # Run tests
+task bench                 # Run benchmarks
+task bench-compare         # Compare Rust vs Python performance
 ```
 
 ## Performance Benchmarking
@@ -295,13 +295,13 @@ make bench-compare         # Compare Rust vs Python performance
 ```bash
 # Run Rust benchmarks (Criterion)
 cd plugins_rust
-make bench
+task bench
 
 # Run Python vs Rust comparison
-make bench-compare
+task bench-compare
 
 # Or from project root
-make rust-bench-compare
+task rust-bench-compare
 ```
 
 ### Sample Benchmark Output
@@ -352,7 +352,7 @@ pytest tests/unit/mcpgateway/plugins/test_pii_filter_rust.py
 pytest tests/differential/test_pii_filter_differential.py
 
 # Or use make
-make rust-test-all         # Run all tests
+task rust-test-all         # Run all tests
 ```
 
 ### Test Coverage
@@ -533,11 +533,11 @@ The repository includes automated CI/CD for Rust plugins:
 
 ```bash
 # Run full CI pipeline locally
-make rust-check            # Format, lint, test
-make rust-test-all         # All test suites
-make rust-bench            # Performance benchmarks
-make rust-audit            # Security audit
-make rust-coverage         # Code coverage report
+task rust-check            # Format, lint, test
+task rust-test-all         # All test suites
+task rust-bench            # Performance benchmarks
+task rust-audit            # Security audit
+task rust-coverage         # Code coverage report
 ```
 
 ## Performance Optimizations

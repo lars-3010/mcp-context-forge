@@ -41,10 +41,10 @@ A comprehensive MCP server for LaTeX document creation, editing, and compilation
 
 ```bash
 # Install in development mode
-make dev-install
+task dev-install
 
 # Or install normally
-make install
+task install
 ```
 
 ## Usage
@@ -52,13 +52,13 @@ make install
 ### Stdio Mode (for Claude Desktop, IDEs)
 
 ```bash
-make dev
+task dev
 ```
 
 ### HTTP Mode (via MCP Gateway)
 
 ```bash
-make serve-http
+task serve-http
 ```
 
 ## Templates
@@ -183,13 +183,13 @@ Automatically included packages:
 
 ```bash
 # Format code
-make format
+task format
 
 # Run tests
-make test
+task test
 
 # Lint code
-make lint
+task lint
 ```
 
 ## Compilation Notes

@@ -42,7 +42,7 @@ python -m mcpgateway.scripts.validate_env
 python -m mcpgateway.scripts.validate_env .env.example
 
 # Use in Makefile
-make check-env
+task check-env
 ```
 
 The validator checks for:

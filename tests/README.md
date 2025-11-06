@@ -26,8 +26,8 @@ tests/
 | Unit tests only                                         | `pytest tests/unit`                                                                                                         |
 | A single module (verbose)                               | `pytest -v tests/unit/mcpgateway/test_main.py`                                                                              |
 | **Coverage for `mcpgateway/main.py` from *unit* suite** | <br>`pytest tests/unit/mcpgateway/test_main.py \`<br>`       --cov=mcpgateway.main \`<br>`       --cov-report=term-missing` |
-| **HTML coverage report (all code)**                     | `make htmlcov` → open `htmlcov/index.html`                                                                                  |
-| Project-wide tests + coverage (CI default)              | `make test`                                                                                                                 |
+| **HTML coverage report (all code)**                     | `task htmlcov` → open `htmlcov/index.html`                                                                                  |
+| Project-wide tests + coverage (CI default)              | `task test`                                                                                                                 |
 
 ---
 
@@ -82,8 +82,8 @@ tests/
 
 | target         | does...                                                                  |
 | -------------- | ---------------------------------------------------------------------- |
-| `make test`    | Runs `pytest --cov --cov-report=term` across the whole repo.           |
-| `make htmlcov` | Re-runs tests and generates an **HTML coverage report** in `htmlcov/`. |
-| `make lint`    | Static analysis (ruff, mypy, etc.) - optional in CI.                   |
+| `task test`    | Runs `pytest --cov --cov-report=term` across the whole repo.           |
+| `task htmlcov` | Re-runs tests and generates an **HTML coverage report** in `htmlcov/`. |
+| `task lint`    | Static analysis (ruff, mypy, etc.) - optional in CI.                   |
 
 ---

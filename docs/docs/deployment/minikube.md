@@ -46,7 +46,7 @@ Minikube provides a self-contained environment, enabling you to replicate produc
 > **Make target**
 
 ```bash
-make minikube-install
+task minikube-install
 ```
 
 This target checks for existing installations of `minikube` and `kubectl`. If missing, it installs them using:
@@ -91,7 +91,7 @@ choco install -y minikube kubernetes-cli
 > **Make target**
 
 ```bash
-make minikube-start
+task minikube-start
 ```
 
 <details>
@@ -115,7 +115,7 @@ minikube start \
 **Check cluster status:**
 
 ```bash
-make minikube-status
+task minikube-status
 # or:
 minikube status -p mcpgw
 kubectl get pods -n ingress-nginx
@@ -128,7 +128,7 @@ kubectl get pods -n ingress-nginx
 > **Make target**
 
 ```bash
-make minikube-image-load
+task minikube-image-load
 ```
 
 This target builds the `ghcr.io/ibm/mcp-context-forge:0.8.0` image and loads it into Minikube.
@@ -155,7 +155,7 @@ This target builds the `ghcr.io/ibm/mcp-context-forge:0.8.0` image and loads it 
 > **Make target**
 
 ```bash
-make minikube-k8s-apply
+task minikube-k8s-apply
 ```
 
 This applies the Kubernetes manifests. Alternative manual step:
@@ -280,8 +280,8 @@ curl http://gateway.local/health
 
 | Action              | Make target            | Manual command                                               |
 | ------------------- | ---------------------- | ------------------------------------------------------------ |
-| Pause cluster       | `make minikube-stop`   | `minikube stop -p mcpgw`                                     |
-| Delete cluster      | `make minikube-delete` | `minikube delete -p mcpgw`                                   |
+| Pause cluster       | `task minikube-stop`   | `minikube stop -p mcpgw`                                     |
+| Delete cluster      | `task minikube-delete` | `minikube delete -p mcpgw`                                   |
 | Remove cached image | -                      | `minikube cache delete ghcr.io/ibm/mcp-context-forge:0.8.0` |
 
 ---

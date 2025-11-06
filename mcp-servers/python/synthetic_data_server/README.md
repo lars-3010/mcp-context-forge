@@ -143,12 +143,12 @@ All column types support `nullable` and `null_probability` for generating null v
 
 ## Makefile Targets
 
-- `make install` — Install in editable mode with development dependencies (requires `uv`)
-- `make lint` — Run Ruff + MyPy
-- `make test` — Execute pytest suite with coverage
-- `make dev` — Run the FastMCP server over stdio
-- `make serve-http` — Run with the built-in HTTP transport on `/mcp`
-- `make serve-sse` — Expose an SSE bridge using `mcpgateway.translate`
+- `task install` — Install in editable mode with development dependencies (requires `uv`)
+- `task lint` — Run Ruff + MyPy
+- `task test` — Execute pytest suite with coverage
+- `task dev` — Run the FastMCP server over stdio
+- `task serve-http` — Run with the built-in HTTP transport on `/mcp`
+- `task serve-sse` — Expose an SSE bridge using `mcpgateway.translate`
 
 ## Container Usage
 
@@ -162,7 +162,7 @@ docker run --rm -p 9018:9018 synthetic-data-server python -m synthetic_data_serv
 ## Testing
 
 ```bash
-make test
+task test
 ```
 
 The unit tests cover deterministic generation, preset usage, and artifact persistence.
@@ -176,4 +176,4 @@ The unit tests cover deterministic generation, preset usage, and artifact persis
 }
 ```
 
-For HTTP clients, invoke `make serve-http` and target `http://localhost:9018/mcp/`.
+For HTTP clients, invoke `task serve-http` and target `http://localhost:9018/mcp/`.

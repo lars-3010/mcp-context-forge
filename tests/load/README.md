@@ -6,10 +6,10 @@ Production-scale load testing and database population system for MCP Gateway wit
 
 ```bash
 # Generate small test dataset (100 users, ~74K records, <1 minute)
-make generate-small
+task generate-small
 
 # View generated data report
-make generate-report
+task generate-report
 
 # Check database
 sqlite3 mcp.db "SELECT COUNT(*) FROM email_users;"
@@ -19,22 +19,22 @@ sqlite3 mcp.db "SELECT COUNT(*) FROM email_users;"
 
 | Profile | Users | Teams | Total Records | Time | Database | Command |
 |---------|-------|-------|---------------|------|----------|---------|
-| **Small** | 100 | ~600 | ~74K | <1 min | SQLite OK | `make generate-small` |
-| **Medium** | 10K | ~110K | ~70M | ~10 min | PostgreSQL recommended | `make generate-medium` |
-| **Large** | 100K | ~1.1M | ~700M | ~1-2 hours | PostgreSQL/MySQL required | `make generate-large` |
-| **Massive** | 1M | ~11M | ~7B | ~10-20 hours | PostgreSQL/MySQL + high-end hardware | `make generate-massive` |
+| **Small** | 100 | ~600 | ~74K | <1 min | SQLite OK | `task generate-small` |
+| **Medium** | 10K | ~110K | ~70M | ~10 min | PostgreSQL recommended | `task generate-medium` |
+| **Large** | 100K | ~1.1M | ~700M | ~1-2 hours | PostgreSQL/MySQL required | `task generate-large` |
+| **Massive** | 1M | ~11M | ~7B | ~10-20 hours | PostgreSQL/MySQL + high-end hardware | `task generate-massive` |
 
 ## Command-Line Usage
 
 ### Makefile Targets (Easiest)
 
 ```bash
-make generate-small      # 100 users, ~74K records, <1 min
-make generate-medium     # 10K users, ~70M records, ~10 min
-make generate-large      # 100K users, ~700M records, ~1-2 hours
-make generate-massive    # 1M users, billions of records, ~10-20 hours
-make generate-clean      # Clean reports
-make generate-report     # Display latest reports
+task generate-small      # 100 users, ~74K records, <1 min
+task generate-medium     # 10K users, ~70M records, ~10 min
+task generate-large      # 100K users, ~700M records, ~1-2 hours
+task generate-massive    # 1M users, billions of records, ~10-20 hours
+task generate-clean      # Clean reports
+task generate-report     # Display latest reports
 ```
 
 ### Direct Python Usage
@@ -92,7 +92,7 @@ alembic upgrade head
 
 ```bash
 # View latest reports
-make generate-report
+task generate-report
 
 # Or directly
 jq . reports/small_load_report.json
@@ -166,7 +166,7 @@ Automatically validates:
 
 ```bash
 # Clean reports only
-make generate-clean
+task generate-clean
 
 # Clean database
 rm mcp.db  # SQLite

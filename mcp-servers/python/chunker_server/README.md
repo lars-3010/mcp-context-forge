@@ -17,22 +17,22 @@ Advanced text chunking server with multiple strategies and configurable options.
 
 ### Basic Installation
 ```bash
-make install  # Core functionality with FastMCP
+task install  # Core functionality with FastMCP
 ```
 
 ### With NLP Libraries
 ```bash
-make install-nlp  # Includes NLTK and spaCy
+task install-nlp  # Includes NLTK and spaCy
 ```
 
 ### With LangChain Support
 ```bash
-make install-langchain  # Includes LangChain text splitters
+task install-langchain  # Includes LangChain text splitters
 ```
 
 ### Full Installation (Recommended)
 ```bash
-make install-full  # All features including FastMCP, NLP, and LangChain
+task install-full  # All features including FastMCP, NLP, and LangChain
 ```
 
 ## Usage
@@ -40,13 +40,13 @@ make install-full  # All features including FastMCP, NLP, and LangChain
 ### Running with FastMCP (Recommended)
 
 ```bash
-make dev-fastmcp  # Run FastMCP server
+task dev-fastmcp  # Run FastMCP server
 ```
 
 ### Running Original MCP Implementation
 
 ```bash
-make dev  # Run original MCP server
+task dev  # Run original MCP server
 ```
 
 ### HTTP Bridge
@@ -55,10 +55,10 @@ Expose the server over HTTP for REST API access:
 
 ```bash
 # FastMCP server over HTTP
-make serve-http-fastmcp
+task serve-http-fastmcp
 
 # Original server over HTTP
-make serve-http
+task serve-http
 ```
 
 ### MCP Client Configuration
@@ -325,22 +325,22 @@ All tools return a JSON response with:
 
 ### Running Tests
 ```bash
-make test
+task test
 ```
 
 ### Formatting Code
 ```bash
-make format
+task format
 ```
 
 ### Linting
 ```bash
-make lint
+task lint
 ```
 
 ### Example Chunking
 ```bash
-make example-chunk
+task example-chunk
 ```
 
 ## Troubleshooting

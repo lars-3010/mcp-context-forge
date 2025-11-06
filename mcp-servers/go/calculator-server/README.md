@@ -116,13 +116,13 @@ git clone <repository-url>
 cd calculator-server
 
 # Install dependencies
-make deps
+task deps
 
 # Build the server
-make build
+task build
 
 # Run the server
-make run
+task run
 ```
 
 ### Alternative Setup
@@ -370,61 +370,61 @@ calculator-server/
 
 ```bash
 # Build for current platform
-make build
+task build
 
 # Build for all platforms
-make build-all
+task build-all
 
 # Install to $GOPATH/bin
-make install
+task install
 ```
 
 ### Testing
 
 ```bash
 # Run all tests
-make test
+task test
 
 # Run tests with coverage
-make coverage
+task coverage
 
 # Run tests with race detection
-make test-race
+task test-race
 
 # Run benchmarks
-make benchmark
+task benchmark
 ```
 
 ### Quality Assurance
 
 ```bash
 # Format code
-make fmt
+task fmt
 
 # Run linter
-make lint
+task lint
 
 # Run vet
-make vet
+task vet
 
 # Run all quality checks
-make quality
+task quality
 
 # Pre-commit checks
-make pre-commit
+task pre-commit
 
 # CI pipeline
-make ci
+task ci
 ```
 
 ### Development Mode
 
 ```bash
 # Run without building (development)
-make run-dev
+task run-dev
 
 # Run with rebuild
-make run
+task run
 ```
 
 ## 📋 Available Tools
@@ -646,7 +646,7 @@ go test ./tests/advanced_test.go -v
 go test ./tests/integration_test.go -v
 
 # Generate coverage report
-make coverage
+task coverage
 ```
 
 ## 🚢 Deployment
@@ -655,20 +655,20 @@ make coverage
 
 ```bash
 # Build Docker image
-make docker-build
+task docker-build
 
 # Run in Docker
-make docker-run
+task docker-run
 
 # Push to registry
-make docker-push
+task docker-push
 ```
 
 ### Binary Distribution
 
 ```bash
 # Create release build
-make release
+task release
 
 # Binaries will be in ./dist/release/
 ls -la ./dist/release/
@@ -813,7 +813,7 @@ All tools include comprehensive JSON Schema definitions for parameter validation
 - Maintain >95% test coverage
 - Add comprehensive documentation
 - Use meaningful commit messages
-- Run `make quality` before submitting
+- Run `task quality` before submitting
 
 ## 📄 License
 
@@ -832,7 +832,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 **Project Resources:**
 - **Issues**: [GitHub Issues](https://github.com/IBM/mcp-context-forge/issues)
 - **Documentation**: This README and inline code documentation
-- **Examples**: See `make example-*` commands
+- **Examples**: See `task example-*` commands
 
 **Getting Help:**
 1. Check this README for comprehensive documentation

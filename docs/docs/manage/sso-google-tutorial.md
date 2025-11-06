@@ -150,13 +150,13 @@ SSO_TRUSTED_DOMAINS=["yourcompany.com", "subsidiary.com", "contractor.org"]
 
 ```bash
 # Development
-make dev
+task dev
 
 # Or directly with uvicorn
 uvicorn mcpgateway.main:app --reload --host 0.0.0.0 --port 8000
 
 # Production
-make serve
+task serve
 ```
 
 ### 3.2 Verify Google SSO is Enabled

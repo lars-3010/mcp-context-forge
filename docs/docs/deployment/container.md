@@ -35,7 +35,7 @@ You can now access the UI at [http://localhost:4444/admin](http://localhost:4444
 ### Using Podman (recommended)
 
 ```bash
-make podman
+task podman
 ```
 
 ### Using Docker (manual alternative)
@@ -53,7 +53,7 @@ docker build -t mcpgateway:latest -f Containerfile .
 ### With HTTP (no TLS)
 
 ```bash
-make podman-run
+task podman-run
 ```
 
 This starts the app at `http://localhost:4444`.
@@ -63,7 +63,7 @@ This starts the app at `http://localhost:4444`.
 ### With Self-Signed TLS (HTTPS)
 
 ```bash
-make podman-run-ssl
+task podman-run-ssl
 ```
 
 Runs the gateway using certs from `./certs/`, available at:

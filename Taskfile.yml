@@ -1,0 +1,815 @@
+version: '3'
+
+# MCP Gateway (ContextForge) - Comprehensive Task Runner
+# Migrated from 418-target Makefile with script extraction for maintainability
+# Install: https://taskfile.dev/installation/
+
+dotenv: ['.env']
+
+vars:
+  # Python Environment Detection
+  USE_UV: '{{default "true" .USE_UV}}'
+  PYTHON: '{{if eq .USE_UV "true"}}uv run python{{else}}{{.VENV_DIR}}/bin/python{{end}}'
+  PYTEST: '{{if eq .USE_UV "true"}}uv run pytest{{else}}{{.VENV_DIR}}/bin/pytest{{end}}'
+  UVICORN: '{{if eq .USE_UV "true"}}uv run uvicorn{{else}}{{.VENV_DIR}}/bin/uvicorn{{end}}'
+
+  # Virtual Environment
+  VENVS_DIR: '{{default (print .HOME "/.venv") .VENVS_DIR}}'
+  PROJECT_NAME: mcpgateway
+  VENV_DIR: '{{default ".venv" .VENV_DIR}}'
+
+  # Server Configuration
+  HOST: '{{default "0.0.0.0" .HOST}}'
+  PORT: '{{default "4444" .PORT}}'
+  RELOAD: '{{default "true" .RELOAD}}'
+
+  # Container Runtime (auto-detect docker/podman)
+  CONTAINER_RUNTIME: '{{default "auto" .CONTAINER_RUNTIME}}'
+  IMAGE_NAME: '{{default "mcpgateway" .IMAGE_NAME}}'
+  IMAGE_TAG: '{{default "latest" .IMAGE_TAG}}'
+  CONTAINER_NAME: '{{default "mcpgateway" .CONTAINER_NAME}}'
+
+  # Certificates
+  CERTS_DIR: '{{default "./certs" .CERTS_DIR}}'
+  CERT_DAYS: '{{default "825" .CERT_DAYS}}'
+
+  # Testing
+  TEST_PATTERN: '{{default "tests/" .TEST_PATTERN}}'
+  COVERAGE_DIR: '{{default "docs/docs/coverage" .COVERAGE_DIR}}'
+
+  # Linting
+  LINT_TARGET: '{{default "mcpgateway tests" .LINT_TARGET}}'
+  MAX_LINE_LENGTH: '{{default "200" .MAX_LINE_LENGTH}}'
+
+# ============================================================================
+# QUICK START & HELP
+# ============================================================================
+
+tasks:
+  default:
+    desc: Show available tasks
+    aliases: [help]
+    cmds:
+      - task --list
+
+  info:
+    desc: Show project information and configuration
+    cmds:
+      - cmd: |
+          echo "MCP Gateway (ContextForge) - Development Info"
+          echo "============================================="
+          echo "Python: $({{.PYTHON}} --version)"
+          echo "Package manager: {{if eq .USE_UV "true"}}uv{{else}}pip{{end}}"
+          echo "Database: ${DATABASE_URL:-sqlite:///./mcp.db}"
+          echo "Vault: ${VAULT_ENABLED:-false}"
+          echo "Container Runtime: {{.CONTAINER_RUNTIME}}"
+          echo "Certs Directory: {{.CERTS_DIR}}"
+          {{.PYTHON}} -c "from mcpgateway import __version__; print(f'Version: {__version__}')" 2>/dev/null || echo "Version: unknown"
+
+# ============================================================================
+# VIRTUAL ENVIRONMENT & INSTALLATION
+# ============================================================================
+
+  venv:
+    desc: Create fresh virtual environment with uv
+    cmds:
+      - ./scripts/venv/create_venv.sh
+    sources:
+      - pyproject.toml
+      - uv.lock
+
+  install:
+    desc: Install project with dependencies
+    cmds:
+      - cmd: |
+          {{if eq .USE_UV "true"}}
+          echo "📦 Installing with uv..."
+          uv sync
+          {{else}}
+          echo "📦 Installing with pip..."
+          test -d {{.VENV_DIR}} || python3 -m venv {{.VENV_DIR}}
+          {{.VENV_DIR}}/bin/pip install --upgrade pip
+          {{.VENV_DIR}}/bin/pip install -e .
+          {{end}}
+
+  install-dev:
+    desc: Install project with development dependencies
+    cmds:
+      - cmd: |
+          {{if eq .USE_UV "true"}}
+          echo "📦 Installing dev dependencies with uv..."
+          uv sync --group dev
+          {{else}}
+          echo "📦 Installing with pip..."
+          test -d {{.VENV_DIR}} || python3 -m venv {{.VENV_DIR}}
+          {{.VENV_DIR}}/bin/pip install --upgrade pip
+          {{.VENV_DIR}}/bin/pip install -e ".[dev]"
+          {{end}}
+
+  setup:
+    desc: Complete setup workflow (install + env check)
+    cmds:
+      - task: install-dev
+      - task: check-env
+
+  check-env:
+    desc: Verify .env file against .env.example
+    cmds:
+      - cmd: |
+          if [ ! -f .env ]; then
+            echo "❌ .env file not found"
+            echo "💡 Run: cp .env.example .env"
+            exit 1
+          fi
+          {{.PYTHON}} -c "
+          import sys
+          from pathlib import Path
+
+          example = set(l.split('=')[0] for l in Path('.env.example').read_text().splitlines() if l and not l.startswith('#'))
+          actual = set(l.split('=')[0] for l in Path('.env').read_text().splitlines() if l and not l.startswith('#'))
+          missing = example - actual
+
+          if missing:
+              print('⚠️  Missing environment variables:', ', '.join(missing))
+              sys.exit(1)
+          else:
+              print('✅ .env file is complete')
+          "
+
+  upgrade-deps:
+    desc: Upgrade all dependencies to latest versions
+    cmds:
+      - cmd: |
+          {{if eq .USE_UV "true"}}
+          uv pip install --upgrade pip setuptools wheel
+          uv pip list --outdated
+          {{else}}
+          {{.VENV_DIR}}/bin/pip install --upgrade pip setuptools wheel
+          {{.VENV_DIR}}/bin/pip list --outdated
+          {{end}}
+
+  sync:
+    desc: Sync dependencies with lock file
+    cmds:
+      - cmd: |
+          {{if eq .USE_UV "true"}}
+          uv pip sync
+          {{else}}
+          echo "⚠️  Sync requires uv. Set USE_UV=true"
+          {{end}}
+
+# ============================================================================
+# SERVE & DEVELOPMENT
+# ============================================================================
+
+  dev:
+    desc: Start development server with auto-reload (port 8000)
+    cmds:
+      - '{{.UVICORN}} mcpgateway.main:app --host {{.HOST}} --port 8000 --reload --reload-exclude="public/"'
+
+  serve:
+    desc: Production server with gunicorn (port {{.PORT}})
+    cmds:
+      - cmd: |
+          {{if eq .USE_UV "true"}}
+          uv run gunicorn mcpgateway.main:app \
+            --workers 4 \
+            --worker-class uvicorn.workers.UvicornWorker \
+            --bind {{.HOST}}:{{.PORT}}
+          {{else}}
+          {{.VENV_DIR}}/bin/gunicorn mcpgateway.main:app \
+            --workers 4 \
+            --worker-class uvicorn.workers.UvicornWorker \
+            --bind {{.HOST}}:{{.PORT}}
+          {{end}}
+
+  serve-dev:
+    desc: Development server with gunicorn (1 worker, reload)
+    cmds:
+      - cmd: |
+          {{if eq .USE_UV "true"}}
+          uv run gunicorn mcpgateway.main:app -w 1 -k uvicorn.workers.UvicornWorker --bind {{.HOST}}:{{.PORT}} --reload
+          {{else}}
+          {{.VENV_DIR}}/bin/gunicorn mcpgateway.main:app -w 1 -k uvicorn.workers.UvicornWorker --bind {{.HOST}}:{{.PORT}} --reload
+          {{end}}
+
+# ============================================================================
+# TESTING & COVERAGE
+# ============================================================================
+
+  test:
+    desc: Run full test suite with coverage
+    cmds:
+      - ./scripts/test/run_tests.sh "{{.TEST_PATTERN}}"
+
+  test-fast:
+    desc: Run tests in parallel without coverage
+    cmds:
+      - '{{.PYTEST}} {{.TEST_PATTERN}} -n auto --maxfail=3'
+
+  test-unit:
+    desc: Run only unit tests
+    cmds:
+      - ./scripts/test/run_tests.sh "tests/unit/"
+
+  test-integration:
+    desc: Run only integration tests
+    cmds:
+      - ./scripts/test/run_tests.sh "tests/integration/"
+
+  test-e2e:
+    desc: Run only end-to-end tests
+    cmds:
+      - ./scripts/test/run_tests.sh "tests/e2e/"
+
+  test-security:
+    desc: Run security tests
+    cmds:
+      - ./scripts/test/run_tests.sh "tests/security/"
+
+  test-playwright:
+    desc: Run Playwright UI tests
+    cmds:
+      - '{{.PYTEST}} tests/playwright/ -v --headed'
+
+  doctest:
+    desc: Run doctests in source code
+    cmds:
+      - '{{.PYTEST}} --doctest-modules mcpgateway/ -v'
+
+  coverage:
+    desc: Generate and display coverage report
+    deps: [test]
+    cmds:
+      - echo "📊 Coverage report → file://$(pwd)/{{.COVERAGE_DIR}}/index.html"
+
+  htmlcov:
+    desc: Alias for coverage
+    deps: [coverage]
+
+  smoketest:
+    desc: End-to-end container smoke test
+    cmds:
+      - ./scripts/test/smoketest.sh
+
+  mutation-test:
+    desc: Run mutation testing with mutmut (parallel)
+    cmds:
+      - ./scripts/test/mutation_test.sh "mcpgateway/" "auto"
+
+  mutation-test-single:
+    desc: Run mutation testing (single-threaded)
+    cmds:
+      - ./scripts/test/mutation_test.sh "mcpgateway/" "1"
+
+  load-test:
+    desc: Run load tests with locust (headless)
+    cmds:
+      - '{{.PYTHON}} -m locust -f tests/load/locustfile.py --headless -u 10 -r 2 -t 30s'
+
+  load-test-ui:
+    desc: Run load tests with web UI
+    cmds:
+      - '{{.PYTHON}} -m locust -f tests/load/locustfile.py'
+
+  profile:
+    desc: Profile application with py-spy
+    cmds:
+      - py-spy record -o profile.svg -- {{.PYTHON}} -m mcpgateway.main
+
+  benchmark:
+    desc: Run performance benchmarks
+    cmds:
+      - '{{.PYTEST}} tests/performance/ -v --benchmark-only'
+
+# ============================================================================
+# CODE QUALITY & LINTING
+# ============================================================================
+
+  format:
+    desc: Auto-format code (autoflake + isort + black)
+    cmds:
+      - ./scripts/lint/format_code.sh "{{.LINT_TARGET}}"
+
+  autoflake:
+    desc: Remove unused imports and variables
+    cmds:
+      - '{{.PYTHON}} -m autoflake --in-place --remove-all-unused-imports --remove-unused-variables --recursive --exclude=__init__.py {{.LINT_TARGET}}'
+
+  isort:
+    desc: Sort imports
+    cmds:
+      - '{{.PYTHON}} -m isort --profile=black --line-length={{.MAX_LINE_LENGTH}} {{.LINT_TARGET}}'
+
+  black:
+    desc: Format code with black
+    cmds:
+      - '{{.PYTHON}} -m black --line-length={{.MAX_LINE_LENGTH}} {{.LINT_TARGET}}'
+
+  lint:
+    desc: Run all linters (ruff, flake8, pylint, mypy, bandit, interrogate)
+    cmds:
+      - ./scripts/lint/lint_all.sh "{{.LINT_TARGET}}"
+
+  ruff:
+    desc: Run ruff linter
+    cmds:
+      - '{{.PYTHON}} -m ruff check --select=F,E,W,B,ASYNC {{.LINT_TARGET}}'
+
+  ruff-fix:
+    desc: Run ruff with auto-fix
+    cmds:
+      - '{{.PYTHON}} -m ruff check --select=F,E,W,B,ASYNC --fix {{.LINT_TARGET}}'
+
+  flake8:
+    desc: Run flake8 linter
+    cmds:
+      - '{{.PYTHON}} -m flake8 --max-line-length={{.MAX_LINE_LENGTH}} --extend-ignore=E203,W503 {{.LINT_TARGET}}'
+
+  pylint:
+    desc: Run pylint
+    cmds:
+      - '{{.PYTHON}} -m pylint -j 0 --fail-on E --fail-under 10 {{.LINT_TARGET}}'
+
+  pylint-errors:
+    desc: Run pylint (errors only)
+    cmds:
+      - '{{.PYTHON}} -m pylint --rcfile=pyproject.toml --errors-only {{.LINT_TARGET}}'
+
+  mypy:
+    desc: Run mypy type checker
+    cmds:
+      - '{{.PYTHON}} -m mypy --config-file=pyproject.toml {{.LINT_TARGET}}'
+
+  bandit:
+    desc: Run bandit security scanner
+    cmds:
+      - '{{.PYTHON}} -m bandit -r {{.LINT_TARGET}} -f json -o bandit-report.json'
+
+  interrogate:
+    desc: Check docstring coverage
+    cmds:
+      - '{{.PYTHON}} -m interrogate --verbose --fail-under=80 {{.LINT_TARGET}}'
+
+  pre-commit:
+    desc: Run pre-commit hooks
+    cmds:
+      - '{{.PYTHON}} -m pre_commit run --all-files'
+
+  pre-commit-install:
+    desc: Install pre-commit hooks
+    cmds:
+      - '{{.PYTHON}} -m pre_commit install'
+
+  shellcheck:
+    desc: Lint shell scripts with shellcheck
+    cmds:
+      - find . -name "*.sh" -type f | xargs shellcheck
+
+  yamllint:
+    desc: Lint YAML files
+    cmds:
+      - '{{.PYTHON}} -m yamllint .'
+
+  hadolint:
+    desc: Lint Dockerfile/Containerfile
+    cmds:
+      - hadolint Containerfile
+
+  lint-web:
+    desc: Lint HTML/CSS/JS in admin UI
+    cmds:
+      - npx htmlhint "mcpgateway/static/**/*.html"
+      - npx stylelint "mcpgateway/static/**/*.css"
+      - npx eslint "mcpgateway/static/**/*.js"
+
+  verify:
+    desc: Run complete quality pipeline (format + lint + test + security)
+    cmds:
+      - task: format
+      - task: lint
+      - task: test
+      - task: security-scan
+
+# ============================================================================
+# SECURITY & SCANNING
+# ============================================================================
+
+  security-scan:
+    desc: Run security scans (bandit + safety + semgrep)
+    cmds:
+      - task: bandit
+      - task: safety-check
+      - cmd: semgrep --config=auto . || echo "⚠️  Semgrep not installed"
+
+  safety-check:
+    desc: Check dependencies for vulnerabilities
+    cmds:
+      - '{{.PYTHON}} -m safety check --json'
+
+  semgrep:
+    desc: Run semgrep security scanner
+    cmds:
+      - semgrep --config=auto .
+
+  trivy-scan:
+    desc: Scan dependencies with trivy
+    cmds:
+      - trivy fs --severity HIGH,CRITICAL .
+
+# ============================================================================
+# CERTIFICATES & TLS
+# ============================================================================
+
+  gen-tls-certs:
+    desc: Generate TLS certificates with auto-signed CA
+    cmds:
+      - ./scripts/cert/gen_tls_certs.sh
+
+  gen-jwt-keys:
+    desc: Generate JWT signing keys (RSA)
+    cmds:
+      - ./scripts/cert/gen_jwt_keys.sh
+
+  gen-mtls-certs:
+    desc: Generate mTLS client certificates
+    deps: [gen-tls-certs]
+    cmds:
+      - ./scripts/cert/gen_mtls_certs.sh
+
+  gen-all-certs:
+    desc: Generate all certificates (TLS + JWT + mTLS)
+    cmds:
+      - ./scripts/cert/gen_all_certs.sh
+
+  configure-tls-env:
+    desc: Add TLS configuration to .env file
+    deps: [gen-tls-certs]
+    cmds:
+      - ./scripts/cert/configure_tls_env.sh
+
+  configure-jwt-env:
+    desc: Add JWT configuration to .env file
+    deps: [gen-jwt-keys]
+    cmds:
+      - ./scripts/cert/configure_jwt_env.sh
+
+  trust-ca:
+    desc: Trust the CA certificate (requires sudo)
+    deps: [gen-tls-certs]
+    cmds:
+      - sudo cp {{.CERTS_DIR}}/ca-cert.pem /usr/local/share/ca-certificates/mcpgateway-ca.crt
+      - sudo update-ca-certificates
+      - echo "✅ CA certificate trusted system-wide"
+
+# ============================================================================
+# CONTAINER OPERATIONS
+# ============================================================================
+
+  container-build:
+    desc: Build container image
+    aliases: [docker-build]
+    cmds:
+      - ./scripts/container/build.sh
+
+  container-run:
+    desc: Run container (detached, bridge network)
+    aliases: [docker-run]
+    deps: [container-build]
+    cmds:
+      - ./scripts/container/run.sh
+    env:
+      DETACH: 'true'
+      HOST_NETWORK: 'false'
+
+  container-run-host:
+    desc: Run container with host networking
+    deps: [container-build]
+    cmds:
+      - ./scripts/container/run.sh
+    env:
+      DETACH: 'true'
+      HOST_NETWORK: 'true'
+
+  container-run-ssl:
+    desc: Run container with TLS enabled
+    deps: [container-build, gen-tls-certs]
+    cmds:
+      - ./scripts/container/run.sh
+    env:
+      DETACH: 'true'
+      TLS_ENABLED: 'true'
+
+  container-run-ssl-host:
+    desc: Run container with TLS and host networking
+    deps: [container-build, gen-tls-certs]
+    cmds:
+      - ./scripts/container/run.sh
+    env:
+      DETACH: 'true'
+      HOST_NETWORK: 'true'
+      TLS_ENABLED: 'true'
+
+  container-run-fg:
+    desc: Run container in foreground (interactive)
+    deps: [container-build]
+    cmds:
+      - ./scripts/container/run.sh
+    env:
+      DETACH: 'false'
+
+  container-stop:
+    desc: Stop and remove container
+    cmds:
+      - ./scripts/container/stop.sh
+
+  container-logs:
+    desc: Show container logs
+    cmds:
+      - cmd: |
+          RUNTIME={{.CONTAINER_RUNTIME}}
+          if [ "$RUNTIME" = "auto" ]; then
+            if command -v podman &> /dev/null; then
+              RUNTIME="podman"
+            else
+              RUNTIME="docker"
+            fi
+          fi
+          $RUNTIME logs -f {{.CONTAINER_NAME}}
+
+  container-exec:
+    desc: Execute shell in running container
+    cmds:
+      - cmd: |
+          RUNTIME={{.CONTAINER_RUNTIME}}
+          if [ "$RUNTIME" = "auto" ]; then
+            if command -v podman &> /dev/null; then
+              RUNTIME="podman"
+            else
+              RUNTIME="docker"
+            fi
+          fi
+          $RUNTIME exec -it {{.CONTAINER_NAME}} /bin/bash
+
+  container-push:
+    desc: Push container image to registry
+    deps: [container-build]
+    cmds:
+      - cmd: |
+          RUNTIME={{.CONTAINER_RUNTIME}}
+          if [ "$RUNTIME" = "auto" ]; then
+            if command -v podman &> /dev/null; then
+              RUNTIME="podman"
+            else
+              RUNTIME="docker"
+            fi
+          fi
+          $RUNTIME push {{.IMAGE_NAME}}:{{.IMAGE_TAG}}
+
+  container-scan:
+    desc: Scan container for vulnerabilities
+    deps: [container-build]
+    cmds:
+      - ./scripts/security/scan_container.sh
+
+  container-clean:
+    desc: Remove container image
+    cmds:
+      - cmd: |
+          RUNTIME={{.CONTAINER_RUNTIME}}
+          if [ "$RUNTIME" = "auto" ]; then
+            if command -v podman &> /dev/null; then
+              RUNTIME="podman"
+            else
+              RUNTIME="docker"
+            fi
+          fi
+          $RUNTIME rmi {{.IMAGE_NAME}}:{{.IMAGE_TAG}} || true
+
+# ============================================================================
+# DATABASE OPERATIONS
+# ============================================================================
+
+  db-migrate:
+    desc: Run database migrations
+    aliases: [db-upgrade]
+    cmds:
+      - '{{.PYTHON}} -m alembic upgrade head'
+
+  db-migrate-down:
+    desc: Rollback one migration
+    aliases: [db-downgrade]
+    cmds:
+      - '{{.PYTHON}} -m alembic downgrade -1'
+
+  db-revision:
+    desc: 'Create new migration (use MESSAGE="description")'
+    cmds:
+      - '{{.PYTHON}} -m alembic revision --autogenerate -m "{{.MESSAGE}}"'
+
+  db-history:
+    desc: Show migration history
+    cmds:
+      - '{{.PYTHON}} -m alembic history'
+
+  db-current:
+    desc: Show current migration version
+    cmds:
+      - '{{.PYTHON}} -m alembic current'
+
+  db-reset:
+    desc: 'Reset database (WARNING: destructive)'
+    cmds:
+      - rm -f mcp.db
+      - task db-migrate
+
+# ============================================================================
+# DOCUMENTATION
+# ============================================================================
+
+  docs-serve:
+    desc: Serve documentation locally
+    cmds:
+      - '{{.PYTHON}} -m mkdocs serve'
+
+  docs-build:
+    desc: Build documentation
+    cmds:
+      - '{{.PYTHON}} -m mkdocs build'
+
+  docs-deploy:
+    desc: Deploy documentation to GitHub Pages
+    cmds:
+      - '{{.PYTHON}} -m mkdocs gh-deploy'
+
+  sphinx-build:
+    desc: Build Sphinx documentation
+    cmds:
+      - '{{.PYTHON}} -m sphinx -b html docs/source docs/build/html'
+
+  sphinx-serve:
+    desc: Serve Sphinx documentation
+    deps: [sphinx-build]
+    cmds:
+      - python3 -m http.server --directory docs/build/html 8080
+
+# ============================================================================
+# UTILITIES
+# ============================================================================
+
+  clean:
+    desc: Remove generated files and caches
+    cmds:
+      - rm -rf build/ dist/ *.egg-info
+      - rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage htmlcov
+      - rm -rf **/__pycache__
+      - find . -type f -name "*.pyc" -delete
+      - find . -type f -name "*.pyo" -delete
+      - echo "✅ Cleaned generated files"
+
+  clean-venv:
+    desc: Remove virtual environment
+    cmds:
+      - rm -rf {{.VENV_DIR}}
+      - echo "✅ Virtual environment removed"
+
+  clean-all:
+    desc: Deep clean (venv + generated files + certs)
+    cmds:
+      - task: clean
+      - task: clean-venv
+      - rm -rf {{.CERTS_DIR}}
+      - echo "✅ Deep clean complete"
+
+  version:
+    desc: Show project version
+    cmds:
+      - '{{.PYTHON}} -c "import mcpgateway; print(mcpgateway.__version__)"'
+
+  shell:
+    desc: Start interactive Python shell with context
+    cmds:
+      - '{{.PYTHON}} -i -c "from mcpgateway.main import app; from mcpgateway import models, schemas; from mcpgateway.config import get_settings; settings = get_settings(); print(\"Context loaded: app, models, schemas, settings\")"'
+
+  routes:
+    desc: Show all API routes
+    cmds:
+      - '{{.PYTHON}} -c "from mcpgateway.main import app; from fastapi.routing import APIRoute; routes = [r for r in app.routes if isinstance(r, APIRoute)]; [print(f\"{list(r.methods)} {r.path}\") for r in sorted(routes, key=lambda x: x.path)]"'
+
+  translate:
+    desc: Run MCP translate utility (stdio to HTTP/SSE)
+    cmds:
+      - '{{.PYTHON}} -m mcpgateway.translate {{.CLI_ARGS}}'
+
+  jwt-token:
+    desc: Generate JWT bearer token
+    cmds:
+      - '{{.PYTHON}} -m mcpgateway.utils.create_jwt_token --username admin@example.com --exp 10080 --secret ${JWT_SECRET_KEY:-my-secret-key}'
+
+  support-bundle:
+    desc: Generate support bundle for troubleshooting
+    cmds:
+      - '{{.PYTHON}} -m mcpgateway --support-bundle --output-dir /tmp --log-lines 1000'
+
+# ============================================================================
+# VAULT INTEGRATION
+# ============================================================================
+
+  vault-status:
+    desc: Check Vault connection and configuration
+    cmds:
+      - cmd: |
+          echo "Vault Configuration:"
+          echo "  VAULT_ENABLED: ${VAULT_ENABLED:-false}"
+          echo "  VAULT_URL: ${VAULT_URL:-not set}"
+          echo "  VAULT_SECRET_PATH: ${VAULT_SECRET_ENGINE:-secret}/${VAULT_SECRET_PATH:-not set}"
+          echo "  Token source: ${VAULT_TOKEN:+env var}${VAULT_TOKEN:-~/.vault-token}"
+          if [ "${VAULT_ENABLED}" = "true" ]; then
+            {{.PYTHON}} -c "from mcpgateway.utils.vault_wrapper import VaultAccess; v = VaultAccess(); print('✓ Connected' if v.ping() else '✗ Not authenticated')"
+          fi
+
+# ============================================================================
+# KUBERNETES & CLOUD DEPLOYMENTS
+# ============================================================================
+
+  k8s-deploy:
+    desc: Deploy to Kubernetes
+    cmds:
+      - kubectl apply -f k8s/
+
+  k8s-delete:
+    desc: Delete from Kubernetes
+    cmds:
+      - kubectl delete -f k8s/
+
+  k8s-logs:
+    desc: Show Kubernetes pod logs
+    cmds:
+      - kubectl logs -l app=mcpgateway -f
+
+  helm-install:
+    desc: Install with Helm
+    cmds:
+      - helm install mcpgateway ./helm/mcpgateway
+
+  helm-upgrade:
+    desc: Upgrade with Helm
+    cmds:
+      - helm upgrade mcpgateway ./helm/mcpgateway
+
+  helm-uninstall:
+    desc: Uninstall Helm release
+    cmds:
+      - helm uninstall mcpgateway
+
+# ============================================================================
+# CI/CD & RELEASE
+# ============================================================================
+
+  ci:
+    desc: Run CI pipeline locally
+    cmds:
+      - task: format
+      - task: lint
+      - task: test
+      - task: container-build
+      - task: container-scan
+
+  release:
+    desc: Build release artifacts
+    deps: [clean, test]
+    cmds:
+      - cmd: |
+          {{if eq .USE_UV "true"}}
+          uv build
+          {{else}}
+          {{.PYTHON}} -m build
+          {{end}}
+      - echo "✅ Release artifacts in dist/"
+
+  publish:
+    desc: Publish to PyPI
+    deps: [release]
+    cmds:
+      - cmd: |
+          {{if eq .USE_UV "true"}}
+          uv publish
+          {{else}}
+          {{.PYTHON}} -m twine upload dist/*
+          {{end}}
+
+# ============================================================================
+# COMPREHENSIVE WORKFLOW ALIASES
+# ============================================================================
+
+  all:
+    desc: Complete setup and quality check
+    cmds:
+      - task: setup
+      - task: verify
+
+  quick:
+    desc: Quick validation (format + test-fast)
+    cmds:
+      - task: format
+      - task: test-fast

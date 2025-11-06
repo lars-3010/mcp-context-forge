@@ -10,28 +10,28 @@ To ensure consistency, all Python source files must include a standardized heade
 
 These commands only check files and report issues without making any changes:
 
-*   **`make check-headers`**:
+*   **`task check-headers`**:
     Scans all Python files in `mcpgateway/` and `tests/` and reports any files with missing or incorrect headers. This is the default behavior.
 
     ```bash
     make check-headers
     ```
 
-*   **`make check-headers-diff`**:
+*   **`task check-headers-diff`**:
     Same as `check-headers` but also shows a diff preview of what would be changed.
 
     ```bash
     make check-headers-diff
     ```
 
-*   **`make check-headers-debug`**:
+*   **`task check-headers-debug`**:
     Checks headers with additional debug information (file permissions, shebang status, etc.).
 
     ```bash
     make check-headers-debug
     ```
 
-*   **`make check-header`**:
+*   **`task check-header`**:
     Check a specific file or directory without modifying it.
 
     ```bash
@@ -46,21 +46,21 @@ These commands only check files and report issues without making any changes:
 
 **⚠️ WARNING**: These commands WILL modify your files. Always commit your changes before running fix commands.
 
-*   **`make fix-all-headers`**:
+*   **`task fix-all-headers`**:
     Automatically fixes all Python files with incorrect headers across the entire project.
 
     ```bash
     make fix-all-headers
     ```
 
-*   **`make fix-all-headers-no-encoding`**:
+*   **`task fix-all-headers-no-encoding`**:
     Fix all headers but don't require the encoding line (`# -*- coding: utf-8 -*-`).
 
     ```bash
     make fix-all-headers-no-encoding
     ```
 
-*   **`make fix-all-headers-custom`**:
+*   **`task fix-all-headers-custom`**:
     Fix all headers with custom configuration options.
 
     ```bash
@@ -77,14 +77,14 @@ These commands only check files and report issues without making any changes:
     make fix-all-headers-custom year=2024 license=MIT shebang=never
     ```
 
-*   **`make interactive-fix-headers`**:
+*   **`task interactive-fix-headers`**:
     Scans all files and prompts for confirmation before applying each fix. This gives you full control over which files are modified.
 
     ```bash
     make interactive-fix-headers
     ```
 
-*   **`make fix-header`**:
+*   **`task fix-header`**:
     Fix headers for a specific file or directory with various options.
 
     ```bash
@@ -143,10 +143,10 @@ For use with pre-commit hooks:
 
 ```bash
 # Check only (recommended for pre-commit)
-make pre-commit-check-headers
+task pre-commit-check-headers
 
 # Fix mode (use with caution)
-make pre-commit-fix-headers
+task pre-commit-fix-headers
 ```
 
 ### 💡 Best Practices

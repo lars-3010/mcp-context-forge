@@ -192,7 +192,7 @@ gh pr checkout 29
 ### 5.1 Local build (SQLite + self-signed HTTPS)
 
 ```bash
-make install-dev serve-ssl
+task install-dev serve-ssl
 ```
 
 * Sets up a Python virtualenv
@@ -202,8 +202,8 @@ make install-dev serve-ssl
 ### 5.2 Container build (PostgreSQL + Redis)
 
 ```bash
-make docker-prod      # build the lite runtime image locally
-make compose-up       # start the Docker Compose stack (PostgreSQL + Redis)
+task docker-prod      # build the lite runtime image locally
+task compose-up       # start the Docker Compose stack (PostgreSQL + Redis)
 ```
 
 * Spins up the full Docker Compose stack
@@ -240,7 +240,7 @@ These steps are described in [Basic Testing](../testing/basic.md).
 ### 5.4 Run the automated test suite
 
 ```bash
-make test         # or `pytest` directly
+task test         # or `pytest` directly
 ```
 
 All tests **must** pass locally. If you add or modify functionality, ensure new tests cover the change.
@@ -248,7 +248,7 @@ All tests **must** pass locally. If you add or modify functionality, ensure new 
 ### 5.5 Lint & static analysis
 
 ```bash
-make lint         # runs ruff, mypy, black --check, etc.
+task lint         # runs ruff, mypy, black --check, etc.
 ```
 
 Code should come back clean. Fix any warnings before pushing.

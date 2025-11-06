@@ -47,7 +47,7 @@ go install github.com/hashicorp/terraform-mcp-server/cmd/terraform-mcp-server@ma
 # Clone the source repository
 git clone https://github.com/hashicorp/terraform-mcp-server.git && cd terraform-mcp-server
 # Build the docker image
-make docker-build
+task docker-build
 ```
 
 ### Sessions Mode In Streamable HTTP Transport

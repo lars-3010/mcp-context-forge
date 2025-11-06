@@ -39,16 +39,16 @@ pip install -e .
 python -m pptx_server.server
 
 # Or use make command
-make dev
+task dev
 ```
 
 #### With HTTP Download Server
 ```bash
 # Start combined MCP + HTTP server
-make serve-combined
+task serve-combined
 
 # Or HTTP download server only
-make serve-http-only
+task serve-http-only
 ```
 
 ### Integration with MCP Gateway

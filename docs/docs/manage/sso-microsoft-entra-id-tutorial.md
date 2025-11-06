@@ -203,13 +203,13 @@ SSO_ENTRA_TENANT_ID=your-tenant-id  # Same tenant, different app
 
 ```bash
 # Development
-make dev
+task dev
 
 # Or directly with uvicorn
 uvicorn mcpgateway.main:app --reload --host 0.0.0.0 --port 8000
 
 # Production
-make serve
+task serve
 ```
 
 ### 6.2 Verify Entra ID SSO is Enabled

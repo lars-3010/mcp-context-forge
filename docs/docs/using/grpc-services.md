@@ -50,7 +50,7 @@ After installing dependencies and enabling the feature, restart MCP Gateway:
 
 ```bash
 # Development mode
-make dev
+task dev
 
 # Production mode
 mcpgateway

@@ -7,7 +7,7 @@ This guide shows how to integrate the **enhanced PowerPoint MCP Server** with po
 ```bash
 # Install and test
 cd mcp-servers/python/pptx_server
-make dev-install
+task dev-install
 python3 demo.py  # Creates a comprehensive demo presentation
 ```
 
@@ -57,7 +57,7 @@ Start the server in HTTP mode for web integration:
 
 ```bash
 # Start HTTP server
-make serve-http
+task serve-http
 
 # Test with curl
 curl -X POST http://localhost:9000/ \

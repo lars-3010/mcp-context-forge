@@ -196,13 +196,13 @@ SSO_OKTA_ISSUER=https://dev-12345.okta.com/oauth2/custom-auth-server-id
 
 ```bash
 # Development
-make dev
+task dev
 
 # Or directly with uvicorn
 uvicorn mcpgateway.main:app --reload --host 0.0.0.0 --port 8000
 
 # Production
-make serve
+task serve
 ```
 
 ### 5.2 Verify Okta SSO is Enabled

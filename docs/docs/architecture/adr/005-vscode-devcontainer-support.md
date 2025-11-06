@@ -36,8 +36,8 @@ We will add VS Code Dev Container support to the project by implementing:
 
 3. **`.devcontainer/postCreateCommand.sh`** - Setup script that:
    - Copies `.env.example` to `.env` if needed
-   - Runs `make install-dev` to install development dependencies
-   - Runs `make test` to verify the environment
+   - Runs `task install-dev` to install development dependencies
+   - Runs `task test` to verify the environment
 
 4. **Documentation updates** - README.md section explaining:
    - How to use the devcontainer in VS Code
@@ -91,7 +91,7 @@ The devcontainer uses:
 
 - **Python 3.11**: As specified in the project requirements
 - **PDM and UV**: For package management (matching the project's tooling)
-- **Make targets**: Leverages existing `make install-dev` and `make test` workflows
+- **Make targets**: Leverages existing `task install-dev` and `task test` workflows
 - **Environment variables**: Sets `DEV_MODE=true` for development
 - **VS Code extensions**: Includes Python and Docker extensions for optimal development experience
 

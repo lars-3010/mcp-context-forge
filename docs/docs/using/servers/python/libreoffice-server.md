@@ -43,20 +43,20 @@ brew install pdftk-java
 
 ```bash
 # Install in development mode
-make dev-install
+task dev-install
 
 # Or install normally
-make install
+task install
 ```
 
 ### Running the Server
 
 ```bash
 # Stdio mode (for Claude Desktop, IDEs)
-make dev
+task dev
 
 # HTTP mode (via MCP Gateway)
-make serve-http
+task serve-http
 ```
 
 ## Available Tools
@@ -234,7 +234,7 @@ List all supported input/output formats.
 
 ```bash
 # Start the LibreOffice server via HTTP
-make serve-http
+task serve-http
 
 # Register with MCP Gateway
 curl -X POST http://localhost:8000/gateways \

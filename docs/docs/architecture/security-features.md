@@ -62,7 +62,7 @@
 - **Encrypted OAuth/SSO secrets.** The SSO service and DCR service wrap client secrets and registration tokens with Fernet and only decrypt them on demand.
 - **Cookie security helpers.** `utils/security_cookies.py` sets auth/session cookies with HttpOnly, `SameSite`, and `secure` flags (enforced for production or when `SECURE_COOKIES=true`) and provides symmetric deletion helpers to avoid stale cookies.
 - **Security headers middleware.** `SecurityHeadersMiddleware` adds CSP, X-Frame-Options (default `DENY`), X-Content-Type-Options (`nosniff`), X-Download-Options (`noopen`), Referrer-Policy, HSTS (when HTTPS is detected), and strips `Server`/`X-Powered-By` headers.
-- **TLS ready.** `make certs` creates local certificates, `make serve-ssl` runs Gunicorn with TLS, and the client defaults keep `SKIP_SSL_VERIFY=false`. The container images trust RHEL certificate bundles for outbound TLS.
+- **TLS ready.** `task certs` creates local certificates, `task serve-ssl` runs Gunicorn with TLS, and the client defaults keep `SKIP_SSL_VERIFY=false`. The container images trust RHEL certificate bundles for outbound TLS.
 - **Support bundle sanitisation.** `SupportBundleService` redacts passwords, tokens, secrets, and bearer values before writing diagnostic ZIPs. Patterns cover API keys, JWTs, Authorization headers, and database URLs.
 - **Configuration masking.** `/admin/config/settings` hides sensitive keys using the `mask_sensitive` helper to prevent secret exfiltration through the Admin UI/API.
 - **Hardened containers.** `Containerfile.lite` builds on patched RHEL UBI 10 ↦ scratch, installs dependencies in a venv, strips debugging symbols, removes package managers, deletes setuid/setgid binaries, creates a non-root `UID 1001`, preserves the RPM DB for scanning, and sets security-oriented runtime env vars.
@@ -81,7 +81,7 @@
 
 - **Startup enforcement.** `validate_security_configuration()` blocks boot when critical issues remain and `REQUIRE_STRONG_SECRETS=true`, and otherwise prints actionable warnings (default secrets, disabled auth, SSL verification overrides).
 - **Continuous telemetry.** Permission checks, OAuth flows, and token usage log structured events with timestamps, IP addresses, user-agent strings, span attributes, and success/failure flags for downstream monitoring.
-- **Security tooling baked into the build.** The `Makefile` exposes `make security-all`, `make security-scan`, `make security-report`, `make bandit`, `make semgrep`, `make dodgy`, `make gitleaks`, `make trivy`, `make grype-scan`, `make snyk-all`, and `make fuzz-security`, providing repeatable security automation for CI/CD.
+- **Security tooling baked into the build.** The `Makefile` exposes `task security-all`, `task security-scan`, `task security-report`, `task bandit`, `task semgrep`, `task dodgy`, `task gitleaks`, `task trivy`, `task grype-scan`, `task snyk-all`, and `task fuzz-security`, providing repeatable security automation for CI/CD.
 - **Observability hooks.** OpenTelemetry exports (when configured) tag spans with error flags, latency, and success status, supporting tracing-based detection of anomalies.
 - **Support bundle hygiene.** Operators can gather diagnostics without leaking credentials thanks to sanitisation routines and configurable size/time limits.
 
@@ -92,7 +92,7 @@
 - [ ] **Keep auth mandatory.** Maintain `AUTH_REQUIRED=true`, `MCP_CLIENT_AUTH_ENABLED=true`, and only enable `TRUST_PROXY_AUTH` behind a trusted authentication proxy.
 - [ ] **Disable unused surfaces.** Leave `MCPGATEWAY_UI_ENABLED=false`, `MCPGATEWAY_ADMIN_API_ENABLED=false`, `MCPGATEWAY_BULK_IMPORT_ENABLED=false`, `MCPGATEWAY_A2A_ENABLED=false`, and `MCPGATEWAY_CATALOG_ENABLED=false` unless you actively use them.
 - [ ] **Leave header passthrough off.** `ENABLE_HEADER_PASSTHROUGH=false` (default) should only change after reviewing downstream requirements and allowlists.
-- [ ] **Secure the data plane.** Terminate TLS with real certificates (`make certs`/`make serve-ssl` or a fronting proxy), and prefer PostgreSQL/MySQL with TLS over SQLite in production.
+- [ ] **Secure the data plane.** Terminate TLS with real certificates (`task certs`/`task serve-ssl` or a fronting proxy), and prefer PostgreSQL/MySQL with TLS over SQLite in production.
 - [ ] **Monitor activity.** Ship `token_usage_logs`, `email_auth_events`, audit trails, and structured logs to your SIEM/observability stack; alert on repeated failures or blocked requests.
 - [ ] **Lock down federation.** If `federation_enabled` remains on, restrict `FEDERATION_PEERS`, ensure every peer enforces auth, and monitor health-check traffic.
 - [ ] **Automate security checks.** Integrate the security Make targets into CI/CD so images, dependencies, and IaC are scanned before deployment.

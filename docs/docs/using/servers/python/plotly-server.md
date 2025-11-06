@@ -30,10 +30,10 @@ pip install kaleido
 
 ```bash
 # Install in development mode with Plotly dependencies
-make dev-install
+task dev-install
 
 # Or install normally and add dependencies
-make install
+task install
 pip install plotly pandas numpy kaleido
 ```
 
@@ -41,13 +41,13 @@ pip install plotly pandas numpy kaleido
 
 ```bash
 # Start the FastMCP server
-make dev
+task dev
 
 # Or directly
 python -m plotly_server.server_fastmcp
 
 # HTTP bridge for REST API access
-make serve-http
+task serve-http
 ```
 
 ## Available Tools
@@ -229,7 +229,7 @@ List supported chart types and features.
 
 ```bash
 # Start the Plotly server via HTTP
-make serve-http
+task serve-http
 
 # Register with MCP Gateway
 curl -X POST http://localhost:8000/gateways \

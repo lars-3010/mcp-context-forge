@@ -17,10 +17,10 @@ AST-based code analysis and splitting for intelligent code segmentation. Now pow
 
 ```bash
 # Basic installation with FastMCP
-make install
+task install
 
 # Installation with development dependencies
-make dev-install
+task dev-install
 ```
 
 ## Usage
@@ -29,7 +29,7 @@ make dev-install
 
 ```bash
 # Start the server
-make dev
+task dev
 
 # Or directly
 python -m code_splitter_server.server_fastmcp
@@ -40,7 +40,7 @@ python -m code_splitter_server.server_fastmcp
 Expose the server over HTTP for REST API access:
 
 ```bash
-make serve-http
+task serve-http
 ```
 
 ### MCP Client Configuration
@@ -222,7 +222,7 @@ Dependencies are categorized into:
 ### Splitting a Python Module
 
 ```bash
-make example-split
+task example-split
 ```
 
 This will split example code and show the extracted segments.
@@ -230,7 +230,7 @@ This will split example code and show the extracted segments.
 ### Analyzing Code Complexity
 
 ```bash
-make example-analyze
+task example-analyze
 ```
 
 This will analyze example code and show complexity metrics.
@@ -281,17 +281,17 @@ def helper_function(x: int) -> int:
 
 ### Running Tests
 ```bash
-make test
+task test
 ```
 
 ### Code Formatting
 ```bash
-make format
+task format
 ```
 
 ### Linting
 ```bash
-make lint
+task lint
 ```
 
 ## FastMCP Advantages

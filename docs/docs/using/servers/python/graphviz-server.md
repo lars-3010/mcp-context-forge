@@ -34,23 +34,23 @@ brew install graphviz
 
 ```bash
 # Install in development mode
-make dev-install
+task dev-install
 
 # Or install normally
-make install
+task install
 ```
 
 ### Running the Server
 
 ```bash
 # Start the FastMCP server
-make dev
+task dev
 
 # Or directly
 python -m graphviz_server.server_fastmcp
 
 # HTTP bridge for REST API access
-make serve-http
+task serve-http
 ```
 
 ## Available Tools
@@ -268,7 +268,7 @@ List available layout engines and output formats.
 
 ```bash
 # Start the Graphviz server via HTTP
-make serve-http
+task serve-http
 
 # Register with MCP Gateway
 curl -X POST http://localhost:8000/gateways \

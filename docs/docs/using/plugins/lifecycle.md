@@ -90,13 +90,13 @@ Inspect those two files and get familiar with them. There are many options you c
 Plugins are Python packages with dependencies managed by `uv`. Just like the gateway, you can add, lock, lint, and ensure that best practices are followed when creating your plugins. To install dependencies with dev packages (required for linting and testing), run:
 
 ```bash
-make install-dev
+task install-dev
 ```
 
 Alternatively, you can also install it in editable mode:
 
 ```bash
-make install-editable
+task install-editable
 ```
 
 ### Test
@@ -104,7 +104,7 @@ make install-editable
 To run all unit tests for your plugins:
 
 ```bash
-make test
+task test
 ```
 
 ### Build
@@ -112,7 +112,7 @@ make test
 To build a container image (runtime) containing a standardized plugin server, run:
 
 ```bash
-make build
+task build
 ```
 
 ### Serve
@@ -120,7 +120,7 @@ make build
 To start the plugin server:
 
 ```bash
-make start
+task start
 ```
 
 By default, this will start a Streamable HTTP MCP server on `http://localhost:8000/mcp`.
@@ -231,7 +231,7 @@ plugins:
 Then, start the gateway:
 
 ```bash
-make serve
+task serve
 ```
 
 !!! note

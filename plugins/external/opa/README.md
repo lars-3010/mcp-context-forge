@@ -154,7 +154,7 @@ plugin_settings:
 3. Now suppose you have a sample policy in `policy.rego` file that allows a tool invocation only when "IBM" key word is present in the repo_path. Add the sample policy file or policy rego file that you defined, in `plugins/external/opa/opaserver/rego`.
 
 3. Once you have your plugin defined in `config.yaml` and policy added in the rego file, run the following commands to build your OPA Plugin external MCP server using:
-* `make build`:  This will build a docker image named `opapluginfilter`
+* `task build`:  This will build a docker image named `opapluginfilter`
 
 ```bash
 Verification point:
@@ -163,7 +163,7 @@ REPOSITORY                   TAG       IMAGE ID       CREATED        SIZE
 mcpgateway/opapluginfilter   latest    a94428dd9c64   1 second ago   810MB
 ```
 
-* `make start`: This will start the OPA Plugin server
+* `task start`: This will start the OPA Plugin server
 ```bash
 Verification point:
 ✅ Container started
@@ -257,10 +257,10 @@ opa --version
 
 2. Once, OPA is installed run the test using:
 ```bash
-make test
+task test
 ```
 
-The`make test` command executes a complete testing workflow: it launches an OPA server using the policy file located at ./opaserver/rego/policy.rego (as specified by `POLICY_PATH`), runs all test cases against this server, and automatically terminates the OPA server process once testing finishes.
+The`task test` command executes a complete testing workflow: it launches an OPA server using the policy file located at ./opaserver/rego/policy.rego (as specified by `POLICY_PATH`), runs all test cases against this server, and automatically terminates the OPA server process once testing finishes.
 
 
 

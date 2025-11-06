@@ -100,7 +100,7 @@ export OPENAI_API_KEY="your-openai-api-key"
 cd /Users/mg/mg-work/manav/work/ai-experiments/mcp-context-forge
 export PLUGINS_ENABLED=true
 export AUTH_REQUIRED=false
-make dev
+task dev
 ```
 
 3. **Test Content Moderation**:
@@ -458,7 +458,7 @@ curl -X POST http://localhost:8000/ \
 ### Enable Debug Logging
 ```bash
 export LOG_LEVEL=DEBUG
-make dev
+task dev
 
 # Look for content moderation logs
 tail -f logs/mcpgateway.log | grep -i moderation

@@ -36,7 +36,7 @@ Every other visual/behaviour change is code-driven.
    ```
    This enables template + static reloads while you work.
 
-2. Start the dev server: `make dev` (serves the UI at http://localhost:8000).
+2. Start the dev server: `task dev` (serves the UI at http://localhost:8000).
 3. Edit any of the following and refresh your browser:
    - `mcpgateway/templates/admin.html`
    - `mcpgateway/static/admin.css`
@@ -178,7 +178,7 @@ Roll the deployment after changes so the pod picks up the new files.
 
 ## Testing Checklist
 
-1. `make dev` – confirm the UI renders, tabs switch, and tables load as expected.
+1. `task dev` – confirm the UI renders, tabs switch, and tables load as expected.
 2. Optional: `pytest tests/playwright/ -k admin` – run UI smoke tests if you
    altered interaction logic.
 

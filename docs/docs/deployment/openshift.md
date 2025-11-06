@@ -19,10 +19,10 @@ OpenShift (both **OKD** and **Red Hat OpenShift Container Platform**) adds opini
 
 | Target             | Builds                  | Dockerfile             | Notes                    |
 | ------------------ | ----------------------- | ---------------------- | ------------------------ |
-| `make podman`      | `mcpgateway-dev:latest` | **Containerfile**      | Rootless Podman build    |
-| `make podman-prod` | `mcpgateway:latest`     | **Containerfile.lite** | UBI 9-micro, multi-stage |
-| `make docker`      | `mcpgateway-dev:latest` | **Containerfile**      | Docker Desktop           |
-| `make docker-prod` | `mcpgateway:latest`     | **Containerfile.lite** | Same slim image          |
+| `task podman`      | `mcpgateway-dev:latest` | **Containerfile**      | Rootless Podman build    |
+| `task podman-prod` | `mcpgateway:latest`     | **Containerfile.lite** | UBI 9-micro, multi-stage |
+| `task docker`      | `mcpgateway-dev:latest` | **Containerfile**      | Docker Desktop           |
+| `task docker-prod` | `mcpgateway:latest`     | **Containerfile.lite** | Same slim image          |
 
 Push afterwards, for example:
 

@@ -19,10 +19,10 @@ The CSV Pandas Chat MCP Server provides a secure environment for analyzing CSV d
 
 ```bash
 # Install in development mode
-make dev-install
+task dev-install
 
 # Or install normally
-make install
+task install
 ```
 
 ### Prerequisites
@@ -49,13 +49,13 @@ export CSV_CHAT_MAX_RETRIES=3                # Max retries for code generation
 
 ```bash
 # Start the FastMCP server
-make dev
+task dev
 
 # Or directly
 python -m csv_pandas_chat_server.server_fastmcp
 
 # HTTP bridge for REST API access
-make serve-http
+task serve-http
 ```
 
 ## Available Tools
@@ -173,7 +173,7 @@ Perform automated analysis (basic, detailed, statistical).
 
 ```bash
 # Start the CSV chat server via HTTP
-make serve-http
+task serve-http
 
 # Register with MCP Gateway
 curl -X POST http://localhost:8000/gateways \

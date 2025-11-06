@@ -101,7 +101,7 @@ When the test completes, look at:
 * Always test against a **realistic endpoint** (e.g. `POST /rpc` with auth and payload).
 * Use the same JWT and payload structure your clients would.
 * Run from a dedicated machine to avoid local CPU skewing results.
-* Use `make run` or `make serve` to launch the app for local testing.
+* Use `task run` or `task serve` to launch the app for local testing.
 
 For runtime tuning details, see [Gateway Tuning Guide](../manage/tuning.md).
 
@@ -187,7 +187,7 @@ All JSON serialization is automatically handled by orjson. No client changes req
 
 ```bash
 # Start the development server
-make dev
+task dev
 
 # Check that responses are using orjson (compact, fast)
 curl -s http://localhost:8000/health | jq .

@@ -92,7 +92,7 @@
     make podman-run-ssl-host # or make docker-run-ssl-host
     ```
 
-    Docker Compose is also available, ex: `make compose-up`.
+    Docker Compose is also available, ex: `task compose-up`.
 
 ???+ example "☁️ How can I deploy MCP Gateway on Google Cloud Run, Code Engine, Kubernetes, AWS, etc?"
     See the [Deployment Documentation](../deployment/index.md) for detailed deployment instructions across local, docker, podman, compose, AWS, Azure, GCP, IBM Cloud, Helm, Minikube, Kubernetes, OpenShift and more.
@@ -147,7 +147,7 @@
 
 ???+ example "🛡️ How do I enable TLS and configure CORS?"
 
-    - Use `make podman-run-ssl` for self-signed certs or drop your own certificate under `certs`.
+    - Use `task podman-run-ssl` for self-signed certs or drop your own certificate under `certs`.
     - Set `ALLOWED_ORIGINS` or `CORS_ENABLED` for CORS headers.
 
 ???+ example "🔐 How do I pass Authorization headers to upstream MCP servers when the gateway uses authentication?"
@@ -387,7 +387,7 @@
 ???+ tip "🧑🎓 What code style and CI tools are used?"
 
     - Pre-commit: `ruff`, `black`, `mypy`, `isort`
-    - Run `make lint` before PRs
+    - Run `task lint` before PRs
 
 ???+ tip "💬 Where can I chat or ask questions?"
     Join the [GitHub Discussions board](https://github.com/IBM/mcp-context-forge/discussions).

@@ -156,14 +156,14 @@ plugins:
 1. Choose plugins from the catalog above
 2. Add configuration to `plugins/config.yaml`
 3. Set `PLUGINS_ENABLED=true` in `.env`
-4. Restart the gateway: `make dev`
+4. Restart the gateway: `task dev`
 
 ### Using External Plugins
 
 1. Build the external plugin: `cd plugins/external/opa && make build`
-2. Start the plugin server: `make start`
+2. Start the plugin server: `task start`
 3. Configure gateway to use external plugin in `plugins/config.yaml`
-4. Restart the gateway: `make dev`
+4. Restart the gateway: `task dev`
 
 ## Plugin Development
 

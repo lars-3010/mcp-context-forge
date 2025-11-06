@@ -50,16 +50,16 @@ The following modules already contain runnable doctest examples you can referenc
 
 ```bash
 # Run all doctests
-make doctest
+task doctest
 
 # Run with verbose output
-make doctest-verbose
+task doctest-verbose
 
 # Generate coverage report
-make doctest-coverage
+task doctest-coverage
 
 # Check coverage percentage (fails if < 100%)
-make doctest-check
+task doctest-check
 ```
 
 ### Individual Modules
@@ -180,7 +180,7 @@ When enabled, the hook blocks commits until doctests pass—handy if you're touc
 
 ## Coverage Metrics
 
-- `make doctest-coverage` writes an HTML report to `htmlcov-doctest/` and an XML summary to `coverage-doctest.xml`.
+- `task doctest-coverage` writes an HTML report to `htmlcov-doctest/` and an XML summary to `coverage-doctest.xml`.
 - GitHub Actions currently enforces a doctest coverage floor of **40%** via `--cov-fail-under=40`.
 - Use `coverage json -o doctest-coverage.json` (already produced in CI) or `coverage report` locally to inspect specific modules.
 
@@ -245,16 +245,16 @@ Before submitting a PR:
 
 ```bash
 # Run all tests including doctests
-make test
+task test
 
 # Run only doctests
-make doctest
+task doctest
 
 # Check linting
-make flake8
+task flake8
 
 # Run pre-commit hooks
-make pre-commit
+task pre-commit
 ```
 
 ## Troubleshooting

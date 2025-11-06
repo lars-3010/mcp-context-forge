@@ -36,7 +36,7 @@ pip install -e ".[dev]"
 python -m mcp_eval_server.server
 
 # Or use make command
-make dev
+task dev
 ```
 
 #### REST API Server Mode
@@ -45,7 +45,7 @@ make dev
 python -m mcp_eval_server.rest_server --port 8080 --host 0.0.0.0
 
 # Or use make command
-make serve-rest
+task serve-rest
 
 # Access interactive docs
 open http://localhost:8080/docs
@@ -54,7 +54,7 @@ open http://localhost:8080/docs
 #### HTTP Bridge Mode
 ```bash
 # MCP protocol over HTTP with Server-Sent Events
-make serve-http
+task serve-http
 
 # Access via JSON-RPC on port 9000
 curl -X POST -H 'Content-Type: application/json' \

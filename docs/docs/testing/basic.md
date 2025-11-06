@@ -18,9 +18,9 @@ cp .env.example .env
 ### 1. Start the Gateway
 
 ```bash
-make podman podman-run-ssl
+task podman podman-run-ssl
 # or
-make venv install serve-ssl
+task venv install serve-ssl
 ```
 
 Gateway will listen on:

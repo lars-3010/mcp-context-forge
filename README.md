@@ -891,7 +891,7 @@ VS Code will detect the `.devcontainer` and prompt:
 The container build will:
 
 * Install system packages & Python 3.11
-* Run `make install-dev` to pull all dependencies
+* Run `task install-dev` to pull all dependencies
 * Execute tests to verify the toolchain
 
 You'll land in `/workspace` ready to develop.
@@ -905,17 +905,17 @@ Common tasks inside the container:
 
 ```bash
 # Start dev server (hot reload)
-make dev            # http://localhost:4444
+task dev            # http://localhost:8000 (with hot reload)
 
 # Run tests & linters
-make test
-make lint
+task test
+task lint
 ```
 
 Optional:
 
-* `make bash` - drop into an interactive shell
-* `make clean` - clear build artefacts & caches
+* `task shell` - drop into an interactive Python shell with app context
+* `task clean` - clear build artefacts & caches
 * Port forwarding is automatic (customize via `.devcontainer/devcontainer.json`)
 
 </details>
@@ -944,20 +944,20 @@ No local Docker? Use Codespaces:
 ### One-liner (dev)
 
 ```bash
-make venv install serve
+task setup serve
 ```
 
 What it does:
 
-1. Creates / activates a `.venv` in your home folder `~/.venv/mcpgateway`
+1. Creates / activates a `.venv` (via uv by default)
 2. Installs the gateway and necessary dependencies
 3. Launches **Gunicorn** (Uvicorn workers) on [http://localhost:4444](http://localhost:4444)
 
 For development, you can use:
 
 ```bash
-make install-dev # Install development dependencies, ex: linters and test harness
-make lint          # optional: run style checks (ruff, mypy, etc.)
+task install-dev # Install development dependencies, ex: linters and test harness
+task lint        # optional: run style checks (ruff, mypy, etc.)
 ```
 
 ### Containerized (self-signed TLS)
@@ -969,15 +969,16 @@ which runtime is available and handles image naming differences.
 
 ### Auto-detection
 ```bash
-make container-build  # Uses podman if available, otherwise docker
+task container-build  # Auto-detects podman or docker
+```
 
 > You can use docker or podman, ex:
 
 ```bash
-make podman            # build production image
-make podman-run-ssl    # run at https://localhost:4444
-# or listen on port 4444 on your host directly, adds --network=host to podman
-make podman-run-ssl-host
+task container-build           # Build production image
+task container-run-ssl         # Run at https://localhost:4444
+# or listen on port 4444 on your host directly, adds --network=host
+task container-run-ssl-host
 ```
 
 ### Smoke-test the API
@@ -994,11 +995,11 @@ You should receive `[]` until you register a tool.
 
 ## Installation
 
-### Via Make
+### Via Task
 
 ```bash
-make venv install          # create .venv + install deps
-make serve                 # gunicorn on :4444
+task setup                 # create .venv + install deps + check env
+task serve                 # gunicorn on :4444
 ```
 
 ### UV (alternative)
@@ -1037,7 +1038,7 @@ docker run --name mcp-postgres \
   -p 5432:5432 -d postgres
 ```
 
-A `make compose-up` target is provided along with a [docker-compose.yml](docker-compose.yml) file to make this process simpler.
+A `task compose-up` target is provided along with a [docker-compose.yml](docker-compose.yml) file to make this process simpler.
 
 ---
 
@@ -1533,7 +1534,7 @@ MCP Gateway includes automatic response compression middleware that reduces band
 **Testing Compression:**
 ```bash
 # Start server
-make dev
+task dev
 
 # Test Brotli (best compression)
 curl -H "Accept-Encoding: br" http://localhost:8000/openapi.json -v | grep -i "content-encoding"
@@ -1762,11 +1763,11 @@ mcpgateway
 
 MCP Gateway uses Alembic for database migrations. Common commands:
 
-- `make db-current` - Show current database version
-- `make db-upgrade` - Apply pending migrations
-- `make db-migrate` - Create new migration
-- `make db-history` - Show migration history
-- `make db-status` - Detailed migration status
+- `task db-current` - Show current database version
+- `task db-migrate` - Apply pending migrations
+- `task db-revision` - Create new migration
+- `task db-history` - Show migration history
+- `task db-current` - Detailed migration status
 
 #### Troubleshooting
 
@@ -1845,7 +1846,7 @@ MCP Gateway uses Alembic for database migrations. Common commands:
 ### Makefile
 
 ```bash
- make serve               # Run production Gunicorn server on
+task serve               # Run production Gunicorn server on
  make serve-ssl           # Run Gunicorn behind HTTPS on :4444 (uses ./certs)
 ```
 
@@ -1854,7 +1855,7 @@ MCP Gateway uses Alembic for database migrations. Common commands:
 To run the development (uvicorn) server:
 
 ```bash
-make dev
+task dev
 # or
 ./run.sh --reload --log debug --workers 2
 ```
@@ -1906,7 +1907,7 @@ This project supports deployment to [IBM Cloud Code Engine](https://cloud.ibm.co
 ### 🔧 Prerequisites
 
 - Podman **or** Docker installed locally
-- IBM Cloud CLI (use `make ibmcloud-cli-install` to install)
+- IBM Cloud CLI (use `task ibmcloud-cli-install` to install)
 - An [IBM Cloud API key](https://cloud.ibm.com/iam/apikeys) with access to Code Engine & Container Registry
 - Code Engine and Container Registry services **enabled** in your IBM Cloud account
 
@@ -1933,38 +1934,38 @@ IBMCLOUD_MEMORY=4G                   # Memory allocation
 IBMCLOUD_REGISTRY_SECRET=my-regcred  # Name of the Container Registry secret
 ```
 
-> ✅ **Quick check:** `make ibmcloud-check-env`
+> ✅ **Quick check:** `task ibmcloud-check-env`
 
 ---
 
-### 🚀 Make Targets
+### 🚀 Task Targets
 
 | Target                      | Purpose                                                                   |
 | --------------------------- | ------------------------------------------------------------------------- |
-| `make ibmcloud-cli-install` | Install IBM Cloud CLI and required plugins                                |
-| `make ibmcloud-login`       | Log in to IBM Cloud (API key or SSO)                                      |
-| `make ibmcloud-ce-login`    | Select the Code Engine project & region                                   |
-| `make ibmcloud-tag`         | Tag the local container image                                             |
-| `make ibmcloud-push`        | Push the image to IBM Container Registry                                  |
-| `make ibmcloud-deploy`      | **Create or update** the Code Engine application (uses CPU/memory/secret) |
-| `make ibmcloud-ce-status`   | Show current deployment status                                            |
-| `make ibmcloud-ce-logs`     | Stream logs from the running app                                          |
-| `make ibmcloud-ce-rm`       | Delete the Code Engine application                                        |
+| `task ibmcloud-cli-install` | Install IBM Cloud CLI and required plugins                                |
+| `task ibmcloud-login`       | Log in to IBM Cloud (API key or SSO)                                      |
+| `task ibmcloud-ce-login`    | Select the Code Engine project & region                                   |
+| `task ibmcloud-tag`         | Tag the local container image                                             |
+| `task ibmcloud-push`        | Push the image to IBM Container Registry                                  |
+| `task ibmcloud-deploy`      | **Create or update** the Code Engine application (uses CPU/memory/secret) |
+| `task ibmcloud-ce-status`   | Show current deployment status                                            |
+| `task ibmcloud-ce-logs`     | Stream logs from the running app                                          |
+| `task ibmcloud-ce-rm`       | Delete the Code Engine application                                        |
 
 ---
 
 ### 📝 Example Workflow
 
 ```bash
-make ibmcloud-check-env
-make ibmcloud-cli-install
-make ibmcloud-login
-make ibmcloud-ce-login
-make ibmcloud-tag
-make ibmcloud-push
-make ibmcloud-deploy
-make ibmcloud-ce-status
-make ibmcloud-ce-logs
+task ibmcloud-check-env
+task ibmcloud-cli-install
+task ibmcloud-login
+task ibmcloud-ce-login
+task ibmcloud-tag
+task ibmcloud-push
+task ibmcloud-deploy
+task ibmcloud-ce-status
+task ibmcloud-ce-logs
 ```
 
 </details>
@@ -2414,8 +2415,8 @@ curl -X POST -H "Content-Type: application/json" \
 ## Testing
 
 ```bash
-make test            # Run unit tests
-make lint            # Run lint tools
+task test            # Run unit tests with coverage
+task lint            # Run all linters
 ```
 
 ## Doctest Coverage
@@ -2423,10 +2424,8 @@ make lint            # Run lint tools
 ContextForge implements comprehensive doctest coverage to ensure all code examples in documentation are tested and verified:
 
 ```bash
-make doctest         # Run all doctests
-make doctest-verbose # Run with detailed output
-make doctest-coverage # Generate coverage report
-make doctest-check   # Check coverage percentage
+task doctest         # Run all doctests
+task test            # Run with coverage report (includes doctests)
 ```
 
 **Coverage Status:**

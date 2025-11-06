@@ -19,7 +19,7 @@ Install fuzzing dependencies as an optional package group:
 
 ```bash
 # Via Makefile (recommended)
-make fuzz-install
+task fuzz-install
 
 # Or directly with pip
 pip install -e .[fuzz]
@@ -29,13 +29,13 @@ pip install -e .[fuzz]
 
 ```bash
 # Complete fuzzing suite
-make fuzz-all
+task fuzz-all
 
 # Individual components
-make fuzz-hypothesis     # Property-based tests
-make fuzz-security       # Security vulnerability tests
-make fuzz-quick          # Fast CI validation
-make fuzz-report         # Generate reports
+task fuzz-hypothesis     # Property-based tests
+task fuzz-security       # Security vulnerability tests
+task fuzz-quick          # Fast CI validation
+task fuzz-report         # Generate reports
 ```
 
 ## Fuzzing Components
@@ -121,7 +121,7 @@ API fuzzing requires a running server instance:
 
 ```bash
 # Terminal 1: Start server
-make dev
+task dev
 
 # Terminal 2: Run API fuzzing
 source $(VENV_DIR)/bin/activate
@@ -188,20 +188,20 @@ def test_sql_injection_resistance(self, malicious_input):
 ### Development Mode
 For interactive development and debugging:
 ```bash
-make fuzz-hypothesis    # Run with statistics and detailed output
-make fuzz-security      # Security tests with warnings
+task fuzz-hypothesis    # Run with statistics and detailed output
+task fuzz-security      # Security tests with warnings
 ```
 
 ### CI/CD Mode
 For automated testing in continuous integration:
 ```bash
-make fuzz-quick         # Fast validation (50 examples)
+task fuzz-quick         # Fast validation (50 examples)
 ```
 
 ### Comprehensive Mode
 For thorough testing in nightly builds:
 ```bash
-make fuzz-extended      # Extended testing (1000+ examples)
+task fuzz-extended      # Extended testing (1000+ examples)
 ```
 
 ## RESTler Fuzzing
@@ -214,7 +214,7 @@ Prerequisites: Docker installed and the gateway running locally.
 
 ```bash
 # Terminal 1: Start the server
-make dev
+task dev
 
 # Terminal 2: Generate/OpenAPI and run RESTler via Docker
 curl -sSf http://localhost:4444/openapi.json -o reports/restler/openapi.json
@@ -229,7 +229,7 @@ docker run --rm -v "$PWD/reports/restler:/workspace" \
 You can print these instructions anytime with:
 
 ```bash
-make fuzz-restler
+task fuzz-restler
 ```
 
 ### Option A2: Automated Docker runner
@@ -238,10 +238,10 @@ Use the helper that waits for the server, downloads the spec, then compiles and 
 
 ```bash
 # Terminal 1: Start the server
-make dev
+task dev
 
 # Terminal 2: Run automated RESTler fuzzing
-make fuzz-restler-auto
+task fuzz-restler-auto
 
 # Optional environment variables:
 # MCPFUZZ_BASE_URL   (default: http://localhost:4444)
@@ -252,7 +252,7 @@ make fuzz-restler-auto
 
 Notes:
 
-- If Docker is not present, `fuzz-restler-auto` will print a friendly message and exit successfully (use `make fuzz-restler` for manual steps). This behavior avoids CI failures on runners without Docker.
+- If Docker is not present, `fuzz-restler-auto` will print a friendly message and exit successfully (use `task fuzz-restler` for manual steps). This behavior avoids CI failures on runners without Docker.
 - Artifacts are written under `reports/restler/`.
 
 ### Option B: Local install
@@ -452,7 +452,7 @@ st.text().filter(lambda x: '$' in x)
 ```
 ModuleNotFoundError: No module named 'hypothesis'
 ```
-**Solution:** Run `make fuzz-install` first
+**Solution:** Run `task fuzz-install` first
 
 **Authentication Failures:**
 ```
@@ -700,7 +700,7 @@ def test_performance_regression(self, input_text):
 
 ### Generated Reports
 
-The `make fuzz-report` command generates comprehensive reports:
+The `task fuzz-report` command generates comprehensive reports:
 
 **JSON Report** (`reports/fuzz-report.json`):
 
@@ -747,10 +747,10 @@ The `make fuzz-report` command generates comprehensive reports:
 
 ```bash
 # Clean up old artifacts
-make fuzz-clean
+task fuzz-clean
 
 # Regenerate corpus with latest code
-make fuzz-atheris
+task fuzz-atheris
 
 # Verify corpus quality
 python tests/fuzz/scripts/generate_fuzz_report.py

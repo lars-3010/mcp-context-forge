@@ -338,7 +338,7 @@ def verify_webhook_signature(payload, signature, secret):
 ### Enable Debug Logging
 ```bash
 export LOG_LEVEL=DEBUG
-make dev
+task dev
 ```
 
 ### View Webhook Plugin Logs

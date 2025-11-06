@@ -47,7 +47,7 @@ cd pandoc-server
 go mod download
 
 # Build the server
-make build
+task build
 ```
 
 #### Using Docker
@@ -447,23 +447,23 @@ The server provides comprehensive error handling for:
 
 ```bash
 # Format code
-make fmt
+task fmt
 
 # Run tests
-make test
+task test
 
 # Tidy dependencies
-make tidy
+task tidy
 
 # Build binary
-make build
+task build
 ```
 
 ### Testing
 
 ```bash
 # Run all tests
-make test
+task test
 
 # Test specific functionality
 go test -v ./...

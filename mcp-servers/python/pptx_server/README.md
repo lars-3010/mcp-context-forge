@@ -83,20 +83,20 @@ pip install -e .
 python -m pptx_server.server
 
 # Or use the make command
-make dev
+task dev
 ```
 
 ### HTTP Download Server
 Start the HTTP server for downloading presentations:
 ```bash
 # Start HTTP download server
-make serve-http-only
+task serve-http-only
 
 # Or start combined MCP + HTTP server
-make serve-combined
+task serve-combined
 
 # Test downloads
-make test-download
+task test-download
 ```
 
 **Download URLs include filename:**
@@ -342,30 +342,30 @@ await add_text_box(
 ### Quick Start
 ```bash
 # Install development dependencies
-make dev-install
+task dev-install
 
 # Format and lint code
-make format lint
+task format lint
 
 # Run tests
-make test
+task test
 
 # Create demo presentation
-make demo
+task demo
 
 # Validate created files
-make validate
+task validate
 ```
 
 ### Testing Tools
 ```bash
 # List available tools
-make test-tools
+task test-tools
 
 # Test via HTTP
-make serve-http
+task serve-http
 # In another terminal:
-make test-http
+task test-http
 ```
 
 ### Container Operations
@@ -411,11 +411,11 @@ The server is built using:
 
 ## Contributing
 
-1. Install development dependencies: `make dev-install`
-2. Follow code formatting: `make format`
-3. Run linting: `make lint`
-4. Run tests: `make test`
-5. Test with demo: `make demo && make validate`
+1. Install development dependencies: `task dev-install`
+2. Follow code formatting: `task format`
+3. Run linting: `task lint`
+4. Run tests: `task test`
+5. Test with demo: `task demo && make validate`
 
 ## License
 

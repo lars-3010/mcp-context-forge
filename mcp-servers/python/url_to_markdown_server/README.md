@@ -29,22 +29,22 @@ The ultimate MCP server for retrieving web content and files, then converting th
 
 ### Basic Installation
 ```bash
-make install  # Core functionality only (includes FastMCP)
+task install  # Core functionality only (includes FastMCP)
 ```
 
 ### With HTML Engines
 ```bash
-make install-html  # Includes html2text, markdownify, BeautifulSoup, readability
+task install-html  # Includes html2text, markdownify, BeautifulSoup, readability
 ```
 
 ### With Document Converters
 ```bash
-make install-docs  # Includes PDF, DOCX, XLSX, PPTX support
+task install-docs  # Includes PDF, DOCX, XLSX, PPTX support
 ```
 
 ### Full Installation (Recommended)
 ```bash
-make install-full  # All features enabled, including FastMCP
+task install-full  # All features enabled, including FastMCP
 ```
 
 ### FastMCP Requirements
@@ -112,24 +112,24 @@ The new FastMCP implementation requires:
 
 #### Stdio Mode (for Claude Desktop, IDEs)
 ```bash
-make dev-fastmcp  # Run FastMCP implementation
+task dev-fastmcp  # Run FastMCP implementation
 ```
 
 #### HTTP Mode (via MCP Gateway)
 ```bash
-make serve-http-fastmcp  # Expose FastMCP server over HTTP
+task serve-http-fastmcp  # Expose FastMCP server over HTTP
 ```
 
 ### Running Original MCP Implementation
 
 #### Stdio Mode
 ```bash
-make dev  # Run original MCP server
+task dev  # Run original MCP server
 ```
 
 #### HTTP Mode
 ```bash
-make serve-http  # Expose original server over HTTP
+task serve-http  # Expose original server over HTTP
 ```
 
 ### MCP Client Configuration
@@ -426,16 +426,16 @@ export MARKDOWN_USER_AGENT="Custom-Agent/1.0"  # Custom user agent
 
 ```bash
 # Format code
-make format
+task format
 
 # Run tests
-make test
+task test
 
 # Lint code
-make lint
+task lint
 
 # Install with all features for development
-make install-full
+task install-full
 ```
 
 ## Troubleshooting
@@ -453,7 +453,7 @@ make install-full
 Enable debug logging:
 ```bash
 export LOG_LEVEL=DEBUG
-make dev
+task dev
 ```
 
 ### Engine Selection Guide

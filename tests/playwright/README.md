@@ -38,23 +38,23 @@ tests/playwright/
 pip install -e ".[playwright]"
 
 # Install Playwright browsers (only needed once)
-make playwright-install      # Installs Chromium only
+task playwright-install      # Installs Chromium only
 # OR
-make playwright-install-all  # Installs all browsers (Chromium, Firefox, WebKit)
+task playwright-install-all  # Installs all browsers (Chromium, Firefox, WebKit)
 ```
 
 ### Running Tests
 
 ```bash
 # Start the MCP Gateway server first
-make serve
+task serve
 
 # In another terminal, run the tests:
-make test-ui              # Run with visible browser
-make test-ui-headless     # Run in headless mode (CI/CD)
-make test-ui-debug        # Run with Playwright Inspector
-make test-ui-smoke        # Run only smoke tests (fast)
-make test-ui-report       # Generate HTML report
+task test-ui              # Run with visible browser
+task test-ui-headless     # Run in headless mode (CI/CD)
+task test-ui-debug        # Run with Playwright Inspector
+task test-ui-smoke        # Run only smoke tests (fast)
+task test-ui-report       # Generate HTML report
 ```
 
 ## 🧪 Test Categories
@@ -152,7 +152,7 @@ The project's `pyproject.toml` includes Playwright configuration in `[tool.pytes
 ### 1. Playwright Inspector
 
 ```bash
-make test-ui-debug
+task test-ui-debug
 # OR
 PWDEBUG=1 pytest tests/playwright/test_admin_ui.py -s
 ```
@@ -165,7 +165,7 @@ This opens the Playwright Inspector with:
 ### 2. Headed Mode
 
 ```bash
-make test-ui
+task test-ui
 # OR
 pytest tests/playwright --headed
 ```
@@ -209,14 +209,14 @@ Add to `.vscode/launch.json`:
 ### HTML Report
 
 ```bash
-make test-ui-report
+task test-ui-report
 open tests/playwright/reports/report.html
 ```
 
 ### Coverage Report
 
 ```bash
-make test-ui-coverage
+task test-ui-coverage
 open tests/playwright/reports/coverage/index.html
 ```
 
@@ -270,7 +270,7 @@ Tests run automatically on GitHub Actions for:
 ```bash
 # Error: Connection refused to localhost:4444
 # Solution: Start the server first
-make serve
+task serve
 ```
 
 ### Browser Not Installed
@@ -278,7 +278,7 @@ make serve
 ```bash
 # Error: Executable doesn't exist at...
 # Solution: Install browsers
-make playwright-install
+task playwright-install
 ```
 
 ### Flaky Tests
@@ -312,7 +312,7 @@ page.click("button", timeout=10000)  # 10 seconds for this action
 2. Add appropriate test markers
 3. Update page objects for new UI elements
 4. Include docstrings explaining test purpose
-5. Run `make test-ui` locally before submitting PR
+5. Run `task test-ui` locally before submitting PR
 6. Ensure all smoke tests pass
 
 See the main project README for more details.

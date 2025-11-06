@@ -28,7 +28,7 @@ docker run --rm -it -p 8888:8080 \
 
 # From source
 cd mcp-servers/go/fast-time-server
-make build && make run
+task build && make run
 ```
 
 ---

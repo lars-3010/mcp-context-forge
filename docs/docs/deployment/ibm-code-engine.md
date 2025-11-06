@@ -13,7 +13,7 @@ This guide covers two supported deployment paths for the **MCP Gateway**:
 | -------------------- | ------------------------------------------------------------------ |
 | IBM Cloud account    | [Create one](https://cloud.ibm.com/registration) if needed         |
 | Docker **or** Podman | Builds the production container image locally                      |
-| IBM Cloud CLI ≥ 2.16 | Installed automatically with `make ibmcloud-cli-install`           |
+| IBM Cloud CLI ≥ 2.16 | Installed automatically with `task ibmcloud-cli-install`           |
 | Code Engine project  | Create or select one in the IBM Cloud console                      |
 | `.env` file          | Runtime secrets & config for the gateway                           |
 | `.env.ce` file       | Deployment credentials & metadata for Code Engine / Container Reg. |
@@ -113,7 +113,7 @@ IBMCLOUD_MEMORY=4G                     # Memory (must match a valid CPU/MEM pair
 IBMCLOUD_REGISTRY_SECRET=my-regcred
 ```
 
-> **Tip:** run `make ibmcloud-check-env` to verify every required `IBMCLOUD_*` key is present in `.env.ce`.
+> **Tip:** run `task ibmcloud-check-env` to verify every required `IBMCLOUD_*` key is present in `.env.ce`.
 
 ---
 
@@ -137,20 +137,20 @@ IBMCLOUD_REGISTRY_SECRET=my-regcred
 **Typical first deploy**
 
 ```bash
-make ibmcloud-check-env
-make ibmcloud-cli-install
-make ibmcloud-login
-make ibmcloud-ce-login
-make podman            # or: make docker
-make ibmcloud-tag
-make ibmcloud-push
-make ibmcloud-deploy
+task ibmcloud-check-env
+task ibmcloud-cli-install
+task ibmcloud-login
+task ibmcloud-ce-login
+task podman            # or: make docker
+task ibmcloud-tag
+task ibmcloud-push
+task ibmcloud-deploy
 ```
 
 **Redeploy after code changes**
 
 ```bash
-make podman ibmcloud-tag ibmcloud-push ibmcloud-deploy
+task podman ibmcloud-tag ibmcloud-push ibmcloud-deploy
 ```
 
 ---
@@ -231,7 +231,7 @@ curl -H "Authorization: Bearer ${MCPGATEWAY_BEARER_TOKEN}" \
      https://mcpgateway.us-south.codeengine.appdomain.cloud/tools
 
 # Check the logs
-make ibmcloud-ce-logs
+task ibmcloud-ce-logs
 ```
 
 ---
@@ -240,7 +240,7 @@ make ibmcloud-ce-logs
 
 ```bash
 # via Makefile
-make ibmcloud-ce-rm
+task ibmcloud-ce-rm
 
 # or directly
 ibmcloud ce application delete --name "$IBMCLOUD_CODE_ENGINE_APP" -f
@@ -394,7 +394,7 @@ reducing latency and database load.
 ## 9. Gunicorn configuration (optional tuning)
 
 The container starts `gunicorn` with the settings defined in **`gunicorn.conf.py`** found at the project root.
-If you need to change worker counts, ports, or time-outs, edit this file **before** you build the image (`make podman` or `make docker`). The settings are baked into the container at build time.
+If you need to change worker counts, ports, or time-outs, edit this file **before** you build the image (`task podman` or `task docker`). The settings are baked into the container at build time.
 
 ```python
 # -*- coding: utf-8 -*-
@@ -454,5 +454,5 @@ def worker_exit(server, worker):
 After changing the file, rebuild and redeploy:
 
 ```bash
-make podman ibmcloud-tag ibmcloud-push ibmcloud-deploy
+task podman ibmcloud-tag ibmcloud-push ibmcloud-deploy
 ```

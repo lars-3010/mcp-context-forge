@@ -302,7 +302,7 @@ export TOKEN=$(python3 -m mcpgateway.utils.create_jwt_token --username admin@exa
 curl -s http://localhost:4444/health
 
 # Start gateway
-make dev
+task dev
 ```
 
 ### Tools not showing up

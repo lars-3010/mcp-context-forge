@@ -19,7 +19,7 @@
 
     - [ ] `pip install --upgrade pip`
     - [ ] `uv` and `uvx` installed - [install uv](https://github.com/astral-sh/uv)
-    - [ ] `.venv` recreated with `make install-dev` (installs runtime + dev extras)
+    - [ ] `.venv` recreated with `task install-dev` (installs runtime + dev extras)
 
 ???+ check "Additional tools"
 
@@ -49,24 +49,24 @@
 
 ???+ check "Local setup"
 
-    - [ ] `make check-env` (validates .env is complete)
-    - [ ] `make install-dev serve`
-    - [ ] `make smoketest` runs and passes
+    - [ ] `task check-env` (validates .env is complete)
+    - [ ] `task install-dev serve`
+    - [ ] `task smoketest` runs and passes
 
 ???+ check "Container builds"
 
-    - [ ] Docker: `make docker-prod docker-run-ssl-host compose-up`
-    - [ ] Podman: `make podman podman-prod podman-run-ssl-host`
+    - [ ] Docker: `task docker-prod docker-run-ssl-host compose-up`
+    - [ ] Podman: `task podman podman-prod podman-run-ssl-host`
 
 ???+ check "Packaging"
 
-    - [ ] `make dist verify` builds packages
-    - [ ] `make devpi-install devpi-init devpi-start devpi-setup-user devpi-upload devpi-test`
+    - [ ] `task dist verify` builds packages
+    - [ ] `task devpi-install devpi-init devpi-start devpi-setup-user devpi-upload devpi-test`
     - [ ] Install and test `mcpgateway` CLI locally
 
 ???+ check "Minikube & Helm"
 
-    - [ ] `make helm-install minikube-install minikube-start minikube-k8s-apply helm-package helm-deploy`
+    - [ ] `task helm-install minikube-install minikube-start minikube-k8s-apply helm-package helm-deploy`
     - [ ] See [minikube deployment](../deployment/minikube.md)
 
 ---
@@ -75,13 +75,13 @@
 
 ???+ check "Code quality"
 
-    - [ ] `make lint`, `make lint-web`
-    - [ ] `make shell-linters-install`, `make shell-lint`
-    - [ ] `make hadolint` (Dockerfile linting)
+    - [ ] `task lint`, `task lint-web`
+    - [ ] `task shell-linters-install`, `task shell-lint`
+    - [ ] `task hadolint` (Dockerfile linting)
 
 ???+ check "Unit tests"
 
-    - [ ] `make test` passes all cases
+    - [ ] `task test` passes all cases
 
 ---
 
@@ -96,8 +96,8 @@
 
 ???+ check "SonarQube analysis"
 
-    - [ ] `make sonar-up-docker`
-    - [ ] `make sonar-submit-docker` - ensure no critical violations
+    - [ ] `task sonar-up-docker`
+    - [ ] `task sonar-submit-docker` - ensure no critical violations
 
 ---
 

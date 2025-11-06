@@ -27,11 +27,11 @@ cd mcp-context-forge
 cp .env.example .env && make venv install-dev check-env
 
 # Start development server with hot-reload
-make dev
+task dev
 
 # Run quality checks before committing
-make autoflake isort black pre-commit
-make doctest test htmlcov flake8 pylint verify
+task autoflake isort black pre-commit
+task doctest test htmlcov flake8 pylint verify
 ```
 
 ## Development Setup
@@ -54,10 +54,10 @@ make doctest test htmlcov flake8 pylint verify
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Create virtual environment and install dependencies
-make venv install-dev
+task venv install-dev
 
 # Verify environment
-make check-env
+task check-env
 ```
 
 #### Traditional Setup
@@ -171,13 +171,13 @@ mcp-context-forge/
 
 ```bash
 # Development server with hot-reload (port 8000)
-make dev
+task dev
 
 # Production-like server (port 4444)
-make serve
+task serve
 
 # With SSL/TLS
-make certs serve-ssl
+task certs serve-ssl
 
 # Custom host/port
 python3 -m mcpgateway --host 0.0.0.0 --port 8080
@@ -187,34 +187,34 @@ python3 -m mcpgateway --host 0.0.0.0 --port 8080
 
 ```bash
 # Auto-format code (run before committing)
-make autoflake isort black pre-commit
+task autoflake isort black pre-commit
 
 # Comprehensive linting
-make flake8 bandit interrogate pylint verify
+task flake8 bandit interrogate pylint verify
 
 # Quick lint for changed files only
-make lint-changed
+task lint-changed
 
 # Watch mode for auto-linting
-make lint-watch
+task lint-watch
 
 # Fix common issues automatically
-make lint-fix
+task lint-fix
 ```
 
 ### Pre-commit Workflow
 
 ```bash
 # Install git hooks
-make pre-commit-install
+task pre-commit-install
 
 # Run pre-commit checks manually
-make pre-commit
+task pre-commit
 
 # Complete quality pipeline (recommended before commits)
-make autoflake isort black pre-commit
-make doctest test htmlcov smoketest
-make flake8 bandit interrogate pylint verify
+task autoflake isort black pre-commit
+task doctest test htmlcov smoketest
+task flake8 bandit interrogate pylint verify
 ```
 
 ## Code Quality
@@ -234,22 +234,22 @@ make flake8 bandit interrogate pylint verify
 
 ```bash
 # Format code
-make black              # Python formatter
-make isort              # Import sorter
-make autoflake          # Remove unused imports
+task black              # Python formatter
+task isort              # Import sorter
+task autoflake          # Remove unused imports
 
 # Lint code
-make flake8             # Style checker
-make pylint             # Advanced linting
-make mypy               # Type checking
-make bandit             # Security analysis
+task flake8             # Style checker
+task pylint             # Advanced linting
+task mypy               # Type checking
+task bandit             # Security analysis
 
 # Documentation
-make interrogate        # Docstring coverage
-make doctest            # Test code examples
+task interrogate        # Docstring coverage
+task doctest            # Test code examples
 
 # All checks
-make verify             # Run all quality checks
+task verify             # Run all quality checks
 ```
 
 ## Database Management
@@ -424,7 +424,7 @@ export PLUGINS_ENABLED=true
 export PLUGIN_CONFIG_FILE=plugins/config.yaml
 
 # Test plugin
-make dev
+task dev
 ```
 
 ## Testing MCP Servers
@@ -550,7 +550,7 @@ export OTEL_ENABLE_OBSERVABILITY=true
 export OTEL_TRACES_EXPORTER=console  # Or otlp, jaeger
 
 # Run with tracing
-make dev
+task dev
 
 # View traces in console or tracing backend
 ```
@@ -657,9 +657,9 @@ async def make_requests():
 
 1. **Fork and clone** the repository
 2. **Create a feature branch**: `git checkout -b feature/my-feature`
-3. **Set up environment**: `make venv install-dev`
+3. **Set up environment**: `task venv install-dev`
 4. **Make changes** and write tests
-5. **Run quality checks**: `make verify`
+5. **Run quality checks**: `task verify`
 6. **Commit with sign-off**: `git commit -s -m "feat: add new feature"`
 7. **Push and create PR**: `git push origin feature/my-feature`
 
@@ -678,7 +678,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ### Code Review Process
 
 1. **Self-review** your changes
-2. **Run all tests**: `make test`
+2. **Run all tests**: `task test`
 3. **Update documentation** if needed
 4. **Ensure CI passes**
 5. **Address review feedback**
@@ -764,10 +764,10 @@ curl -u admin:changeme http://localhost:4444/api/test
 
 ```bash
 # Static analysis
-make bandit
+task bandit
 
 # Dependency scanning
-make security-scan
+task security-scan
 
 # OWASP checks
 pip install safety
@@ -781,14 +781,14 @@ safety check
 1. **Import errors**: Ensure package installed with `pip install -e .`
 2. **Database locked**: Use PostgreSQL for concurrent access
 3. **Port in use**: Change with `PORT=8001 make dev`
-4. **Missing dependencies**: Run `make install-dev`
+4. **Missing dependencies**: Run `task install-dev`
 5. **Permission errors**: Check file permissions and user context
 
 ### Debug Commands
 
 ```bash
 # Check environment
-make check-env
+task check-env
 
 # Verify installation
 python3 -c "import mcpgateway; print(mcpgateway.__version__)"

@@ -13,9 +13,9 @@ Project management-focused FastMCP server delivering planning, scheduling, risk,
 
 ## Quick Start
 ```bash
-make dev        # stdio transport
-make serve-http # http://localhost:8000/mcp/
-make test
+task dev        # stdio transport
+task serve-http # http://localhost:8000/mcp/
+task test
 ```
 
 Ensure Graphviz binaries are available when using diagram tools.

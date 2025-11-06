@@ -44,10 +44,10 @@ A highly secure MCP server for executing Python code in sandboxed environments. 
 
 ```bash
 # Install in development mode with sandbox dependencies
-make dev-install
+task dev-install
 
 # Or install normally
-make install
+task install
 ```
 
 ## Configuration
@@ -109,10 +109,10 @@ For maximum security with container isolation:
 
 ```bash
 # Build the sandbox container
-make build-sandbox
+task build-sandbox
 
 # Test the container
-make test-sandbox
+task test-sandbox
 ```
 
 ### gVisor Installation (Recommended)
@@ -147,13 +147,13 @@ export SANDBOX_CONTAINER_IMAGE=python-sandbox:latest  # Container image name
 ### Stdio Mode (for Claude Desktop, IDEs)
 
 ```bash
-make dev
+task dev
 ```
 
 ### HTTP Mode (via MCP Gateway)
 
 ```bash
-make serve-http
+task serve-http
 ```
 
 ## Examples
@@ -387,16 +387,16 @@ print(f"Difference from math.pi: {abs(result - math.pi)}")
 
 ```bash
 # Format code
-make format
+task format
 
 # Run tests
-make test
+task test
 
 # Lint code
-make lint
+task lint
 
 # Build sandbox container
-make build-sandbox
+task build-sandbox
 ```
 
 ## Deployment Recommendations

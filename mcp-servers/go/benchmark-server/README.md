@@ -18,13 +18,13 @@ A configurable MCP (Model Context Protocol) server written in Go for benchmarkin
 ### Build
 
 ```bash
-make build
+task build
 ```
 
 ### Run with Default Settings (100 items each)
 
 ```bash
-make run
+task run
 ```
 
 ### Run with Custom Configuration
@@ -159,19 +159,19 @@ curl -X POST http://localhost:8080/messages \
 ## Makefile Targets
 
 ```bash
-make help         # Show all available targets
-make tidy         # Download and tidy dependencies
-make fmt          # Format Go code
-make test         # Run tests
-make build        # Build the binary
-make run          # Build and run with defaults
-make run-small    # Run with 10 items each
-make run-medium   # Run with 100 items each
-make run-large    # Run with 1000 items each
-make run-xlarge   # Run with 10000 items each
-make run-sse      # Run with SSE transport
-make run-http     # Run with HTTP transport
-make clean        # Remove build artifacts
+task help         # Show all available targets
+task tidy         # Download and tidy dependencies
+task fmt          # Format Go code
+task test         # Run tests
+task build        # Build the binary
+task run          # Build and run with defaults
+task run-small    # Run with 10 items each
+task run-medium   # Run with 100 items each
+task run-large    # Run with 1000 items each
+task run-xlarge   # Run with 10000 items each
+task run-sse      # Run with SSE transport
+task run-http     # Run with HTTP transport
+task clean        # Remove build artifacts
 ```
 
 ## Benchmarking Scenarios

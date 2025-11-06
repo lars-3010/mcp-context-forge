@@ -21,30 +21,30 @@ The URL-to-Markdown MCP Server is the ultimate solution for retrieving web conte
 
 ```bash
 # Basic installation (core functionality only)
-make install
+task install
 
 # With HTML engines (includes html2text, markdownify, BeautifulSoup, readability)
-make install-html
+task install-html
 
 # With document converters (includes PDF, DOCX, XLSX, PPTX support)
-make install-docs
+task install-docs
 
 # Full installation (recommended - all features enabled)
-make install-full
+task install-full
 ```
 
 ### Running the Server
 
 ```bash
 # FastMCP server (recommended)
-make dev-fastmcp
+task dev-fastmcp
 
 # Original MCP server
-make dev
+task dev
 
 # HTTP bridge for REST API access
-make serve-http-fastmcp  # FastMCP version
-make serve-http          # Original version
+task serve-http-fastmcp  # FastMCP version
+task serve-http          # Original version
 ```
 
 ## Available Tools
@@ -221,7 +221,7 @@ export MARKDOWN_USER_AGENT="Custom-Agent/1.0"  # Custom user agent
 
 ```bash
 # Start the URL-to-markdown server via HTTP
-make serve-http-fastmcp
+task serve-http-fastmcp
 
 # Register with MCP Gateway
 curl -X POST http://localhost:8000/gateways \

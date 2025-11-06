@@ -1363,6 +1363,10 @@ Disallow: /
             >>> if old_val is not None:
             ...     os.environ['DEFAULT_PASSTHROUGH_HEADERS'] = old_val
         """
+        # Load secrets from Vault before initializing settings
+        # This ensures Vault secrets are available as environment variables
+        self._load_vault_secrets()
+
         super().__init__(**kwargs)
 
         # Parse DEFAULT_PASSTHROUGH_HEADERS environment variable
@@ -1405,6 +1409,43 @@ Disallow: /
                 "This is a security risk! Set TRUST_PROXY_AUTH=true only if MCP Gateway "
                 "is behind a trusted authentication proxy."
             )
+
+    @staticmethod
+    def _load_vault_secrets() -> None:
+        """Load secrets from HashiCorp Vault and populate environment variables.
+
+        This method is called before Settings initialization to ensure Vault secrets
+        are available as environment variables before Pydantic processes them.
+
+        The method is static to avoid dependency on instance state and can be called
+        before parent class initialization.
+        """
+        # Only attempt to load if Vault is enabled
+        vault_enabled = os.getenv("VAULT_ENABLED", "false").lower() in ("true", "1", "yes")
+        if not vault_enabled:
+            logger.debug("Vault integration disabled (VAULT_ENABLED=false)")
+            return
+
+        try:
+            # Import here to avoid circular dependency and allow graceful degradation
+            from mcpgateway.utils.vault_wrapper import load_secrets_from_vault
+
+            logger.info("Loading secrets from HashiCorp Vault...")
+            secrets = load_secrets_from_vault(update_env=True)
+
+            if secrets:
+                logger.info(f"Successfully loaded {len(secrets)} secrets from Vault")
+            else:
+                logger.warning("No secrets loaded from Vault")
+
+        except ImportError:
+            logger.warning(
+                "hvac package not installed, skipping Vault integration. "
+                "Install with: uv add hvac"
+            )
+        except Exception as exception:
+            logger.error(f"Failed to load secrets from Vault: {exception}")
+            # Don't raise - allow application to start with environment-only config
 
     # Masking value for all sensitive data
     masked_auth_value: str = "*****"
