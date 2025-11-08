@@ -100,6 +100,63 @@ GW_FAILURE_THRESHOLD = settings.unhealthy_threshold
 GW_HEALTH_CHECK_INTERVAL = settings.health_check_interval
 
 
+def create_proxy_aware_http_client(
+    headers: dict[str, str] | None = None,
+    timeout: httpx.Timeout | None = None,
+    auth: httpx.Auth | None = None,
+) -> httpx.AsyncClient:
+    """Create httpx AsyncClient with proxy support for corporate environments.
+
+    This factory creates httpx clients that respect HTTP_PROXY/HTTPS_PROXY
+    environment variables and allow proxies to handle DNS resolution for
+    internal domains.
+
+    Args:
+        headers: Optional headers to include with all requests
+        timeout: Request timeout as httpx.Timeout object (default: 30s)
+        auth: Optional authentication handler
+
+    Returns:
+        Configured httpx.AsyncClient with proxy support
+    """
+    import os
+
+    # Debug: Log environment variables
+    http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
+    https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
+    logger.debug(f"Creating httpx client with proxy support:")
+    logger.debug(f"  HTTP_PROXY={os.getenv('HTTP_PROXY')}")
+    logger.debug(f"  HTTPS_PROXY={os.getenv('HTTPS_PROXY')}")
+    logger.debug(f"  http_proxy={os.getenv('http_proxy')}")
+    logger.debug(f"  https_proxy={os.getenv('https_proxy')}")
+    logger.debug(f"  Resolved: http={http_proxy}, https={https_proxy}")
+
+    kwargs: dict[str, Any] = {
+        "follow_redirects": True,
+        "trust_env": True,  # Trust HTTP_PROXY/HTTPS_PROXY/NO_PROXY environment variables
+        "verify": not settings.skip_ssl_verify,
+    }
+
+    # Note: We rely on trust_env=True to respect HTTP_PROXY/HTTPS_PROXY/NO_PROXY
+    # Setting explicit proxy overrides NO_PROXY, which breaks localhost connections
+    if https_proxy or http_proxy:
+        proxy_url = https_proxy or http_proxy
+        logger.info(f"Proxy environment detected: {proxy_url} (httpx will respect NO_PROXY)")
+
+    if timeout is None:
+        kwargs["timeout"] = httpx.Timeout(30.0)
+    else:
+        kwargs["timeout"] = timeout
+
+    if headers is not None:
+        kwargs["headers"] = headers
+
+    if auth is not None:
+        kwargs["auth"] = auth
+
+    return httpx.AsyncClient(**kwargs)
+
+
 class GatewayError(Exception):
     """Base class for gateway-related errors.
 
@@ -286,7 +343,13 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
             True
         """
         self._event_subscribers: List[asyncio.Queue] = []
-        self._http_client = ResilientHttpClient(client_args={"timeout": settings.federation_timeout, "verify": not settings.skip_ssl_verify})
+        self._http_client = ResilientHttpClient(
+            client_args={
+                "timeout": settings.federation_timeout,
+                "verify": not settings.skip_ssl_verify,
+                "trust_env": True,  # Trust HTTP_PROXY/HTTPS_PROXY environment variables
+            }
+        )
         self._health_check_interval = GW_HEALTH_CHECK_INTERVAL
         self._health_check_task: Optional[asyncio.Task] = None
         self._active_gateways: Set[str] = set()  # Track active gateway URLs
@@ -370,14 +433,22 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
         """
         if timeout is None:
             timeout = settings.gateway_validation_timeout
-        validation_client = ResilientHttpClient(client_args={"timeout": settings.gateway_validation_timeout, "verify": not settings.skip_ssl_verify})
+        validation_client = ResilientHttpClient(
+            client_args={
+                "timeout": settings.gateway_validation_timeout,
+                "verify": not settings.skip_ssl_verify,
+                "trust_env": True,  # Trust HTTP_PROXY/HTTPS_PROXY environment variables
+            }
+        )
         try:
             async with validation_client.client.stream("GET", url, headers=headers, timeout=timeout) as response:
                 response_headers = dict(response.headers)
                 location = response_headers.get("location")
                 content_type = response_headers.get("content-type")
+                logger.debug(f"Gateway validation response: status={response.status_code}, content-type={content_type}")
+                logger.debug(f"Response headers: {response_headers}")
                 if response.status_code in (401, 403):
-                    logger.debug(f"Authentication failed for {url} with status {response.status_code}")
+                    logger.warning(f"Authentication failed for {url} with status {response.status_code}, content-type={content_type}")
                     return False
 
                 if transport_type == "STREAMABLEHTTP":
@@ -406,6 +477,116 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
         finally:
             await validation_client.aclose()
 
+    def _resolve_vault_in_auth_dict(self, auth_dict: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Resolve vault references in authentication dict.
+
+        Args:
+            auth_dict: Authentication dict (may contain auth_headers with vault refs)
+
+        Returns:
+            Dict with resolved credentials, or original dict if no vault refs
+
+        Examples:
+            >>> service = GatewayService()
+            >>> auth = {"x-token": "vault:secret/api:token"}
+            >>> resolved = service._resolve_vault_in_auth_dict(auth)
+            >>> # resolved values will be from vault
+        """
+        if not auth_dict:
+            return auth_dict
+
+        try:
+            from mcpgateway.utils.vault_resolver import is_vault_reference, resolve_vault_reference  # pylint: disable=import-outside-toplevel
+
+            resolved_dict = {}
+            for key, value in auth_dict.items():
+                if isinstance(value, str) and is_vault_reference(value):
+                    resolved_value = resolve_vault_reference(value, use_cache=True)
+                    if resolved_value is not None:
+                        resolved_dict[key] = resolved_value
+                        logger.debug(f"Resolved vault reference for auth key: {key}")
+                    else:
+                        logger.warning(f"Failed to resolve vault reference for '{key}', using original value")
+                        resolved_dict[key] = value
+                else:
+                    resolved_dict[key] = value
+
+            return resolved_dict
+        except ImportError:
+            logger.debug("Vault resolver not available, using auth dict as-is")
+            return auth_dict
+        except Exception as e:
+            logger.warning(f"Error resolving vault references in auth dict: {e}, using as-is")
+            return auth_dict
+
+    async def _resolve_vault_credentials(self, db: Session) -> None:
+        """Resolve vault references in gateway auth_headers at startup (DEPRECATED).
+
+        Note: This method is now mostly obsolete since vault resolution happens
+        on-demand with caching. Kept for backward compatibility.
+
+        This method scans all registered gateways for vault references in their
+        auth_headers and resolves them from HashiCorp Vault. Vault references
+        follow the format: vault:kv_engine/path:key
+
+        Args:
+            db: Database session
+
+        Examples:
+            Auth header with vault reference:
+            {"key": "x-api-token", "value": "vault:secret/api:token"}
+
+            Will be resolved to:
+            {"key": "x-api-token", "value": "actual_token_from_vault"}
+        """
+        try:
+            from mcpgateway.utils.vault_resolver import is_vault_reference, resolve_vault_in_auth_headers  # pylint: disable=import-outside-toplevel
+        except ImportError:
+            logger.debug("Vault resolver not available, skipping vault credential resolution")
+            return
+
+        # Check if vault is enabled
+        vault_enabled = os.getenv("VAULT_ENABLED", "false").lower() in ("true", "1", "yes")
+        if not vault_enabled:
+            logger.debug("Vault is disabled, skipping credential resolution")
+            return
+
+        logger.info("Resolving vault credentials for registered gateways")
+
+        # Get all gateways
+        gateways = db.query(DbGateway).all()
+        resolved_count = 0
+
+        for gateway in gateways:
+            # Skip if gateway has no auth_headers
+            if not gateway.auth_headers:
+                continue
+
+            # Check if any header contains vault references
+            has_vault_refs = any(isinstance(h.get("value"), str) and is_vault_reference(h["value"]) for h in gateway.auth_headers if isinstance(h, dict) and "value" in h)
+
+            if not has_vault_refs:
+                continue
+
+            logger.info(f"Resolving vault credentials for gateway: {gateway.name}")
+
+            try:
+                # Resolve vault references
+                resolved_headers = resolve_vault_in_auth_headers(gateway.auth_headers)
+
+                if resolved_headers:
+                    # Update gateway with resolved credentials
+                    gateway.auth_headers = resolved_headers
+                    db.commit()
+                    resolved_count += 1
+                    logger.info(f"✓ Resolved vault credentials for gateway: {gateway.name}")
+            except Exception as e:
+                logger.error(f"Failed to resolve vault credentials for gateway '{gateway.name}': {e}")
+                db.rollback()
+
+        if resolved_count > 0:
+            logger.info(f"Resolved vault credentials for {resolved_count} gateway(s)")
+
     async def initialize(self) -> None:
         """Initialize the service and start health check if this instance is the leader.
 
@@ -418,6 +599,12 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
         db: Session = next(db_gen)
 
         user_email = settings.platform_admin_email
+
+        # Resolve vault credentials for gateways at startup
+        try:
+            await self._resolve_vault_credentials(db)
+        except Exception as e:
+            logger.warning(f"Failed to resolve vault credentials at startup: {e}")
 
         if self._redis_client:
             # Check if Redis is available
@@ -574,6 +761,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                 # Convert list of {key, value} to dict
                 header_dict = {h["key"]: h["value"] for h in gateway.auth_headers if h.get("key")}
                 # Keep encoded form for persistence, but pass raw headers for initialization
+                # Note: Vault resolution happens in _initialize_gateway with caching
                 auth_value = encode_auth(header_dict)  # Encode the dict for consistency
                 authentication_headers = {str(k): str(v) for k, v in header_dict.items()}
 
@@ -2095,7 +2283,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                                     if span:
                                         span.set_attribute("http.status_code", response.status_code)
                             elif (gateway.transport).lower() == "streamablehttp":
-                                async with streamablehttp_client(url=gateway.url, headers=headers, timeout=settings.health_check_timeout) as (read_stream, write_stream, _get_session_id):
+                                async with streamablehttp_client(url=gateway.url, headers=headers, timeout=settings.health_check_timeout, httpx_client_factory=create_proxy_aware_http_client) as (read_stream, write_stream, _get_session_id):
                                     async with ClientSession(read_stream, write_stream) as session:
                                         # Initialize the session
                                         response = await session.initialize()
@@ -2293,6 +2481,9 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
             if authentication is None:
                 authentication = {}
 
+            # Resolve vault references in authentication dict (with caching)
+            authentication = self._resolve_vault_in_auth_dict(authentication)
+
             # Handle OAuth authentication
             if auth_type == "oauth" and oauth_config:
                 grant_type = oauth_config.get("grant_type", "client_credentials")
@@ -2330,8 +2521,11 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
 
             return capabilities, tools, resources, prompts
         except Exception as e:
-            logger.debug(f"Gateway initialization failed for {url}: {str(e)}", exc_info=True)
-            raise GatewayConnectionError(f"Failed to initialize gateway at {url}")
+            logger.error(f"Gateway initialization failed for {url}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception message: {str(e)}")
+            logger.error("Exception details:", exc_info=True)
+            raise GatewayConnectionError(f"Failed to initialize gateway at {url}: {str(e)}")
 
     def _get_gateways(self, include_inactive: bool = True) -> list[DbGateway]:
         """Sync function for database operations (runs in thread).
@@ -2896,7 +3090,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
         # Skip validation for OAuth servers - we already validated via OAuth flow
         # Use async with for both sse_client and ClientSession
         try:
-            async with sse_client(url=server_url, headers=authentication) as streams:
+            async with sse_client(url=server_url, headers=authentication, httpx_client_factory=create_proxy_aware_http_client) as streams:
                 async with ClientSession(*streams) as session:
                     # Initialize the session
                     response = await session.initialize()
@@ -2991,7 +3185,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
 
         if await self._validate_gateway_url(url=server_url, headers=authentication, transport_type="SSE"):
             # Use async with for both sse_client and ClientSession
-            async with sse_client(url=server_url, headers=authentication) as streams:
+            async with sse_client(url=server_url, headers=authentication, httpx_client_factory=create_proxy_aware_http_client) as streams:
                 async with ClientSession(*streams) as session:
                     # Initialize the session
                     response = await session.initialize()
@@ -3085,7 +3279,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
         # The _validate_gateway_url logic is flawed for streamablehttp, so we bypass it
         # and go straight to the client connection. The outer try/except in
         # _initialize_gateway will handle any connection errors.
-        async with streamablehttp_client(url=server_url, headers=authentication) as (read_stream, write_stream, _get_session_id):
+        async with streamablehttp_client(url=server_url, headers=authentication, httpx_client_factory=create_proxy_aware_http_client) as (read_stream, write_stream, _get_session_id):
             async with ClientSession(read_stream, write_stream) as session:
                 # Initialize the session
                 response = await session.initialize()

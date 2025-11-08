@@ -165,7 +165,30 @@ tasks:
   dev:
     desc: Start development server with auto-reload (port 8000)
     cmds:
-      - '{{.UVICORN}} mcpgateway.main:app --host {{.HOST}} --port 8000 --reload --reload-exclude="public/"'
+      - cmd: |
+          # Optional: Load Vault setup from DEV_INFRASTRUCTURE_PATH
+          if [ -n "$DEV_INFRASTRUCTURE_PATH" ] && [ -d "$DEV_INFRASTRUCTURE_PATH" ]; then
+            echo "📦 Loading Vault credentials from $DEV_INFRASTRUCTURE_PATH..."
+            if [ -f "$DEV_INFRASTRUCTURE_PATH/vault/.env" ]; then
+              source "$DEV_INFRASTRUCTURE_PATH/vault/.env"
+              # Save root token to ~/.vault-token for auto-discovery
+              if [ -n "$VAULT_ROOT_TOKEN" ]; then
+                echo "$VAULT_ROOT_TOKEN" > ~/.vault-token
+                chmod 600 ~/.vault-token
+                echo "✅ Vault token configured"
+              fi
+            fi
+            # Auto-unseal Vault if task exists
+            if [ -f "$DEV_INFRASTRUCTURE_PATH/Taskfile.yml" ]; then
+              echo "🔓 Unsealing Vault..."
+              (cd "$DEV_INFRASTRUCTURE_PATH" && task unseal) || echo "⚠️  Unseal task not available, continuing..."
+            fi
+          fi
+          # Optional: Auto-open browser (set AUTO_OPEN_BROWSER=true in .env)
+          if [ "$AUTO_OPEN_BROWSER" = "true" ]; then
+            (sleep 3 && ${BROWSER_COMMAND:-xdg-open} http://localhost:8000/admin 2>/dev/null) &
+          fi
+          {{.UVICORN}} mcpgateway.main:app --host {{.HOST}} --port 8000 --reload --reload-exclude="public/"
 
   serve:
     desc: Production server with gunicorn (port {{.PORT}})
@@ -727,6 +750,7 @@ tasks:
           if [ "${VAULT_ENABLED}" = "true" ]; then
             {{.PYTHON}} -c "from mcpgateway.utils.vault_wrapper import VaultAccess; v = VaultAccess(); print('✓ Connected' if v.ping() else '✗ Not authenticated')"
           fi
+
 
 # ============================================================================
 # KUBERNETES & CLOUD DEPLOYMENTS
