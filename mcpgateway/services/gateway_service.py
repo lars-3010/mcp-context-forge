@@ -558,12 +558,23 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
         resolved_count = 0
 
         for gateway in gateways:
-            # Skip if gateway has no auth_headers
-            if not gateway.auth_headers:
+            # Skip if gateway has no auth_value
+            if not gateway.auth_value:
                 continue
 
-            # Check if any header contains vault references
-            has_vault_refs = any(isinstance(h.get("value"), str) and is_vault_reference(h["value"]) for h in gateway.auth_headers if isinstance(h, dict) and "value" in h)
+            # auth_value can be either a string (encoded) or a dict
+            auth_dict = gateway.auth_value
+            if isinstance(auth_dict, str):
+                try:
+                    auth_dict = decode_auth(auth_dict)
+                except Exception:
+                    continue
+
+            if not isinstance(auth_dict, dict):
+                continue
+
+            # Check if any value contains vault references
+            has_vault_refs = any(isinstance(v, str) and is_vault_reference(v) for v in auth_dict.values())
 
             if not has_vault_refs:
                 continue
@@ -571,12 +582,19 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
             logger.info(f"Resolving vault credentials for gateway: {gateway.name}")
 
             try:
-                # Resolve vault references
-                resolved_headers = resolve_vault_in_auth_headers(gateway.auth_headers)
+                # Resolve vault references in the auth dict
+                resolved_dict = {}
+                for key, value in auth_dict.items():
+                    if isinstance(value, str) and is_vault_reference(value):
+                        from mcpgateway.utils.vault_resolver import resolve_vault_reference  # pylint: disable=import-outside-toplevel
+                        resolved_value = resolve_vault_reference(value)
+                        resolved_dict[key] = resolved_value if resolved_value else value
+                    else:
+                        resolved_dict[key] = value
 
-                if resolved_headers:
+                if resolved_dict != auth_dict:
                     # Update gateway with resolved credentials
-                    gateway.auth_headers = resolved_headers
+                    gateway.auth_value = resolved_dict
                     db.commit()
                     resolved_count += 1
                     logger.info(f"✓ Resolved vault credentials for gateway: {gateway.name}")

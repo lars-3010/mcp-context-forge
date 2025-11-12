@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session
 
 # First-Party
 from mcpgateway.config import settings
+from mcpgateway.utils.gateway_cookie_store import get_cookie_store
 from mcpgateway.db import A2AAgent as DbA2AAgent
 from mcpgateway.db import EmailTeam
 from mcpgateway.db import Gateway as DbGateway
@@ -1344,6 +1345,20 @@ class ToolService:
                             arguments = payload.args
                             if payload.headers is not None:
                                 headers = payload.headers.model_dump()
+
+                    # Gateway cookie persistence for session-based auth
+                    # Load cookies from Redis and inject into request headers if feature is enabled
+                    if settings.gateway_persist_cookies and tool_gateway_id:
+                        try:
+                            cookie_store = get_cookie_store()
+                            stored_cookies = await cookie_store.load_cookies(tool_gateway_id)
+                            if stored_cookies:
+                                # Convert dict to Cookie header format: "key1=value1; key2=value2"
+                                cookie_header = "; ".join([f"{k}={v}" for k, v in stored_cookies.items()])
+                                headers["Cookie"] = cookie_header
+                                logger.debug(f"Injected {len(stored_cookies)} cookies for gateway {tool_gateway_id}")
+                        except Exception as e:
+                            logger.warning(f"Failed to load cookies for gateway {tool_gateway_id}: {e}")
 
                     tool_call_result = ToolResult(content=[TextContent(text="", type="text")])
                     if transport == "sse":

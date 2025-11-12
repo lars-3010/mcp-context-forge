@@ -2960,6 +2960,7 @@ dependencies = [
     { name = "prometheus-client" },
     { name = "prometheus-fastapi-instrumentator" },
     { name = "psutil" },
+    { name = "psycopg2-binary" },
     { name = "pydantic", extra = ["email"] },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
@@ -2972,6 +2973,7 @@ dependencies = [
     { name = "starlette-compress" },
     { name = "typer" },
     { name = "uvicorn" },
+    { name = "watchfiles" },
     { name = "zeroconf" },
 ]
 
@@ -3153,6 +3155,7 @@ requires-dist = [
     { name = "prometheus-fastapi-instrumentator", specifier = ">=7.0.0" },
     { name = "protobuf", marker = "extra == 'grpc'", specifier = ">=6.33.0" },
     { name = "psutil", specifier = ">=7.1.1" },
+    { name = "psycopg2-binary", specifier = ">=2.9.11" },
     { name = "psycopg2-binary", marker = "extra == 'postgres'", specifier = ">=2.9.11" },
     { name = "pydantic", specifier = ">=2.12.3" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.12.3" },
@@ -3175,6 +3178,7 @@ requires-dist = [
     { name = "starlette-compress", specifier = ">=1.6.1" },
     { name = "typer", specifier = ">=0.19.2" },
     { name = "uvicorn", specifier = ">=0.38.0" },
+    { name = "watchfiles", specifier = ">=1.1.1" },
     { name = "zeroconf", specifier = ">=0.148.0" },
 ]
 provides-extras = ["redis", "postgres", "mysql", "llmchat", "fuzz", "fuzz-atheris", "alembic", "observability", "aiosqlite", "asyncpg", "altk", "grpc", "playwright", "all", "dev-all"]

@@ -85,6 +85,8 @@ dependencies = [
     "opentelemetry-api>=1.38.0",
     "opentelemetry-sdk>=1.38.0",
     "opentelemetry-exporter-otlp>=1.38.0",
+    "watchfiles>=1.1.1",
+    "psycopg2-binary>=2.9.11",
 ]
 
 # ----------------------------------------------------------------

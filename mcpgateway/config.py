@@ -756,6 +756,14 @@ class Settings(BaseSettings):
     # For federation_peers strip out quotes to ensure we're passing valid JSON via env
     federation_peers: List[HttpUrl] = Field(default_factory=list)
 
+    # Gateway cookie persistence for session-based authentication
+    # Enables MCP gateways with session-based auth to maintain
+    # authentication across multiple tool invocations by storing cookies in Redis
+    gateway_persist_cookies: bool = Field(
+        default=False,
+        description="Enable cookie persistence for gateway sessions (requires Redis/CACHE_TYPE=redis)"
+    )
+
     @field_validator("federation_peers", mode="before")
     @classmethod
     def _parse_federation_peers(cls, v: Any) -> List[str]:
